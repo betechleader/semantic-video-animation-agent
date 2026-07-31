@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class VideoMetadata(BaseModel):
@@ -12,3 +14,72 @@ class VideoMetadata(BaseModel):
     audio_codec: str | None = None
     has_video: bool
     has_audio: bool
+
+
+class WordTiming(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "WordTiming":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class TranscriptSegment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    words: list[WordTiming] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "TranscriptSegment":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class Transcript(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    language: Literal["zh"]
+    full_text: str = Field(min_length=1)
+    segments: list[TranscriptSegment] = Field(min_length=1)
+
+
+class KeywordPopParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=80)
+    color: str = Field(pattern=r"^#[0-9A-Fa-f]{6}$")
+    position: Literal["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+
+
+class Animation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^animation_[A-Za-z0-9_-]+$")
+    type: Literal["keyword_pop"]
+    template_id: Literal["keyword_pop_v1"]
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    trigger_text: str = Field(min_length=1)
+    parameters: KeywordPopParameters
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "Animation":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
+class AnimationPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    animations: list[Animation] = Field(min_length=1)

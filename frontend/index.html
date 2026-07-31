@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>中文口播语义动画</title>
+  <style>
+    body { margin: 0; background: #10131c; color: #f5f7ff; font: 16px "Microsoft YaHei", sans-serif; }
+    main { max-width: 660px; margin: 10vh auto; padding: 32px; background: #1d2331; border-radius: 16px; }
+    input, button { font: inherit; margin: 12px 0; } button { padding: 10px 18px; cursor: pointer; background: #ffd400; border: 0; border-radius: 8px; color: #111; font-weight: 700; }
+    #status { white-space: pre-wrap; color: #cbd5e1; } a { color: #ffd400; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>中文口播语义动画</h1>
+    <p>上传 MP4，生成带“结构化输出”关键词动画的结果视频。</p>
+    <form id="upload-form">
+      <input id="video" type="file" accept="video/mp4,.mp4" required />
+      <br /><button type="submit">上传并处理</button>
+    </form>
+    <p id="status">请选择一个 MP4 文件。</p>
+    <p><a id="download" hidden>下载结果视频</a></p>
+  </main>
+  <script>
+    const form = document.getElementById('upload-form');
+    const input = document.getElementById('video');
+    const status = document.getElementById('status');
+    const download = document.getElementById('download');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); download.hidden = true;
+      if (!input.files[0]) return;
+      status.textContent = '正在上传、渲染并合成视频，请稍候…';
+      const data = new FormData(); data.append('file', input.files[0]);
+      try {
+        const response = await fetch('/api/videos', {method: 'POST', body: data});
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || '处理失败');
+        const task = await (await fetch(`/api/videos/${body.task_id}`)).json();
+        status.textContent = `处理完成\n时长：${task.metadata.duration_seconds.toFixed(2)} 秒\n分辨率：${task.metadata.width} × ${task.metadata.height}`;
+        download.href = `/api/videos/${body.task_id}/download`; download.hidden = false;
+      } catch (error) { status.textContent = `处理失败：${error.message}`; }
+    });
+  </script>
+</body>
+</html>
