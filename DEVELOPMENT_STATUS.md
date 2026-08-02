@@ -1,8 +1,8 @@
 # 开发状态
 
 - 当前分支：`master`
-- 当前提交：`8f248dd feat: add mock audio transcription workflow`
-- 当前阶段：阶段 3（faster-whisper 本地 ASR）已完成；下一阶段为阶段 4（字幕系统）。
+- 当前提交：`0a0b2f7 feat: validate local faster-whisper transcription`
+- 当前阶段：阶段 4（字幕系统）已完成；阶段 5（本地 LLM 语义）尚未开始。
 
 ## 已完成功能
 
@@ -33,3 +33,10 @@
 - SSE 提供任务阶段事件，不提供 Remotion/FFmpeg 的逐帧百分比。
 - 直连 PyPI 与 Hugging Face 下载均出现超时；已通过清华 PyPI 镜像安装依赖，并使用普通 Hugging Face 下载路径将模型保存到 D 盘。真实中文样本已验证流程可用，但尚未覆盖不同说话人、口音和音质条件下的识别质量。
 - `npm audit` 此前报告 Remotion 依赖树存在审计问题；未执行自动升级以避免未经评审的依赖变更。
+
+## 阶段 4 字幕系统（已完成）
+
+- 新增本地 ASS 字幕生成：按视频分辨率设置 PlayRes、中文字体、时间戳和双行安全区换行。
+- 新增本地字体解析，不下载字体；优先使用 Windows Fonts 或系统字体目录中的字体文件。
+- FFmpeg 最终合成阶段通过 libass 将 `subtitles.ass` 烧录进结果视频，字幕文件保存在任务目录中便于审计。
+- 新增字幕布局单元测试；阶段 4 验证结果为 `24 passed`，`npm.cmd run build` 已通过。

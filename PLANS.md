@@ -6,7 +6,7 @@
 | 1 — Minimum vertical pipeline | COMPLETED | FastAPI upload/probe, Mock ASR/planner, KeywordPop, Remotion, FFmpeg, SQLite task lookup/download | 10 pytest tests, including actual render/composite E2E; Remotion bundle passes | No real ASR/LLM by design |
 | 2 — Engineering foundation | COMPLETED | Settings, mock Provider protocols, StorageService, renderer workflow, SQLAlchemy/Alembic task/event tables, trace IDs, JSON logs, live SSE, process-tree cancellation and cleanup service | 17 pytest tests, Alembic head, asynchronous phase-one E2E and renderer bundle pass | SSE is task-stage progress rather than frame-level percentage; cleanup is an explicit service, not a scheduler |
 | 3 — faster-whisper | COMPLETED | AudioService, Mock ASR Provider, FasterWhisperProvider (CPU int8, local-only), transcript persistence and edit API | 21 pytest tests; CPU int8 local small model transcribed a 94-second Chinese video with 27 segments and 283 word timestamps | One real sample validates the pipeline, not recognition quality across speakers or recording conditions |
-| 4 — Subtitle system | NOT_STARTED | — | — | ASS generation, local fonts, burn-in, layout checks |
+| 4 — Subtitle system | COMPLETED | `backend/app/subtitles.py`, ASS task artifact, FFmpeg libass burn-in, deterministic safe-area wrapping | Subtitle unit tests, full pytest suite, renderer build, end-to-end MP4 burn-in probe | Font selection uses installed local fonts; no font download |
 | 5 — Local LLM semantics | NOT_STARTED | — | — | Mock/Local LLM providers, prompts, semantic segments |
 | 6 — Template library | PARTIAL | KeywordPop only | E2E renders KeywordPop | Remaining templates and preview tests |
 | 7 — Semantic planning rules | NOT_STARTED | — | — | Timestamp binding, density/conflict validation |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-Stage 3 is complete. The next eligible stage is Stage 4 (subtitle system). Mock mode remains required. Do not begin Stage 4 automatically.
+Stage 4 is complete. Mock mode remains required. Stage 5 (local LLM semantics) is not started.

@@ -6,6 +6,7 @@ from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .database import is_cancellation_requested
 from .process_control import process_registry
 from .schemas import AnimationPlan, Transcript, VideoMetadata
+from .subtitles import ffmpeg_filter_path, write_ass
 from .video import ensure_storage_path
 
 
@@ -41,6 +42,7 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     safe_dir = ensure_storage_path(task_dir)
     source = safe_dir / "source.mp4"
     overlay = safe_dir / "animation.mov"
+    subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
     animation = plan.animations[0]
     props = {
@@ -53,9 +55,10 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
         "npx.cmd", "remotion", "render", "src/index.ts", "KeywordPop", str(overlay),
         "--codec=prores", "--prores-profile=4444", "--props=" + json.dumps(props, ensure_ascii=False),
     ], cwd=RENDERER_ROOT, task_id=task_id)
+    write_ass(transcript, subtitles, metadata.width, metadata.height)
     command = [
         "ffmpeg", "-y", "-i", str(source), "-i", str(overlay),
-        "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto[v]", "-map", "[v]",
+        "-filter_complex", f"[0:v][1:v]overlay=0:0:format=auto[v0];[v0]subtitles='{ffmpeg_filter_path(subtitles)}'[v]", "-map", "[v]",
     ]
     if metadata.has_audio:
         command += ["-map", "0:a:0?", "-c:a", "aac"]
