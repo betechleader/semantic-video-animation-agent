@@ -51,6 +51,7 @@ The object must match this schema exactly:
   "semantic_segments": [{"id": "semantic_<id>", "text": "source text", "start_ms": 0, "end_ms": 1, "intent": "emphasis|explanation|transition|summary", "keywords": ["source keyword"]}]
 }
 Return at least one animation. Keep all timestamps within a supplied transcript segment.
+For a quote_card use type quote_card, template_id quote_card_v1, and parameters {"headline": "max 48 chars", "body": "max 160 chars", "accent_color": "#RRGGBB"}.
 Transcript JSON:
 """ + transcript.model_dump_json()
 

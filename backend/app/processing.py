@@ -44,15 +44,13 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     overlay = safe_dir / "animation.mov"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
-    animation = plan.animations[0]
     props = {
-        "text": animation.parameters.text, "color": animation.parameters.color,
-        "position": animation.parameters.position, "start_ms": animation.start_ms,
-        "end_ms": animation.end_ms, "width": metadata.width, "height": metadata.height,
+        "animations": [animation.model_dump() for animation in plan.animations],
+        "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }
     _run([
-        "npx.cmd", "remotion", "render", "src/index.ts", "KeywordPop", str(overlay),
+        "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
         "--codec=prores", "--prores-profile=4444", "--props=" + json.dumps(props, ensure_ascii=False),
     ], cwd=RENDERER_ROOT, task_id=task_id)
     write_ass(transcript, subtitles, metadata.width, metadata.height)

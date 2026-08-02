@@ -8,7 +8,7 @@
 | 3 — faster-whisper | COMPLETED | AudioService, Mock ASR Provider, FasterWhisperProvider (CPU int8, local-only), transcript persistence and edit API | 21 pytest tests; CPU int8 local small model transcribed a 94-second Chinese video with 27 segments and 283 word timestamps | One real sample validates the pipeline, not recognition quality across speakers or recording conditions |
 | 4 — Subtitle system | COMPLETED | `backend/app/subtitles.py`, ASS task artifact, FFmpeg libass burn-in, deterministic safe-area wrapping | Subtitle unit tests, full pytest suite, renderer build, end-to-end MP4 burn-in probe | Font selection uses installed local fonts; no font download |
 | 5 — Local LLM semantics | COMPLETED | Mock/local OpenAI-compatible planner providers, loopback-only endpoint guard, Chinese JSON prompt, Pydantic semantic segments | 27 pytest tests including local-provider response, endpoint, and invalid-output checks | No local LLM service was running during validation; real model quality remains unvalidated |
-| 6 — Template library | PARTIAL | KeywordPop only | E2E renders KeywordPop | Remaining templates and preview tests |
+| 6 — Template library | COMPLETED | KeywordPop, QuoteCard, and multi-animation `AnimationOverlay` Remotion compositions | 27 pytest tests; E2E renders both templates; Remotion bundle passes | Template selection quality is deferred to semantic-planning rules |
 | 7 — Semantic planning rules | NOT_STARTED | — | — | Timestamp binding, density/conflict validation |
 | 8 — Review and editing UI | PARTIAL | Basic upload/result page | API/UI exercised in E2E | Progress, subtitle/plan review and edits, preview workflow |
 | 9 — Quality and safe areas | NOT_STARTED | Output ffprobe validation only | E2E verifies output video stream | Decode/duration/audio/frame quality and safe-area checks |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-Stage 5 is complete. Mock mode remains the default. Stage 6 (template library) remains partial and is the next eligible development stage.
+Stage 6 is complete. Mock mode remains the default. Stage 7 (semantic planning rules) is the next eligible development stage.

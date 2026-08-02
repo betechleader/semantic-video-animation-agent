@@ -56,3 +56,10 @@ $env:PLANNER_BASE_URL = "http://127.0.0.1:11434/v1"
 ```
 
 服务地址仅允许回环地址（`127.0.0.1`、`localhost` 或 `::1`），不会向远程 LLM 发送转录内容。Provider 要求模型返回严格 JSON，并使用 Pydantic 校验动画计划和语义片段；无效输出会使任务失败并保留错误信息。本机目前未检测到运行中的兼容服务，因此真实模型推理仍待在配置服务后验证。
+
+## 动画模板
+
+- `keyword_pop_v1`：在指定位置弹出高亮关键词，参数为 `text`、`color` 与 `position`。
+- `quote_card_v1`：底部出现强调卡片，参数为 `headline`、`body` 与 `accent_color`。
+
+动画计划可包含多条动画。渲染器的 `AnimationOverlay` Composition 会依时间轴将所有模板渲染到同一个透明 ProRes 覆盖层，再由 FFmpeg 与源视频及字幕合成。

@@ -13,15 +13,17 @@ def test_mock_asr_returns_valid_chinese_timestamped_transcript() -> None:
     assert transcript.segments[0].words[1].end_ms == 4000
 
 
-def test_mock_planner_returns_valid_keyword_pop_plan() -> None:
+def test_mock_planner_produces_multiple_template_types() -> None:
     plan = create_mock_plan(create_mock_transcript())
-    animation = plan.animations[0]
-    assert animation.type == "keyword_pop"
-    assert animation.parameters.position == "top-right"
-    assert animation.start_ms < animation.end_ms
+    keyword_pop, quote_card = plan.animations
+    assert keyword_pop.type == "keyword_pop"
+    assert keyword_pop.parameters.position == "top-right"
+    assert keyword_pop.start_ms < keyword_pop.end_ms
+    assert quote_card.type == "quote_card"
+    assert quote_card.template_id == "quote_card_v1"
 
 
-def test_animation_plan_rejects_invalid_ranges_and_unknown_fields() -> None:
+def test_animation_plan_rejects_invalid_ranges_unknown_fields_and_template_mismatches() -> None:
     with pytest.raises(ValidationError):
         AnimationPlan.model_validate({"animations": [{
             "id": "animation_001", "type": "keyword_pop", "template_id": "keyword_pop_v1",
@@ -30,3 +32,9 @@ def test_animation_plan_rejects_invalid_ranges_and_unknown_fields() -> None:
         }]})
     with pytest.raises(ValidationError):
         KeywordPopParameters(text="词", color="yellow", position="top-right", extra=True)
+    with pytest.raises(ValidationError, match="quote_card requires"):
+        AnimationPlan.model_validate({"animations": [{
+            "id": "animation_002", "type": "quote_card", "template_id": "keyword_pop_v1",
+            "start_ms": 1000, "end_ms": 2000, "trigger_text": "词",
+            "parameters": {"headline": "词", "body": "正文", "accent_color": "#6EE7B7"},
+        }]})

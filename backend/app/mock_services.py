@@ -21,6 +21,7 @@ def create_mock_transcript() -> Transcript:
 
 def create_mock_plan(transcript: Transcript) -> AnimationPlan:
     keyword = transcript.segments[0].words[0]
+    segment = transcript.segments[0]
     return AnimationPlan(
         animations=[
             Animation(
@@ -35,6 +36,20 @@ def create_mock_plan(transcript: Transcript) -> AnimationPlan:
                     "color": "#FFD400",
                     "position": "top-right",
                 },
-            )
-        ]
+            ),
+            Animation(
+                id="animation_002",
+                type="quote_card",
+                template_id="quote_card_v1",
+                start_ms=keyword.end_ms,
+                end_ms=segment.end_ms,
+                trigger_text=segment.words[1].text,
+                parameters={
+                    "headline": segment.words[1].text,
+                    "body": segment.text,
+                    "accent_color": "#6EE7B7",
+                },
+            ),
+        ],
+        semantic_segments=[],
     )

@@ -16,7 +16,7 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("backend.app.database.DATABASE_PATH", storage / "tasks.sqlite3")
     source = tmp_path / "source.mp4"
     subprocess.run([
-        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x568:d=2:r=30",
+        "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x568:d=5:r=30",
         "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest",
         "-c:v", "libx264", "-c:a", "aac", str(source),
     ], check=True, capture_output=True)
@@ -34,7 +34,7 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
             time.sleep(0.25)
         assert task["status"] == "completed"
         assert task["transcript"]["language"] == "zh"
-        assert task["plan"]["animations"][0]["type"] == "keyword_pop"
+        assert [animation["type"] for animation in task["plan"]["animations"]] == ["keyword_pop", "quote_card"]
         result = storage / task_id / "result.mp4"
         assert probe_video(result).has_video is True
         download = client.get(f"/api/videos/{task_id}/download")

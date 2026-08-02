@@ -62,21 +62,33 @@ class KeywordPopParameters(BaseModel):
     position: Literal["top-left", "top-right", "bottom-left", "bottom-right", "center"]
 
 
+class QuoteCardParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    headline: str = Field(min_length=1, max_length=48)
+    body: str = Field(min_length=1, max_length=160)
+    accent_color: str = Field(pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
 class Animation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=r"^animation_[A-Za-z0-9_-]+$")
-    type: Literal["keyword_pop"]
-    template_id: Literal["keyword_pop_v1"]
+    type: Literal["keyword_pop", "quote_card"]
+    template_id: Literal["keyword_pop_v1", "quote_card_v1"]
     start_ms: int = Field(ge=0)
     end_ms: int = Field(gt=0)
     trigger_text: str = Field(min_length=1)
-    parameters: KeywordPopParameters
+    parameters: KeywordPopParameters | QuoteCardParameters
 
     @model_validator(mode="after")
     def validate_time_range(self) -> "Animation":
         if self.end_ms <= self.start_ms:
             raise ValueError("end_ms must be greater than start_ms")
+        if self.type == "keyword_pop" and (self.template_id != "keyword_pop_v1" or not isinstance(self.parameters, KeywordPopParameters)):
+            raise ValueError("keyword_pop requires keyword_pop_v1 parameters")
+        if self.type == "quote_card" and (self.template_id != "quote_card_v1" or not isinstance(self.parameters, QuoteCardParameters)):
+            raise ValueError("quote_card requires quote_card_v1 parameters")
         return self
 
 

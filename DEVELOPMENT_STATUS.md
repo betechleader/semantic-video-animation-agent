@@ -2,7 +2,7 @@
 
 - 当前分支：`master`
 - 当前提交：`e9e8248 feat: add ASS subtitle burn-in system`
-- 当前阶段：阶段 5（本地 LLM 语义）已完成；阶段 6（模板库）为下一开发阶段。
+- 当前阶段：阶段 6（模板库）已完成；阶段 7（语义规划规则）为下一开发阶段。
 
 ## 已完成功能
 
@@ -46,3 +46,10 @@
 - 新增 `LocalLlmAnimationPlanningProvider`，仅连接 OpenAI Chat Completions 兼容的回环地址，并保留 Mock Planner 作为默认模式。
 - 新增中文结构化提示词、Markdown JSON code-fence 兼容解析、严格 Pydantic 动画计划和语义片段校验。
 - 已用模拟本地响应验证请求、端点限制和无效输出处理；本机未发现运行中的 Ollama 或 LM Studio 兼容服务，真实模型推理质量尚未验证。
+
+## 阶段 6 模板库（已完成）
+
+- 保留 `KeywordPop`，新增 `QuoteCard` 模板；两者均拥有独立 Remotion Composition 与默认预览属性。
+- 新增 `AnimationOverlay`，可按动画计划在同一透明覆盖层渲染多个模板，而不是只渲染第一条动画。
+- Mock Planner 生成两个不同模板；本地 LLM 提示词也明确了 `quote_card_v1` 的结构化参数。
+- 验证结果：`27 passed`，端到端测试实际覆盖双模板时间区间，`npm.cmd run build` 通过。
