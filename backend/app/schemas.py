@@ -80,7 +80,27 @@ class Animation(BaseModel):
         return self
 
 
+class SemanticSegment(BaseModel):
+    """A local-LLM interpretation anchored to one or more transcript intervals."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^semantic_[A-Za-z0-9_-]+$")
+    text: str = Field(min_length=1, max_length=240)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    intent: Literal["emphasis", "explanation", "transition", "summary"]
+    keywords: list[str] = Field(min_length=1, max_length=5)
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "SemanticSegment":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
 class AnimationPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     animations: list[Animation] = Field(min_length=1)
+    semantic_segments: list[SemanticSegment] = Field(default_factory=list)

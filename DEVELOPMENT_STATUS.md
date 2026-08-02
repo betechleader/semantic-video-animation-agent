@@ -1,8 +1,8 @@
 # 开发状态
 
 - 当前分支：`master`
-- 当前提交：`0a0b2f7 feat: validate local faster-whisper transcription`
-- 当前阶段：阶段 4（字幕系统）已完成；阶段 5（本地 LLM 语义）尚未开始。
+- 当前提交：`e9e8248 feat: add ASS subtitle burn-in system`
+- 当前阶段：阶段 5（本地 LLM 语义）已完成；阶段 6（模板库）为下一开发阶段。
 
 ## 已完成功能
 
@@ -40,3 +40,9 @@
 - 新增本地字体解析，不下载字体；优先使用 Windows Fonts 或系统字体目录中的字体文件。
 - FFmpeg 最终合成阶段通过 libass 将 `subtitles.ass` 烧录进结果视频，字幕文件保存在任务目录中便于审计。
 - 新增字幕布局单元测试；阶段 4 验证结果为 `24 passed`，`npm.cmd run build` 已通过。
+
+## 阶段 5 本地 LLM 语义（已完成）
+
+- 新增 `LocalLlmAnimationPlanningProvider`，仅连接 OpenAI Chat Completions 兼容的回环地址，并保留 Mock Planner 作为默认模式。
+- 新增中文结构化提示词、Markdown JSON code-fence 兼容解析、严格 Pydantic 动画计划和语义片段校验。
+- 已用模拟本地响应验证请求、端点限制和无效输出处理；本机未发现运行中的 Ollama 或 LM Studio 兼容服务，真实模型推理质量尚未验证。

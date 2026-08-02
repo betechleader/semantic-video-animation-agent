@@ -17,6 +17,10 @@ class Settings:
     asr_provider: str
     asr_model: str
     asr_local_files_only: bool
+    planner_provider: str
+    planner_model: str
+    planner_base_url: str
+    planner_timeout_seconds: int
 
     @property
     def max_upload_bytes(self) -> int:
@@ -31,6 +35,10 @@ def load_settings() -> Settings:
         asr_provider=os.getenv("ASR_PROVIDER", "mock"),
         asr_model=os.getenv("ASR_MODEL", "small"),
         asr_local_files_only=os.getenv("ASR_LOCAL_FILES_ONLY", "true").lower() == "true",
+        planner_provider=os.getenv("PLANNER_PROVIDER", "mock"),
+        planner_model=os.getenv("PLANNER_MODEL", "qwen2.5:7b-instruct"),
+        planner_base_url=os.getenv("PLANNER_BASE_URL", "http://127.0.0.1:11434/v1"),
+        planner_timeout_seconds=int(os.getenv("PLANNER_TIMEOUT_SECONDS", "60")),
     )
 
 

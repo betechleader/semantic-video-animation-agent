@@ -7,7 +7,7 @@ from .config import MODEL_ROOT, SETTINGS
 from .database import transition_task
 from .models import TaskStatus
 from .processing import ProcessingCancelled, ProcessingError, render_and_composite
-from .providers import FasterWhisperProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider
+from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider
 from .schemas import VideoMetadata
 
 logger = logging.getLogger("semantic_video")
@@ -22,7 +22,15 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
         audio_path = AudioService().extract_wav(task_dir / "source.mp4", task_dir / "audio.wav")
         provider = MockSpeechRecognitionProvider() if SETTINGS.asr_provider == "mock" else FasterWhisperProvider(SETTINGS.asr_model, MODEL_ROOT, SETTINGS.asr_local_files_only)
         transcript = provider.transcribe(audio_path)
-        plan = MockAnimationPlanningProvider().plan(transcript)
+        if SETTINGS.planner_provider == "mock":
+            planner = MockAnimationPlanningProvider()
+        elif SETTINGS.planner_provider == "local_llm":
+            planner = LocalLlmAnimationPlanningProvider(
+                SETTINGS.planner_model, SETTINGS.planner_base_url, SETTINGS.planner_timeout_seconds,
+            )
+        else:
+            raise ProcessingError("PLANNER_PROVIDER must be mock or local_llm")
+        plan = planner.plan(transcript)
         if not transition_task(task_id, TaskStatus.RENDERING, "Rendering animation and compositing video"):
             return
         transcript, plan = render_and_composite(task_dir, metadata, transcript, plan, task_id=task_id)
