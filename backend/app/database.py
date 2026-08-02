@@ -1,55 +1,115 @@
-import json
-import sqlite3
+from collections.abc import Generator
 from pathlib import Path
 
-from .config import DATABASE_PATH, STORAGE_ROOT
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from .config import DATABASE_PATH, PROJECT_ROOT, STORAGE_ROOT
+from .models import TaskEvent, TaskStatus, VideoTask
+
+_engine: Engine | None = None
+_engine_path: Path | None = None
+_session_factory: sessionmaker[Session] | None = None
+
+
+def _database_url(path: Path) -> str:
+    return f"sqlite:///{path.resolve().as_posix()}"
+
+
+def get_engine() -> Engine:
+    global _engine, _engine_path, _session_factory
+    path = DATABASE_PATH.resolve()
+    if _engine is None or _engine_path != path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _engine = create_engine(_database_url(path), connect_args={"check_same_thread": False})
+        _engine_path = path
+        _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
+    return _engine
+
+
+def get_session() -> Generator[Session, None, None]:
+    get_engine()
+    assert _session_factory is not None
+    with _session_factory() as session:
+        yield session
 
 
 def initialize_database() -> None:
     STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        connection.execute("""
-            CREATE TABLE IF NOT EXISTS tasks (
-                task_id TEXT PRIMARY KEY,
-                status TEXT NOT NULL,
-                metadata_json TEXT NOT NULL,
-                transcript_json TEXT,
-                plan_json TEXT,
-                error TEXT
-            )
-        """)
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", _database_url(DATABASE_PATH))
+    command.upgrade(config, "head")
+    get_engine()
 
 
-def create_task(task_id: str, metadata: dict) -> None:
+def _event(task_id: str, event_type: str, message: str, payload: dict | None = None) -> TaskEvent:
+    return TaskEvent(task_id=task_id, event_type=event_type, message=message, payload=payload or {})
+
+
+def create_task(task_id: str, metadata: dict, trace_id: str = "legacy") -> None:
     initialize_database()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        connection.execute(
-            "INSERT INTO tasks (task_id, status, metadata_json) VALUES (?, ?, ?)",
-            (task_id, "processing", json.dumps(metadata, ensure_ascii=False)),
-        )
+    with next(get_session()) as session:
+        session.add(VideoTask(task_id=task_id, status=TaskStatus.PENDING, metadata_json=metadata, trace_id=trace_id))
+        session.add(_event(task_id, "created", "Upload accepted", {"status": TaskStatus.PENDING.value}))
+        session.commit()
+
+
+def transition_task(task_id: str, status: TaskStatus, message: str, *, transcript: dict | None = None, plan: dict | None = None, error: str | None = None) -> bool:
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None or task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
+            return False
+        if task.cancel_requested and status not in {TaskStatus.CANCELLED, TaskStatus.FAILED}:
+            task.status = TaskStatus.CANCELLED
+            session.add(_event(task_id, "cancelled", "Cancellation requested", {"status": TaskStatus.CANCELLED.value}))
+            session.commit()
+            return False
+        task.status = status
+        if transcript is not None:
+            task.transcript_json = transcript
+        if plan is not None:
+            task.plan_json = plan
+        task.error = error
+        session.add(_event(task_id, status.value, message, {"status": status.value}))
+        session.commit()
+        return True
+
+
+def request_cancellation(task_id: str) -> bool:
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None or task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
+            return False
+        task.cancel_requested = True
+        session.add(_event(task_id, "cancel_requested", "Cancellation requested", {}))
+        session.commit()
+        return True
 
 
 def update_task(task_id: str, status: str, transcript: dict | None = None, plan: dict | None = None, error: str | None = None) -> None:
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        connection.execute(
-            """UPDATE tasks SET status = ?, transcript_json = COALESCE(?, transcript_json),
-               plan_json = COALESCE(?, plan_json), error = ? WHERE task_id = ?""",
-            (status, json.dumps(transcript, ensure_ascii=False) if transcript else None,
-             json.dumps(plan, ensure_ascii=False) if plan else None, error, task_id),
-        )
+    """Compatibility adapter for the phase-one API while services migrate."""
+    transition_task(task_id, TaskStatus(status), f"Task {status}", transcript=transcript, plan=plan, error=error)
 
 
 def get_task(task_id: str) -> dict | None:
     initialize_database()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        connection.row_factory = sqlite3.Row
-        row = connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
-    if row is None:
-        return None
-    return {
-        "task_id": row["task_id"], "status": row["status"],
-        "metadata": json.loads(row["metadata_json"]),
-        "transcript": json.loads(row["transcript_json"]) if row["transcript_json"] else None,
-        "plan": json.loads(row["plan_json"]) if row["plan_json"] else None,
-        "error": row["error"],
-    }
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None:
+            return None
+        return {
+            "task_id": task.task_id, "status": task.status.value,
+            "metadata": task.metadata_json, "transcript": task.transcript_json,
+            "plan": task.plan_json, "error": task.error, "trace_id": task.trace_id,
+            "cancel_requested": task.cancel_requested,
+        }
+
+
+def get_task_events(task_id: str) -> list[dict]:
+    initialize_database()
+    with next(get_session()) as session:
+        events = session.scalars(select(TaskEvent).where(TaskEvent.task_id == task_id).order_by(TaskEvent.id)).all()
+        return [{"id": event.id, "type": event.event_type, "message": event.message, "payload": event.payload, "created_at": event.created_at.isoformat()} for event in events]

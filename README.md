@@ -8,6 +8,7 @@
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pip install -r requirements.txt
+D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic upgrade head
 cd animation-renderer
 npm.cmd install
 cd ..
@@ -31,5 +32,9 @@ npm.cmd run build
 - `POST /api/videos`：上传 `.mp4`，同步处理并返回 `task_id`。
 - `GET /api/videos/{task_id}`：读取元数据、Mock 转录、动画计划和状态。
 - `GET /api/videos/{task_id}/download`：下载 `result.mp4`。
+- `GET /api/videos/{task_id}/events`：以 SSE 格式回放任务状态事件。
+- `POST /api/videos/{task_id}/cancel`：请求取消尚未进入终态的任务。
 
 运行数据保存在 `storage/{task_id}/`，其中包含 `source.mp4`、`animation.mov` 和 `result.mp4`。SQLite 任务记录位于 `storage/tasks.sqlite3`。
+
+阶段二基础设施使用 SQLAlchemy 2 和 Alembic 管理 `video_tasks` 与 `task_events`；每个请求都会返回 `X-Trace-ID`。当前渲染仍为同步流程，SSE 提供任务事件回放，不能在浏览器上传过程中提供实时帧级进度。

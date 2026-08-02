@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | 0 — Audit and baseline | COMPLETED | `AGENTS.md`, this plan, and current status document | Clean `master`, committed history inspected, pytest and renderer build pass | None for this baseline audit |
 | 1 — Minimum vertical pipeline | COMPLETED | FastAPI upload/probe, Mock ASR/planner, KeywordPop, Remotion, FFmpeg, SQLite task lookup/download | 10 pytest tests, including actual render/composite E2E; Remotion bundle passes | No real ASR/LLM by design |
-| 2 — Engineering foundation | PARTIAL | SQLite task table and basic task status exist | Phase-one tests pass | Configuration system, provider interfaces, SQLAlchemy 2, Alembic, event persistence, trace logging, SSE, cancellation, cleanup, unified errors |
+| 2 — Engineering foundation | PARTIAL | Settings, mock Provider protocols, StorageService, SQLAlchemy/Alembic task/event tables, trace IDs, JSON logs, SSE event replay, cancellation request and cleanup service | 16 pytest tests, Alembic head, phase-one E2E and renderer bundle pass | Rendering is still synchronous; cancellation only takes effect at workflow boundaries; SSE is replay rather than live progress; no automatic cleanup scheduler |
 | 3 — faster-whisper | NOT_STARTED | — | — | Local ASR provider, word timestamps, audio extraction, transcript editing |
 | 4 — Subtitle system | NOT_STARTED | — | — | ASS generation, local fonts, burn-in, layout checks |
 | 5 — Local LLM semantics | NOT_STARTED | — | — | Mock/Local LLM providers, prompts, semantic segments |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-The next implementation phase is **Stage 2 — Engineering foundation**. It should preserve the phase-one flow while introducing configuration, clear service boundaries, SQLAlchemy-backed persistence and migrations, task events/state transitions, structured errors/logging, progress reporting, cancellation, and cleanup. Do not begin it automatically.
+Stage 2 remains the current partial phase. The next focused task is to make rendering asynchronous with live SSE progress and cooperative subprocess cancellation, then schedule retention cleanup without regressing the phase-one flow. Do not begin it automatically.
