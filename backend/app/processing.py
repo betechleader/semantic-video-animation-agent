@@ -5,6 +5,7 @@ from pathlib import Path
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .database import is_cancellation_requested
 from .process_control import process_registry
+from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, write_quality_report
 from .schemas import AnimationPlan, Transcript, VideoMetadata
 from .subtitles import ffmpeg_filter_path, write_ass
 from .video import ensure_storage_path
@@ -52,6 +53,7 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     overlay = safe_dir / "animation.mov"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
+    validate_animation_safe_areas(plan, metadata.width, metadata.height)
     props = {
         "animations": [animation.model_dump() for animation in plan.animations],
         "width": metadata.width, "height": metadata.height,
@@ -72,4 +74,9 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     _run(command, task_id=task_id)
     if not result.is_file() or result.stat().st_size == 0:
         raise ProcessingError("Rendering completed without producing result.mp4")
+    try:
+        quality = verify_output_quality(result, metadata)
+        write_quality_report(safe_dir / "quality.json", quality)
+    except QualityValidationError as exc:
+        raise ProcessingError(f"Output quality validation failed: {exc}") from exc
     return transcript.model_dump(), plan.model_dump()

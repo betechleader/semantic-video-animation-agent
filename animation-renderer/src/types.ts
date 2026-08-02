@@ -18,6 +18,8 @@ export type QuoteCardProps = {
   accent_color: string;
   start_ms: number;
   end_ms: number;
+  width: number;
+  height: number;
 };
 
 export type RendererAnimation =

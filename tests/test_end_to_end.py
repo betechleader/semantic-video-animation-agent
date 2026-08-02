@@ -1,5 +1,6 @@
 import subprocess
 import time
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -37,6 +38,9 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert [animation["type"] for animation in task["plan"]["animations"]] == ["keyword_pop", "quote_card"]
         result = storage / task_id / "result.mp4"
         assert probe_video(result).has_video is True
+        quality = json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))
+        assert quality["frame_count"] > 0
+        assert quality["has_audio"] is True
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
@@ -50,6 +54,7 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
             time.sleep(0.25)
         assert reviewed_task["status"] == "completed"
         assert probe_video(result).has_video is True
+        assert json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))["width"] == 320
         events = client.get(f"/api/videos/{task_id}/events")
         assert "event: rendering" in events.text
         assert "event: review_rendering" in events.text

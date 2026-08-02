@@ -11,7 +11,7 @@
 | 6 Template library | COMPLETED | KeywordPop, QuoteCard, multi-animation overlay | E2E renders both templates; renderer build | Selection quality deferred to rules |
 | 7 Semantic planning rules | COMPLETED | `planning_rules.py` validates grounding, duration, density, overlap, and IDs for both planners | Unit, API failure-path, and Mock E2E tests | Thresholds are deterministic safeguards, not learned editorial scoring |
 | 8 Review and editing UI | COMPLETED | Browser preview, transcript/plan JSON review, review re-render API, SSE event cursor | API tests and actual review re-render E2E | Editing uses JSON rather than form-level controls |
-| 9 Quality and safe areas | NOT_STARTED | Output ffprobe validation only | E2E verifies output video stream | Decode/duration/audio/frame and safe-area checks |
+| 9 Quality and safe areas | COMPLETED | Responsive template layout, safe-area validation, decode/metadata quality gate, `quality.json` artifact | Unit checks and two-pass render E2E; renderer build | No visual-perceptual scoring or device-specific review |
 | 10 Evaluation/observability | NOT_STARTED | — | — | Metrics, trace IDs, privacy-aware logs |
 | 11 Optional RAG | NOT_STARTED | — | — | Deferred until core chain stabilizes |
 | 12 Optional MCP | NOT_STARTED | — | — | Deferred until services stabilize |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-Stage 8 is complete. Mock mode remains the default. Stage 9 (quality and safe areas) is the next eligible development stage.
+Stage 9 is complete. Mock mode remains the default. Stage 10 (evaluation and observability) is the next eligible development stage.

@@ -46,3 +46,7 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
 
 Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
+
+## Output quality and safe areas
+
+Before rendering, keyword text is checked against an 8 percent horizontal safe margin and templates scale typography to the target video width. After each render, the pipeline uses `ffprobe` to check dimensions, duration, frame rate, frame count, and expected audio, then uses `ffmpeg` to decode every required stream. Successful tasks also contain `quality.json` with the measured output values.

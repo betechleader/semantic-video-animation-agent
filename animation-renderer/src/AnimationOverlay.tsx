@@ -9,6 +9,6 @@ export const AnimationOverlay: React.FC<AnimationOverlayProps> = (props) => <Abs
     if (animation.type === 'keyword_pop') {
       return <KeywordPop key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} fps={props.fps} durationInFrames={props.durationInFrames} />;
     }
-    return <QuoteCard key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} />;
+    return <QuoteCard key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} />;
   })}
 </AbsoluteFill>;
