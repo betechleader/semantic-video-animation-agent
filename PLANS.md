@@ -5,7 +5,7 @@
 | 0 — Audit and baseline | COMPLETED | `AGENTS.md`, this plan, and current status document | Clean `master`, committed history inspected, pytest and renderer build pass | None for this baseline audit |
 | 1 — Minimum vertical pipeline | COMPLETED | FastAPI upload/probe, Mock ASR/planner, KeywordPop, Remotion, FFmpeg, SQLite task lookup/download | 10 pytest tests, including actual render/composite E2E; Remotion bundle passes | No real ASR/LLM by design |
 | 2 — Engineering foundation | COMPLETED | Settings, mock Provider protocols, StorageService, renderer workflow, SQLAlchemy/Alembic task/event tables, trace IDs, JSON logs, live SSE, process-tree cancellation and cleanup service | 17 pytest tests, Alembic head, asynchronous phase-one E2E and renderer bundle pass | SSE is task-stage progress rather than frame-level percentage; cleanup is an explicit service, not a scheduler |
-| 3 — faster-whisper | PARTIAL | AudioService, Mock ASR Provider, optional FasterWhisperProvider (CPU int8), transcript persistence and edit API | 19 pytest tests; Mock audio extraction and editing tests pass | `faster-whisper` package installation blocked by PyPI timeout; no local model installed, so real ASR is unverified |
+| 3 — faster-whisper | COMPLETED | AudioService, Mock ASR Provider, FasterWhisperProvider (CPU int8, local-only), transcript persistence and edit API | 21 pytest tests; CPU int8 local small model transcribed a 94-second Chinese video with 27 segments and 283 word timestamps | One real sample validates the pipeline, not recognition quality across speakers or recording conditions |
 | 4 — Subtitle system | NOT_STARTED | — | — | ASS generation, local fonts, burn-in, layout checks |
 | 5 — Local LLM semantics | NOT_STARTED | — | — | Mock/Local LLM providers, prompts, semantic segments |
 | 6 — Template library | PARTIAL | KeywordPop only | E2E renders KeywordPop | Remaining templates and preview tests |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-Stage 3 is blocked on installing `faster-whisper` and obtaining an approved local model. After that, verify CPU int8 Chinese transcription and word timestamps while preserving Mock mode. Do not retry the download automatically.
+Stage 3 is complete. The next eligible stage is Stage 4 (subtitle system). Mock mode remains required. Do not begin Stage 4 automatically.

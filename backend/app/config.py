@@ -16,6 +16,7 @@ class Settings:
     task_retention_hours: int
     asr_provider: str
     asr_model: str
+    asr_local_files_only: bool
 
     @property
     def max_upload_bytes(self) -> int:
@@ -29,6 +30,7 @@ def load_settings() -> Settings:
         task_retention_hours=int(os.getenv("TASK_RETENTION_HOURS", "168")),
         asr_provider=os.getenv("ASR_PROVIDER", "mock"),
         asr_model=os.getenv("ASR_MODEL", "small"),
+        asr_local_files_only=os.getenv("ASR_LOCAL_FILES_ONLY", "true").lower() == "true",
     )
 
 

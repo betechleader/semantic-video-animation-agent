@@ -43,4 +43,4 @@ npm.cmd run build
 
 默认 `ASR_PROVIDER=mock`，因此不需要模型也能运行完整视频链路。任务会通过 FFmpeg 提取 16 kHz 单声道 WAV，并保存转录；完成后的转录可通过 `PUT /api/videos/{task_id}/transcript` 编辑。
 
-本地 ASR 使用 `ASR_PROVIDER=faster_whisper` 与 `ASR_MODEL=small`。该可选依赖和模型需单独安装到 D 盘；模型下载前应先确认本地磁盘空间。当前环境尚未成功安装 `faster-whisper`，所以请保持 Mock 模式。
+本地 ASR 使用 `ASR_PROVIDER=faster_whisper` 与 `ASR_MODEL=small`。默认 `ASR_LOCAL_FILES_ONLY=true`，只使用 `storage/models` 的本地模型，不会在处理视频时联网下载。若模型不存在，Provider 会返回明确错误；模型下载前应先确认本地磁盘空间。

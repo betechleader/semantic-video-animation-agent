@@ -20,7 +20,7 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
         if not metadata.has_audio:
             raise ProcessingError("Video has no audio track for speech recognition")
         audio_path = AudioService().extract_wav(task_dir / "source.mp4", task_dir / "audio.wav")
-        provider = MockSpeechRecognitionProvider() if SETTINGS.asr_provider == "mock" else FasterWhisperProvider(SETTINGS.asr_model, MODEL_ROOT)
+        provider = MockSpeechRecognitionProvider() if SETTINGS.asr_provider == "mock" else FasterWhisperProvider(SETTINGS.asr_model, MODEL_ROOT, SETTINGS.asr_local_files_only)
         transcript = provider.transcribe(audio_path)
         plan = MockAnimationPlanningProvider().plan(transcript)
         if not transition_task(task_id, TaskStatus.RENDERING, "Rendering animation and compositing video"):

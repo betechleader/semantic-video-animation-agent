@@ -6,7 +6,7 @@
 
 已实现本地 MP4 上传、ffprobe 元数据读取、固定中文 Mock ASR、严格的 KeywordPop 动画计划、Remotion 渲染、FFmpeg 合成、结果查询下载和简单网页。阶段二已提供后台任务、SQLite/SQLAlchemy 持久化、Alembic、SSE、取消和清理基础。它不包含真实 ASR/LLM、其他动画模板、认证、分布式队列或云端部署。
 
-阶段三已具备 Mock 模式下的音频提取与转录数据流；真实 faster-whisper 仅作为可选本地 Provider，须在安装依赖和模型后验证。
+阶段三已完成：除 Mock 模式外，项目已用本地 CPU int8 `small` faster-whisper 模型成功转录一段 94 秒中文视频，并生成经 Pydantic 校验的逐词时间戳。真实 Provider 仍可选，默认保持 Mock 模式。
 
 ## 后续范围
 
