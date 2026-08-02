@@ -89,6 +89,17 @@ def request_cancellation(task_id: str) -> bool:
         return True
 
 
+def is_cancellation_requested(task_id: str) -> bool:
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        return bool(task and task.cancel_requested)
+
+
+def is_terminal(task_id: str) -> bool:
+    task = get_task(task_id)
+    return task is None or task["status"] in {TaskStatus.COMPLETED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}
+
+
 def update_task(task_id: str, status: str, transcript: dict | None = None, plan: dict | None = None, error: str | None = None) -> None:
     """Compatibility adapter for the phase-one API while services migrate."""
     transition_task(task_id, TaskStatus(status), f"Task {status}", transcript=transcript, plan=plan, error=error)

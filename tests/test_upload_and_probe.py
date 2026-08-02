@@ -16,11 +16,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr("backend.app.database.STORAGE_ROOT", tmp_path / "storage")
     monkeypatch.setattr("backend.app.database.DATABASE_PATH", tmp_path / "storage" / "tasks.sqlite3")
 
-    def fake_render(task_dir: Path, _metadata: VideoMetadata) -> tuple[dict, dict]:
-        (task_dir / "result.mp4").write_bytes(b"mock-result")
-        return ({"language": "zh", "full_text": "结构化输出非常重要", "segments": [{"text": "结构化输出非常重要", "start_ms": 1000, "end_ms": 4000, "words": [{"text": "结构化输出", "start_ms": 1000, "end_ms": 2500}, {"text": "非常重要", "start_ms": 2500, "end_ms": 4000}]}]}, {"animations": [{"id": "animation_001", "type": "keyword_pop", "template_id": "keyword_pop_v1", "start_ms": 1000, "end_ms": 3000, "trigger_text": "结构化输出", "parameters": {"text": "结构化输出", "color": "#FFD400", "position": "top-right"}}]})
-
-    monkeypatch.setattr(main, "render_and_composite", fake_render)
+    monkeypatch.setattr(main, "start_task", lambda *_args: None)
     return TestClient(main.app)
 
 
@@ -50,7 +46,7 @@ def test_rejects_missing_video_stream() -> None:
 
 def test_upload_mp4_and_probe(client: TestClient, sample_mp4: Path) -> None:
     response = client.post("/api/videos", files={"file": ("speech.mp4", sample_mp4.read_bytes(), "video/mp4")})
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
     body = response.json()
     assert body["metadata"]["width"] == 320
     assert (main.STORAGE_ROOT / body["task_id"] / "source.mp4").is_file()

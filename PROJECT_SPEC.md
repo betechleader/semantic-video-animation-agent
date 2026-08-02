@@ -4,7 +4,7 @@
 
 ## 当前基线：阶段一
 
-已实现本地 MP4 上传、ffprobe 元数据读取、固定中文 Mock ASR、严格的 KeywordPop 动画计划、Remotion 渲染、FFmpeg 合成、结果查询下载和简单网页。它不包含真实 ASR/LLM、其他动画模板、认证、队列或云端部署。
+已实现本地 MP4 上传、ffprobe 元数据读取、固定中文 Mock ASR、严格的 KeywordPop 动画计划、Remotion 渲染、FFmpeg 合成、结果查询下载和简单网页。阶段二已提供后台任务、SQLite/SQLAlchemy 持久化、Alembic、SSE、取消和清理基础。它不包含真实 ASR/LLM、其他动画模板、认证、分布式队列或云端部署。
 
 ## 后续范围
 

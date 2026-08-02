@@ -19,6 +19,7 @@ def test_trace_header_and_event_replay(tmp_path, monkeypatch) -> None:
     configure_database(tmp_path, monkeypatch)
     task_id = str(uuid4())
     database.create_task(task_id, {"duration_seconds": 1}, trace_id="trace-test")
+    database.transition_task(task_id, database.TaskStatus.COMPLETED, "Done")
     client = TestClient(main.app)
     response = client.get(f"/api/videos/{task_id}", headers={"X-Trace-ID": "caller-trace"})
     assert response.status_code == 200

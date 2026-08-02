@@ -30,15 +30,25 @@
     form.addEventListener('submit', async (event) => {
       event.preventDefault(); download.hidden = true;
       if (!input.files[0]) return;
-      status.textContent = '正在上传、渲染并合成视频，请稍候…';
+      status.textContent = '正在上传，任务即将进入后台处理…';
       const data = new FormData(); data.append('file', input.files[0]);
       try {
         const response = await fetch('/api/videos', {method: 'POST', body: data});
         const body = await response.json();
         if (!response.ok) throw new Error(body.detail || '处理失败');
-        const task = await (await fetch(`/api/videos/${body.task_id}`)).json();
-        status.textContent = `处理完成\n时长：${task.metadata.duration_seconds.toFixed(2)} 秒\n分辨率：${task.metadata.width} × ${task.metadata.height}`;
-        download.href = `/api/videos/${body.task_id}/download`; download.hidden = false;
+        const events = new EventSource(`/api/videos/${body.task_id}/events`);
+        const update = (event) => {
+          const detail = JSON.parse(event.data);
+          status.textContent = detail.message;
+        };
+        ['created', 'processing', 'rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, update));
+        events.addEventListener('completed', async (event) => {
+          update(event); events.close();
+          const task = await (await fetch(`/api/videos/${body.task_id}`)).json();
+          status.textContent = `处理完成\n时长：${task.metadata.duration_seconds.toFixed(2)} 秒\n分辨率：${task.metadata.width} × ${task.metadata.height}`;
+          download.href = `/api/videos/${body.task_id}/download`; download.hidden = false;
+        });
+        ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, (event) => { update(event); events.close(); }));
       } catch (error) { status.textContent = `处理失败：${error.message}`; }
     });
   </script>

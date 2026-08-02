@@ -1,6 +1,6 @@
 # 中文口播视频语义动画（阶段一）
 
-上传 MP4 后，服务会读取元数据、生成固定中文 Mock 转录与 `KeywordPop` 动画计划，使用 Remotion 渲染关键词动画，再通过 FFmpeg 合成为可下载的 MP4。
+上传 MP4 后，服务会读取元数据并立即创建后台任务；该任务生成固定中文 Mock 转录与 `KeywordPop` 动画计划，使用 Remotion 渲染关键词动画，再通过 FFmpeg 合成为可下载的 MP4。
 
 ## Windows 启动
 
@@ -29,12 +29,12 @@ npm.cmd run build
 
 ## API
 
-- `POST /api/videos`：上传 `.mp4`，同步处理并返回 `task_id`。
+- `POST /api/videos`：上传 `.mp4`，返回 `202 Accepted` 和 `task_id`。
 - `GET /api/videos/{task_id}`：读取元数据、Mock 转录、动画计划和状态。
 - `GET /api/videos/{task_id}/download`：下载 `result.mp4`。
-- `GET /api/videos/{task_id}/events`：以 SSE 格式回放任务状态事件。
-- `POST /api/videos/{task_id}/cancel`：请求取消尚未进入终态的任务。
+- `GET /api/videos/{task_id}/events`：以 SSE 格式持续推送任务状态事件，任务结束后关闭连接。
+- `POST /api/videos/{task_id}/cancel`：请求取消任务，并终止正在运行的 FFmpeg/Remotion Windows 进程树。
 
 运行数据保存在 `storage/{task_id}/`，其中包含 `source.mp4`、`animation.mov` 和 `result.mp4`。SQLite 任务记录位于 `storage/tasks.sqlite3`。
 
-阶段二基础设施使用 SQLAlchemy 2 和 Alembic 管理 `video_tasks` 与 `task_events`；每个请求都会返回 `X-Trace-ID`。当前渲染仍为同步流程，SSE 提供任务事件回放，不能在浏览器上传过程中提供实时帧级进度。
+阶段二基础设施使用 SQLAlchemy 2 和 Alembic 管理 `video_tasks` 与 `task_events`；每个请求都会返回 `X-Trace-ID`。视频渲染由后台线程执行，SSE 提供任务级实时状态事件；它不是帧级渲染百分比。

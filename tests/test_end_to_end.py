@@ -1,4 +1,5 @@
 import subprocess
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -23,9 +24,14 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
     with TestClient(main.app) as client:
         assert client.get("/").status_code == 200
         response = client.post("/api/videos", files={"file": ("speech.mp4", source.read_bytes(), "video/mp4")})
-        assert response.status_code == 201, response.text
+        assert response.status_code == 202, response.text
         task_id = response.json()["task_id"]
-        task = client.get(f"/api/videos/{task_id}").json()
+        deadline = time.monotonic() + 120
+        while True:
+            task = client.get(f"/api/videos/{task_id}").json()
+            if task["status"] in {"completed", "failed", "cancelled"} or time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
         assert task["status"] == "completed"
         assert task["transcript"]["language"] == "zh"
         assert task["plan"]["animations"][0]["type"] == "keyword_pop"
@@ -34,3 +40,6 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
+        events = client.get(f"/api/videos/{task_id}/events")
+        assert "event: rendering" in events.text
+        assert "event: completed" in events.text

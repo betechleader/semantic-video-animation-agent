@@ -1,6 +1,6 @@
-import shutil
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -10,14 +10,14 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, STORAGE_ROOT
-from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, transition_task
+from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation
 from .errors import AppError
 from .logging_config import configure_logging
-from .models import TaskStatus
-from .processing import ProcessingError, render_and_composite
+from .process_control import process_registry
 from .schemas import VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
+from .workflow import start_task
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -58,7 +58,7 @@ async def save_mp4(upload: UploadFile, destination: Path) -> None:
         await upload.close()
 
 
-@app.post("/api/videos", status_code=status.HTTP_201_CREATED)
+@app.post("/api/videos", status_code=status.HTTP_202_ACCEPTED)
 async def upload_video(request: Request, file: UploadFile = File(...)) -> dict:
     if not file.filename or Path(file.filename).suffix.lower() != ".mp4":
         raise HTTPException(status_code=400, detail="Only .mp4 uploads are accepted")
@@ -70,24 +70,14 @@ async def upload_video(request: Request, file: UploadFile = File(...)) -> dict:
         await save_mp4(file, source)
         metadata = probe_video(source)
         create_task(task_id, metadata.model_dump(), request.state.trace_id)
-        if not transition_task(task_id, TaskStatus.PROCESSING, "Video metadata validated"):
-            raise AppError(409, "task_cancelled", "Task was cancelled before processing")
-        if not transition_task(task_id, TaskStatus.RENDERING, "Rendering animation and compositing video"):
-            raise AppError(409, "task_cancelled", "Task was cancelled before rendering")
-        transcript, plan = render_and_composite(task_dir, metadata)
-        transition_task(task_id, TaskStatus.COMPLETED, "Result video created", transcript=transcript, plan=plan)
+        start_task(task_id, task_dir, metadata, request.state.trace_id)
     except HTTPException:
         storage.remove_task_directory(task_id)
         raise
     except VideoProbeError as exc:
         storage.remove_task_directory(task_id)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ProcessingError as exc:
-        transition_task(task_id, TaskStatus.FAILED, "Rendering failed", error=str(exc))
-        logger.error("task_failed", extra={"task_id": task_id, "trace_id": request.state.trace_id, "event_type": "failed"})
-        raise HTTPException(status_code=500, detail=f"Rendering failed: {exc}") from exc
-    logger.info("task_completed", extra={"task_id": task_id, "trace_id": request.state.trace_id, "event_type": "completed"})
-    return {"task_id": task_id, "status": "completed", "metadata": metadata, "trace_id": request.state.trace_id}
+    return {"task_id": task_id, "status": "pending", "metadata": metadata, "trace_id": request.state.trace_id}
 
 
 @app.get("/api/videos/{task_id}")
@@ -116,8 +106,17 @@ def stream_task_events(task_id: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail="Task not found")
 
     def event_stream():
-        for event in get_task_events(task_id):
-            yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+        last_event_id = 0
+        while True:
+            events = get_task_events(task_id)
+            for event in events:
+                if event["id"] > last_event_id:
+                    last_event_id = event["id"]
+                    yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+            task = get_task(task_id)
+            if task is None or task["status"] in {"completed", "failed", "cancelled"}:
+                break
+            time.sleep(0.25)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -126,6 +125,7 @@ def stream_task_events(task_id: str) -> StreamingResponse:
 def cancel_video_task(task_id: str) -> dict:
     if not request_cancellation(task_id):
         raise HTTPException(status_code=409, detail="Task cannot be cancelled")
+    process_registry.cancel(task_id)
     return {"task_id": task_id, "status": "cancellation_requested"}
 
 
