@@ -5,6 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STORAGE_ROOT = PROJECT_ROOT / "storage"
 RENDERER_ROOT = PROJECT_ROOT / "animation-renderer"
+MODEL_ROOT = PROJECT_ROOT / "storage" / "models"
 DATABASE_PATH = STORAGE_ROOT / "tasks.sqlite3"
 
 
@@ -13,6 +14,8 @@ class Settings:
     max_upload_mb: int
     command_timeout_seconds: int
     task_retention_hours: int
+    asr_provider: str
+    asr_model: str
 
     @property
     def max_upload_bytes(self) -> int:
@@ -24,6 +27,8 @@ def load_settings() -> Settings:
         max_upload_mb=int(os.getenv("MAX_UPLOAD_MB", "100")),
         command_timeout_seconds=int(os.getenv("COMMAND_TIMEOUT_SECONDS", "120")),
         task_retention_hours=int(os.getenv("TASK_RETENTION_HOURS", "168")),
+        asr_provider=os.getenv("ASR_PROVIDER", "mock"),
+        asr_model=os.getenv("ASR_MODEL", "small"),
     )
 
 

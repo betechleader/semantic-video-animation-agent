@@ -5,8 +5,7 @@ from pathlib import Path
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .database import is_cancellation_requested
 from .process_control import process_registry
-from .mock_services import create_mock_plan, create_mock_transcript
-from .schemas import VideoMetadata
+from .schemas import AnimationPlan, Transcript, VideoMetadata
 from .video import ensure_storage_path
 
 
@@ -38,13 +37,11 @@ def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = N
         raise ProcessingError(stderr.strip() or stdout.strip() or "External command failed")
 
 
-def render_and_composite(task_dir: Path, metadata: VideoMetadata, task_id: str | None = None) -> tuple[dict, dict]:
+def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, task_id: str | None = None) -> tuple[dict, dict]:
     safe_dir = ensure_storage_path(task_dir)
     source = safe_dir / "source.mp4"
     overlay = safe_dir / "animation.mov"
     result = safe_dir / "result.mp4"
-    transcript = create_mock_transcript()
-    plan = create_mock_plan(transcript)
     animation = plan.animations[0]
     props = {
         "text": animation.parameters.text, "color": animation.parameters.color,

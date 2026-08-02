@@ -10,11 +10,11 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, STORAGE_ROOT
-from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation
+from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, update_transcript
 from .errors import AppError
 from .logging_config import configure_logging
 from .process_control import process_registry
-from .schemas import VideoMetadata
+from .schemas import Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_task
@@ -127,6 +127,13 @@ def cancel_video_task(task_id: str) -> dict:
         raise HTTPException(status_code=409, detail="Task cannot be cancelled")
     process_registry.cancel(task_id)
     return {"task_id": task_id, "status": "cancellation_requested"}
+
+
+@app.put("/api/videos/{task_id}/transcript")
+def edit_transcript(task_id: str, transcript: Transcript) -> dict:
+    if not update_transcript(task_id, transcript.model_dump()):
+        raise HTTPException(status_code=409, detail="Transcript cannot be edited while task is processing or does not exist")
+    return {"task_id": task_id, "transcript": transcript}
 
 
 app.mount("/", StaticFiles(directory=PROJECT_ROOT / "frontend", html=True), name="frontend")

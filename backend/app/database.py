@@ -124,3 +124,14 @@ def get_task_events(task_id: str) -> list[dict]:
     with next(get_session()) as session:
         events = session.scalars(select(TaskEvent).where(TaskEvent.task_id == task_id).order_by(TaskEvent.id)).all()
         return [{"id": event.id, "type": event.event_type, "message": event.message, "payload": event.payload, "created_at": event.created_at.isoformat()} for event in events]
+
+
+def update_transcript(task_id: str, transcript: dict) -> bool:
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None or task.status in {TaskStatus.PROCESSING, TaskStatus.RENDERING}:
+            return False
+        task.transcript_json = transcript
+        session.add(_event(task_id, "transcript_updated", "Transcript updated", {}))
+        session.commit()
+        return True

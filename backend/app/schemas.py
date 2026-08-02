@@ -48,7 +48,8 @@ class TranscriptSegment(BaseModel):
 class Transcript(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    language: Literal["zh"]
+    language: str = Field(min_length=2, max_length=16)
+    language_confidence: float | None = Field(default=None, ge=0, le=1)
     full_text: str = Field(min_length=1)
     segments: list[TranscriptSegment] = Field(min_length=1)
 

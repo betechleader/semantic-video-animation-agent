@@ -21,8 +21,8 @@ def test_storage_cleanup_only_removes_expired_uuid_task_directories(tmp_path, mo
     assert service.task_directory(recent_id).exists()
 
 
-def test_mock_provider_interfaces_produce_valid_plan() -> None:
-    transcript = MockSpeechRecognitionProvider().transcribe()
+def test_mock_provider_interfaces_produce_valid_plan(tmp_path) -> None:
+    transcript = MockSpeechRecognitionProvider().transcribe(tmp_path / "audio.wav")
     plan = MockAnimationPlanningProvider().plan(transcript)
     assert transcript.language == "zh"
     assert plan.animations[0].type == "keyword_pop"
