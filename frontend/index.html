@@ -3,53 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>中文口播语义动画</title>
+  <title>Chinese Semantic Video Animation</title>
   <style>
-    body { margin: 0; background: #10131c; color: #f5f7ff; font: 16px "Microsoft YaHei", sans-serif; }
-    main { max-width: 660px; margin: 10vh auto; padding: 32px; background: #1d2331; border-radius: 16px; }
-    input, button { font: inherit; margin: 12px 0; } button { padding: 10px 18px; cursor: pointer; background: #ffd400; border: 0; border-radius: 8px; color: #111; font-weight: 700; }
-    #status { white-space: pre-wrap; color: #cbd5e1; } a { color: #ffd400; }
+    :root { color-scheme: dark; font-family: "Microsoft YaHei", sans-serif; background: #10131c; color: #f5f7ff; }
+    main { max-width: 1000px; margin: 5vh auto; padding: 28px; background: #1d2331; border-radius: 16px; }
+    button, input, textarea { font: inherit; } button { margin: 8px 8px 8px 0; padding: 10px 16px; cursor: pointer; background: #ffd400; border: 0; border-radius: 8px; color: #111; font-weight: 700; } button:disabled { opacity: .5; cursor: default; }
+    #status { white-space: pre-wrap; color: #cbd5e1; min-height: 1.5em; } a { color: #ffd400; } .review { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; } textarea { width: 100%; min-height: 320px; box-sizing: border-box; background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; padding: 12px; font: 13px ui-monospace, monospace; } video { width: 100%; margin-top: 12px; border-radius: 10px; background: #000; } .hidden { display: none; } @media (max-width: 700px) { .review { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>中文口播语义动画</h1>
-    <p>上传 MP4，生成带“结构化输出”关键词动画的结果视频。</p>
+    <h1>Chinese Semantic Video Animation</h1>
+    <p>Upload an MP4, preview the generated result, then review and edit the saved transcript and animation plan.</p>
     <form id="upload-form">
-      <input id="video" type="file" accept="video/mp4,.mp4" required />
-      <br /><button type="submit">上传并处理</button>
+      <input id="video-file" type="file" accept="video/mp4,.mp4" required />
+      <button type="submit">Upload and process</button>
     </form>
-    <p id="status">请选择一个 MP4 文件。</p>
-    <p><a id="download" hidden>下载结果视频</a></p>
+    <p id="status">Choose an MP4 file to begin.</p>
+    <section id="result" class="hidden">
+      <video id="preview" controls></video>
+      <p><a id="download">Download result video</a></p>
+      <div class="review">
+        <label>Transcript JSON<textarea id="transcript"></textarea></label>
+        <label>Animation plan JSON<textarea id="plan"></textarea></label>
+      </div>
+      <button id="save-review" type="button">Save review edits and re-render</button>
+    </section>
   </main>
   <script>
-    const form = document.getElementById('upload-form');
-    const input = document.getElementById('video');
-    const status = document.getElementById('status');
-    const download = document.getElementById('download');
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault(); download.hidden = true;
+    const form = document.querySelector('#upload-form');
+    const input = document.querySelector('#video-file');
+    const status = document.querySelector('#status');
+    const result = document.querySelector('#result');
+    const preview = document.querySelector('#preview');
+    const download = document.querySelector('#download');
+    const transcript = document.querySelector('#transcript');
+    const plan = document.querySelector('#plan');
+    const saveReview = document.querySelector('#save-review');
+    let taskId = null;
+    let lastEventId = 0;
+
+    const pretty = (value) => JSON.stringify(value, null, 2);
+    const setStatus = (message) => { status.textContent = message; };
+    async function loadTask(id) {
+      const response = await fetch(`/api/videos/${id}`);
+      if (!response.ok) throw new Error('Could not load the task.');
+      const task = await response.json();
+      if (task.status === 'completed') {
+        transcript.value = pretty(task.transcript);
+        plan.value = pretty(task.plan);
+        preview.src = `/api/videos/${id}/download?preview=${Date.now()}`;
+        download.href = `/api/videos/${id}/download`;
+        result.classList.remove('hidden');
+        setStatus(`Completed. ${task.metadata.duration_seconds.toFixed(2)} seconds, ${task.metadata.width} x ${task.metadata.height}.`);
+      }
+      return task;
+    }
+    function watchTask(id) {
+      const events = new EventSource(`/api/videos/${id}/events?after_event_id=${lastEventId}`);
+      const readEvent = event => { const detail = JSON.parse(event.data); lastEventId = Math.max(lastEventId, detail.id); return detail; };
+      ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, event => setStatus(readEvent(event).message)));
+      events.addEventListener('completed', async event => { const detail = readEvent(event); events.close(); setStatus(detail.message); await loadTask(id); });
+      ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, event => { const detail = readEvent(event); events.close(); setStatus(detail.message); }));
+    }
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
       if (!input.files[0]) return;
-      status.textContent = '正在上传，任务即将进入后台处理…';
+      result.classList.add('hidden'); setStatus('Uploading video…');
       const data = new FormData(); data.append('file', input.files[0]);
       try {
-        const response = await fetch('/api/videos', {method: 'POST', body: data});
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.detail || '处理失败');
-        const events = new EventSource(`/api/videos/${body.task_id}/events`);
-        const update = (event) => {
-          const detail = JSON.parse(event.data);
-          status.textContent = detail.message;
-        };
-        ['created', 'processing', 'rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, update));
-        events.addEventListener('completed', async (event) => {
-          update(event); events.close();
-          const task = await (await fetch(`/api/videos/${body.task_id}`)).json();
-          status.textContent = `处理完成\n时长：${task.metadata.duration_seconds.toFixed(2)} 秒\n分辨率：${task.metadata.width} × ${task.metadata.height}`;
-          download.href = `/api/videos/${body.task_id}/download`; download.hidden = false;
-        });
-        ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, (event) => { update(event); events.close(); }));
-      } catch (error) { status.textContent = `处理失败：${error.message}`; }
+        const response = await fetch('/api/videos', { method: 'POST', body: data });
+        const body = await response.json(); if (!response.ok) throw new Error(body.detail || 'Upload failed.');
+        taskId = body.task_id; watchTask(taskId);
+      } catch (error) { setStatus(`Failed: ${error.message}`); }
+    });
+    saveReview.addEventListener('click', async () => {
+      if (!taskId) return;
+      try {
+        const body = { transcript: JSON.parse(transcript.value), plan: JSON.parse(plan.value) };
+        saveReview.disabled = true; setStatus('Validating review edits and re-rendering…');
+        const response = await fetch(`/api/videos/${taskId}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || 'Review update failed.');
+        watchTask(taskId);
+      } catch (error) { setStatus(`Review update failed: ${error.message}`); }
+      finally { saveReview.disabled = false; }
     });
   </script>
 </body>

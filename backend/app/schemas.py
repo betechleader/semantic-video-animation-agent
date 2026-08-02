@@ -116,3 +116,12 @@ class AnimationPlan(BaseModel):
 
     animations: list[Animation] = Field(min_length=1)
     semantic_segments: list[SemanticSegment] = Field(default_factory=list)
+
+
+class ReviewUpdate(BaseModel):
+    """User-approved transcript and plan submitted for a review re-render."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    transcript: Transcript
+    plan: AnimationPlan

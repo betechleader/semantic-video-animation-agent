@@ -10,14 +10,15 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, STORAGE_ROOT
-from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, update_transcript
+from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, start_review_render, update_transcript
 from .errors import AppError
 from .logging_config import configure_logging
 from .process_control import process_registry
-from .schemas import Transcript, VideoMetadata
+from .planning_rules import PlanningRuleError, validate_animation_plan
+from .schemas import ReviewUpdate, Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
-from .workflow import start_task
+from .workflow import start_review_task, start_task
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -101,12 +102,12 @@ def download_video(task_id: str) -> FileResponse:
 
 
 @app.get("/api/videos/{task_id}/events")
-def stream_task_events(task_id: str) -> StreamingResponse:
+def stream_task_events(task_id: str, after_event_id: int = 0) -> StreamingResponse:
     if get_task(task_id) is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
     def event_stream():
-        last_event_id = 0
+        last_event_id = max(0, after_event_id)
         while True:
             events = get_task_events(task_id)
             for event in events:
@@ -134,6 +135,22 @@ def edit_transcript(task_id: str, transcript: Transcript) -> dict:
     if not update_transcript(task_id, transcript.model_dump()):
         raise HTTPException(status_code=409, detail="Transcript cannot be edited while task is processing or does not exist")
     return {"task_id": task_id, "transcript": transcript}
+
+
+@app.post("/api/videos/{task_id}/review", status_code=status.HTTP_202_ACCEPTED)
+def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
+    try:
+        plan = validate_animation_plan(review.plan, review.transcript)
+    except PlanningRuleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not start_review_render(task_id, review.transcript.model_dump(), plan.model_dump()):
+        raise HTTPException(status_code=409, detail="Review edits are only available for completed tasks")
+    task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
+    start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), review.transcript, plan, task["trace_id"])
+    return {"task_id": task_id, "status": "rendering", "transcript": review.transcript, "plan": plan}
 
 
 app.mount("/", StaticFiles(directory=PROJECT_ROOT / "frontend", html=True), name="frontend")

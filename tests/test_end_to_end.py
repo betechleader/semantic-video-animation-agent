@@ -40,6 +40,17 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
+        review = client.post(f"/api/videos/{task_id}/review", json={"transcript": task["transcript"], "plan": task["plan"]})
+        assert review.status_code == 202, review.text
+        deadline = time.monotonic() + 120
+        while True:
+            reviewed_task = client.get(f"/api/videos/{task_id}").json()
+            if reviewed_task["status"] in {"completed", "failed", "cancelled"} or time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
+        assert reviewed_task["status"] == "completed"
+        assert probe_video(result).has_video is True
         events = client.get(f"/api/videos/{task_id}/events")
         assert "event: rendering" in events.text
+        assert "event: review_rendering" in events.text
         assert "event: completed" in events.text

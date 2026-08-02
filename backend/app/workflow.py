@@ -9,7 +9,7 @@ from .models import TaskStatus
 from .processing import ProcessingCancelled, ProcessingError, render_and_composite
 from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider
 from .planning_rules import PlanningRuleError, validate_animation_plan
-from .schemas import VideoMetadata
+from .schemas import AnimationPlan, Transcript, VideoMetadata
 
 logger = logging.getLogger("semantic_video")
 
@@ -49,5 +49,28 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
 
 def start_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id: str) -> threading.Thread:
     thread = threading.Thread(target=process_task, args=(task_id, task_dir, metadata, trace_id), daemon=True, name=f"video-task-{task_id}")
+    thread.start()
+    return thread
+
+
+def rerender_review(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str) -> None:
+    try:
+        transcript_data, plan_data = render_and_composite(task_dir, metadata, transcript, plan, task_id=task_id)
+        transition_task(task_id, TaskStatus.COMPLETED, "Review result video created", transcript=transcript_data, plan=plan_data)
+        logger.info("review_task_completed", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "completed"})
+    except ProcessingCancelled:
+        transition_task(task_id, TaskStatus.CANCELLED, "Review rendering cancelled")
+    except (ProcessingError, RuntimeError) as exc:
+        transition_task(task_id, TaskStatus.FAILED, "Review rendering failed", error=str(exc))
+        logger.error("review_task_failed", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "failed"})
+
+
+def start_review_task(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str) -> threading.Thread:
+    thread = threading.Thread(
+        target=rerender_review,
+        args=(task_id, task_dir, metadata, transcript, plan, trace_id),
+        daemon=True,
+        name=f"review-video-task-{task_id}",
+    )
     thread.start()
     return thread

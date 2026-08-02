@@ -21,7 +21,15 @@ class ProcessingCancelled(ProcessingError):
 def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = None) -> None:
     try:
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        process = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=creationflags)
+        process = subprocess.Popen(
+            command,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            creationflags=creationflags,
+        )
         if task_id:
             process_registry.register(task_id, process)
         stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)

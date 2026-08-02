@@ -41,5 +41,8 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 - `GET /api/videos/{task_id}/events` streams task-state events with SSE.
 - `POST /api/videos/{task_id}/cancel` requests cancellation.
 - `PUT /api/videos/{task_id}/transcript` edits the transcript after processing completes.
+- `POST /api/videos/{task_id}/review` accepts a completed task's `{transcript, plan}`, validates the plan against that transcript, saves both, and creates an updated result video.
+
+After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
 
 Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.

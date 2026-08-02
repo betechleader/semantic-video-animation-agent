@@ -135,3 +135,19 @@ def update_transcript(task_id: str, transcript: dict) -> bool:
         session.add(_event(task_id, "transcript_updated", "Transcript updated", {}))
         session.commit()
         return True
+
+
+def start_review_render(task_id: str, transcript: dict, plan: dict) -> bool:
+    """Persist a user-approved review edit and return a completed task to rendering."""
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None or task.status != TaskStatus.COMPLETED:
+            return False
+        task.status = TaskStatus.RENDERING
+        task.transcript_json = transcript
+        task.plan_json = plan
+        task.error = None
+        task.cancel_requested = False
+        session.add(_event(task_id, "review_rendering", "Review changes saved; rendering updated result", {"status": TaskStatus.RENDERING.value}))
+        session.commit()
+        return True

@@ -10,7 +10,7 @@
 | 5 Local LLM semantics | COMPLETED | Loopback-only OpenAI-compatible local planner | Provider and invalid-output tests | No live local model quality validation |
 | 6 Template library | COMPLETED | KeywordPop, QuoteCard, multi-animation overlay | E2E renders both templates; renderer build | Selection quality deferred to rules |
 | 7 Semantic planning rules | COMPLETED | `planning_rules.py` validates grounding, duration, density, overlap, and IDs for both planners | Unit, API failure-path, and Mock E2E tests | Thresholds are deterministic safeguards, not learned editorial scoring |
-| 8 Review and editing UI | PARTIAL | Basic upload/result page | API/UI exercised in E2E | Plan/subtitle review, edits, and preview workflow |
+| 8 Review and editing UI | COMPLETED | Browser preview, transcript/plan JSON review, review re-render API, SSE event cursor | API tests and actual review re-render E2E | Editing uses JSON rather than form-level controls |
 | 9 Quality and safe areas | NOT_STARTED | Output ffprobe validation only | E2E verifies output video stream | Decode/duration/audio/frame and safe-area checks |
 | 10 Evaluation/observability | NOT_STARTED | — | — | Metrics, trace IDs, privacy-aware logs |
 | 11 Optional RAG | NOT_STARTED | — | — | Deferred until core chain stabilizes |
@@ -20,4 +20,4 @@
 
 ## Current execution plan
 
-Stage 7 is complete. Mock mode remains the default. Stage 8 (review and editing UI) is the next eligible development stage.
+Stage 8 is complete. Mock mode remains the default. Stage 9 (quality and safe areas) is the next eligible development stage.
