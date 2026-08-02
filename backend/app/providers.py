@@ -7,6 +7,7 @@ import requests
 from pydantic import ValidationError
 
 from .mock_services import create_mock_plan, create_mock_transcript
+from .planning_rules import PlanningRuleError, validate_animation_plan
 from .schemas import AnimationPlan, Transcript
 
 
@@ -50,7 +51,7 @@ The object must match this schema exactly:
   "animations": [{"id": "animation_<id>", "type": "keyword_pop", "template_id": "keyword_pop_v1", "start_ms": 0, "end_ms": 1, "trigger_text": "source text", "parameters": {"text": "max 80 chars", "color": "#RRGGBB", "position": "top-left|top-right|bottom-left|bottom-right|center"}}],
   "semantic_segments": [{"id": "semantic_<id>", "text": "source text", "start_ms": 0, "end_ms": 1, "intent": "emphasis|explanation|transition|summary", "keywords": ["source keyword"]}]
 }
-Return at least one animation. Keep all timestamps within a supplied transcript segment.
+Return at least one animation. Each animation must be fully contained in one supplied word or transcript segment, last 300-5000 ms, never overlap another animation, and have no more than two animation starts in any 10-second window.
 For a quote_card use type quote_card, template_id quote_card_v1, and parameters {"headline": "max 48 chars", "body": "max 160 chars", "accent_color": "#RRGGBB"}.
 Transcript JSON:
 """ + transcript.model_dump_json()
@@ -84,8 +85,9 @@ Transcript JSON:
         if not isinstance(content, str):
             raise RuntimeError("Local LLM response content must be text")
         try:
-            return AnimationPlan.model_validate(self._extract_json(content))
-        except (ValidationError, RuntimeError) as exc:
+            plan = AnimationPlan.model_validate(self._extract_json(content))
+            return validate_animation_plan(plan, transcript)
+        except (ValidationError, PlanningRuleError, RuntimeError) as exc:
             raise RuntimeError(f"Local LLM returned an invalid animation plan: {exc}") from exc
 
 

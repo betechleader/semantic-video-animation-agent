@@ -45,3 +45,11 @@ def test_local_llm_planner_rejects_invalid_structured_output(monkeypatch) -> Non
     monkeypatch.setattr("backend.app.providers.requests.post", lambda *args, **kwargs: FakeResponse('{"animations": []}'))
     with pytest.raises(RuntimeError, match="invalid animation plan"):
         LocalLlmAnimationPlanningProvider("qwen", "http://localhost:11434/v1").plan(create_mock_transcript())
+
+
+def test_local_llm_planner_applies_transcript_grounding_rules(monkeypatch) -> None:
+    invalid = json.loads(valid_plan())
+    invalid["animations"][0]["start_ms"] = 900
+    monkeypatch.setattr("backend.app.providers.requests.post", lambda *args, **kwargs: FakeResponse(json.dumps(invalid)))
+    with pytest.raises(RuntimeError, match="fully contained"):
+        LocalLlmAnimationPlanningProvider("qwen", "http://localhost:11434/v1").plan(create_mock_transcript())

@@ -1,4 +1,5 @@
 from .schemas import Animation, AnimationPlan, Transcript, TranscriptSegment, WordTiming
+from .planning_rules import validate_animation_plan
 
 
 def create_mock_transcript() -> Transcript:
@@ -22,7 +23,7 @@ def create_mock_transcript() -> Transcript:
 def create_mock_plan(transcript: Transcript) -> AnimationPlan:
     keyword = transcript.segments[0].words[0]
     segment = transcript.segments[0]
-    return AnimationPlan(
+    plan = AnimationPlan(
         animations=[
             Animation(
                 id="animation_001",
@@ -53,3 +54,4 @@ def create_mock_plan(transcript: Transcript) -> AnimationPlan:
         ],
         semantic_segments=[],
     )
+    return validate_animation_plan(plan, transcript)

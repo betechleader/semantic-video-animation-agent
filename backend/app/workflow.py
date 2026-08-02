@@ -8,6 +8,7 @@ from .database import transition_task
 from .models import TaskStatus
 from .processing import ProcessingCancelled, ProcessingError, render_and_composite
 from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider
+from .planning_rules import PlanningRuleError, validate_animation_plan
 from .schemas import VideoMetadata
 
 logger = logging.getLogger("semantic_video")
@@ -30,7 +31,9 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
             )
         else:
             raise ProcessingError("PLANNER_PROVIDER must be mock or local_llm")
-        plan = planner.plan(transcript)
+        # Providers validate their normal outputs, and the workflow validates again
+        # at the trust boundary before an untrusted plan can reach the renderer.
+        plan = validate_animation_plan(planner.plan(transcript), transcript)
         if not transition_task(task_id, TaskStatus.RENDERING, "Rendering animation and compositing video"):
             return
         transcript, plan = render_and_composite(task_dir, metadata, transcript, plan, task_id=task_id)
@@ -39,7 +42,7 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
     except ProcessingCancelled:
         transition_task(task_id, TaskStatus.CANCELLED, "External rendering process cancelled")
         logger.info("task_cancelled", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "cancelled"})
-    except (ProcessingError, AudioExtractionError, RuntimeError) as exc:
+    except (ProcessingError, AudioExtractionError, PlanningRuleError, RuntimeError) as exc:
         transition_task(task_id, TaskStatus.FAILED, "Rendering failed", error=str(exc))
         logger.error("task_failed", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "failed"})
 

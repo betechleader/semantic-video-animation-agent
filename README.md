@@ -1,10 +1,8 @@
-# 中文口播视频语义动画（阶段一）
+# Chinese Talking-head Semantic Video Animation
 
-上传 MP4 后，服务会读取元数据并立即创建后台任务；该任务生成固定中文 Mock 转录与 `KeywordPop` 动画计划，使用 Remotion 渲染关键词动画，再通过 FFmpeg 合成为可下载的 MP4。
+This local Windows pipeline accepts an MP4, extracts speech, produces a time-grounded animation plan, renders a transparent Remotion overlay, burns ASS subtitles, and composites a downloadable MP4 with FFmpeg.
 
-## Windows 启动
-
-在仓库根目录执行：
+## Start
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pip install -r requirements.txt
@@ -15,9 +13,9 @@ cd ..
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.app.main:app --reload
 ```
 
-打开 http://127.0.0.1:8000 ，选择 MP4 并等待处理完成。上传上限为 100 MB。
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), and wait for processing to finish.
 
-## 验证
+## Verification
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv
@@ -25,41 +23,23 @@ cd animation-renderer
 npm.cmd run build
 ```
 
-端到端测试会使用 FFmpeg 临时生成一个两秒视频，并实际执行 Remotion 渲染与 FFmpeg 合成，通常需要约一分钟。
+## Providers
 
-## API
+`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` are the defaults, so the full local workflow is available without a model service. `ASR_PROVIDER=faster_whisper` uses a local CPU int8 model and word timestamps. `PLANNER_PROVIDER=local_llm` uses a local, OpenAI Chat Completions-compatible server; its base URL must resolve to a loopback host (`127.0.0.1`, `localhost`, or `::1`).
 
-- `POST /api/videos`：上传 `.mp4`，返回 `202 Accepted` 和 `task_id`。
-- `GET /api/videos/{task_id}`：读取元数据、Mock 转录、动画计划和状态。
-- `GET /api/videos/{task_id}/download`：下载 `result.mp4`。
-- `GET /api/videos/{task_id}/events`：以 SSE 格式持续推送任务状态事件，任务结束后关闭连接。
-- `POST /api/videos/{task_id}/cancel`：请求取消任务，并终止正在运行的 FFmpeg/Remotion Windows 进程树。
+## Semantic planning safety rules
 
-运行数据保存在 `storage/{task_id}/`，其中包含 `source.mp4`、`animation.mov`、`subtitles.ass` 和 `result.mp4`。SQLite 任务记录位于 `storage/tasks.sqlite3`。
+The Mock and local LLM planners use the same transcript-aware validation after planning. Every animation must fit completely inside one transcript word or segment, last 300–5000 ms, and use a unique ID. Plans may start at most two animations in any rolling 10-second window, and animation time ranges cannot overlap. Semantic segments must fit inside one transcript segment. Invalid plans fail before Remotion or FFmpeg rendering begins.
 
-阶段二基础设施使用 SQLAlchemy 2 和 Alembic 管理 `video_tasks` 与 `task_events`；每个请求都会返回 `X-Trace-ID`。视频渲染由后台线程执行，SSE 提供任务级实时状态事件；它不是帧级渲染百分比。
+## Animation templates and API
 
-## ASR 模式
+`keyword_pop_v1` highlights a keyword; `quote_card_v1` shows an emphasized card. The shared `AnimationOverlay` composition renders all validated animations on the timeline.
 
-默认 `ASR_PROVIDER=mock`，因此不需要模型也能运行完整视频链路。任务会通过 FFmpeg 提取 16 kHz 单声道 WAV，并保存转录；完成后的转录可通过 `PUT /api/videos/{task_id}/transcript` 编辑。
+- `POST /api/videos` uploads an `.mp4` and returns `202 Accepted` plus a task ID.
+- `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
+- `GET /api/videos/{task_id}/download` downloads `result.mp4` after completion.
+- `GET /api/videos/{task_id}/events` streams task-state events with SSE.
+- `POST /api/videos/{task_id}/cancel` requests cancellation.
+- `PUT /api/videos/{task_id}/transcript` edits the transcript after processing completes.
 
-本地 ASR 使用 `ASR_PROVIDER=faster_whisper` 与 `ASR_MODEL=small`。默认 `ASR_LOCAL_FILES_ONLY=true`，只使用 `storage/models` 的本地模型，不会在处理视频时联网下载。若模型不存在，Provider 会返回明确错误；模型下载前应先确认本地磁盘空间。
-
-## 语义规划模式
-
-默认 `PLANNER_PROVIDER=mock`，保持可重复的本地 Mock 规划。要启用本地 LLM，先启动兼容 OpenAI Chat Completions API 的本机服务，然后设置：
-
-```powershell
-$env:PLANNER_PROVIDER = "local_llm"
-$env:PLANNER_MODEL = "qwen2.5:7b-instruct"
-$env:PLANNER_BASE_URL = "http://127.0.0.1:11434/v1"
-```
-
-服务地址仅允许回环地址（`127.0.0.1`、`localhost` 或 `::1`），不会向远程 LLM 发送转录内容。Provider 要求模型返回严格 JSON，并使用 Pydantic 校验动画计划和语义片段；无效输出会使任务失败并保留错误信息。本机目前未检测到运行中的兼容服务，因此真实模型推理仍待在配置服务后验证。
-
-## 动画模板
-
-- `keyword_pop_v1`：在指定位置弹出高亮关键词，参数为 `text`、`color` 与 `position`。
-- `quote_card_v1`：底部出现强调卡片，参数为 `headline`、`body` 与 `accent_color`。
-
-动画计划可包含多条动画。渲染器的 `AnimationOverlay` Composition 会依时间轴将所有模板渲染到同一个透明 ProRes 覆盖层，再由 FFmpeg 与源视频及字幕合成。
+Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
