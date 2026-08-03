@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .database import is_cancellation_requested
+from .media_assets import prepare_media_assets, renderer_media_assets
 from .process_control import process_registry
 from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, verify_overlay_has_alpha, write_quality_report
 from .schemas import AnimationPlan, Transcript, VideoMetadata
@@ -53,9 +54,14 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     overlay = safe_dir / "animation.mov"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
+    try:
+        plan = prepare_media_assets(safe_dir, plan)
+    except ValueError as exc:
+        raise ProcessingError(f"Media asset validation failed: {exc}") from exc
     validate_animation_safe_areas(plan, metadata.width, metadata.height)
     props = {
         "animations": [animation.model_dump() for animation in plan.animations],
+        "mediaAssets": renderer_media_assets(safe_dir, plan),
         "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }

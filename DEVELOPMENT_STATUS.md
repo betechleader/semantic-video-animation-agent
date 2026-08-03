@@ -1,8 +1,8 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `8839a8a feat: add review and editing workflow`
-- Current stage: Stage 9, quality and safe areas - completed.
+- Current commit before this stage: `797e2ff feat: add transcript-aligned offline planning`
+- Current stage: Stage 10A, copyright-compliant media visuals - completed.
 
 ## Stage 9 delivered
 
@@ -28,3 +28,18 @@
 - `ASR_PROVIDER=faster_whisper` and `PLANNER_PROVIDER=rule_based` run without a local LLM service. The planner selects readable highlights from real ASR segments and anchors every animation to that segment's real timestamps.
 - On 2026-08-03, the local `small` faster-whisper model processed the available 94-second Chinese video into 27 segments and 283 word timestamps; the offline planner produced 13 validated highlights.
 - `PLANNER_PROVIDER=local_llm` remains available for richer semantic selection after a loopback-compatible local LLM service is started.
+
+## Stage 10A delivered
+
+- Added `media_visual_v1`, a timeline-bound Remotion template for topic visuals, while retaining the shared planning density, grounding, conflict, safe-area, alpha, and output-quality checks.
+- The pipeline does not download or place web images. Book/topic mentions use a generic task-local original SVG illustration rather than a specific or recognisable book cover.
+- Every visual material is written to `media_assets.json` and the saved plan with source URI, provider, licence, permitted transformations, acquisition time, task-relative local path, SHA-256 digest, and asset kind. The renderer verifies that the local file remains inside the task directory and matches its digest.
+- Mock mode now exercises the media template; `faster_whisper` plus `rule_based` produces the same safe fallback for real ASR segments that mention a book/topic.
+
+## Stage 10A verification
+
+- Full Python suite passes: `47 passed`, including the API and actual FFmpeg/Remotion end-to-end render path.
+- `npm.cmd run build` passes for the Remotion renderer.
+- Unit tests cover book-title selection, provenance manifest fields, local-file hash rejection, and duplicate audit metadata rejection.
+- The end-to-end MP4 test confirms the generated original asset manifest is stored beside the rendered video.
+- Rule-based planning tests cover title-visual priority over nearby keyword highlights, three-line keyword safe-area layout, and the observed `心理学有生活` ASR title variant.

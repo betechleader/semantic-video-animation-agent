@@ -1,6 +1,7 @@
 """Deterministic output quality and animation safe-area checks."""
 
 import json
+import math
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -29,13 +30,16 @@ def validate_animation_safe_areas(plan: AnimationPlan, width: int, height: int) 
     safe_width = width * 0.84
     keyword_font_size = max(28, min(72, round(width / 10)))
     for animation in plan.animations:
-        if animation.type != "keyword_pop":
-            continue
-        text_width = len(animation.parameters.text) * keyword_font_size + 68
-        if text_width > safe_width:
-            raise QualityValidationError(
-                f"{animation.id} keyword text exceeds the {round(safe_width)} px horizontal safe area"
-            )
+        if animation.type == "keyword_pop":
+            available_text_width = safe_width - 68
+            characters_per_line = max(1, math.floor(available_text_width / keyword_font_size))
+            line_count = math.ceil(len(animation.parameters.text) / characters_per_line)
+            if line_count > 3:
+                raise QualityValidationError(
+                    f"{animation.id} keyword text exceeds the {round(safe_width)} px horizontal safe area"
+                )
+        if animation.type == "media_visual" and width * 0.27 > safe_width:
+            raise QualityValidationError(f"{animation.id} media visual exceeds the horizontal safe area")
     if width < 240 or height < 240:
         raise QualityValidationError("video dimensions are too small for the supported safe-area layout")
 

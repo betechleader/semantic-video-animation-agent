@@ -35,7 +35,10 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
             time.sleep(0.25)
         assert task["status"] == "completed"
         assert task["transcript"]["language"] == "zh"
-        assert [animation["type"] for animation in task["plan"]["animations"]] == ["keyword_pop", "quote_card"]
+        assert [animation["type"] for animation in task["plan"]["animations"]] == ["keyword_pop", "media_visual"]
+        media_manifest = json.loads((storage / task_id / "media_assets.json").read_text(encoding="utf-8"))
+        assert media_manifest[0]["asset_kind"] == "generated_original"
+        assert media_manifest[0]["local_path"].startswith("media-assets/")
         result = storage / task_id / "result.mp4"
         assert probe_video(result).has_video is True
         quality = json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))

@@ -13,14 +13,14 @@ def test_mock_asr_returns_valid_chinese_timestamped_transcript() -> None:
     assert transcript.segments[0].words[1].end_ms == 4000
 
 
-def test_mock_planner_produces_multiple_template_types() -> None:
+def test_mock_planner_produces_keyword_and_media_templates() -> None:
     plan = create_mock_plan(create_mock_transcript())
-    keyword_pop, quote_card = plan.animations
+    keyword_pop, media_visual = plan.animations
     assert keyword_pop.type == "keyword_pop"
     assert keyword_pop.parameters.position == "top-right"
     assert keyword_pop.start_ms < keyword_pop.end_ms
-    assert quote_card.type == "quote_card"
-    assert quote_card.template_id == "quote_card_v1"
+    assert media_visual.type == "media_visual"
+    assert media_visual.template_id == "media_visual_v1"
 
 
 def test_animation_plan_rejects_invalid_ranges_unknown_fields_and_template_mismatches() -> None:

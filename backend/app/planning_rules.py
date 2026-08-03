@@ -38,6 +38,18 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
     if len(animation_ids) != len(set(animation_ids)):
         raise PlanningRuleError("animation IDs must be unique")
 
+    media_animation_ids = [animation.parameters.asset_id for animation in plan.animations if animation.type == "media_visual"]
+    if len(media_animation_ids) != len(set(media_animation_ids)):
+        raise PlanningRuleError("media visual asset IDs must be unique")
+    if plan.media_assets:
+        asset_ids = {asset.asset_id for asset in plan.media_assets}
+        if len(asset_ids) != len(plan.media_assets):
+            raise PlanningRuleError("media asset audit IDs must be unique")
+        if asset_ids != set(media_animation_ids):
+            raise PlanningRuleError("media asset audit metadata must exactly match media visual references")
+        if any(asset.asset_kind != "generated_original" for asset in plan.media_assets):
+            raise PlanningRuleError("only generated_original media assets are currently permitted")
+
     for animation in plan.animations:
         duration_ms = animation.end_ms - animation.start_ms
         if duration_ms < MIN_ANIMATION_DURATION_MS or duration_ms > MAX_ANIMATION_DURATION_MS:

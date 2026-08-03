@@ -22,8 +22,8 @@ export const KeywordPop: React.FC<KeywordPopProps> = (props) => {
 
   if (!visible) return null;
   const fontSize = Math.max(28, Math.min(72, Math.round(props.width / 10)));
-  return <div style={{position: 'absolute', ...positions[props.position], opacity, transform: `${positions[props.position].transform ?? ''} scale(${scale})`}}>
-    <div style={{backgroundColor: props.color, borderRadius: 24, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', color: '#111', fontFamily: 'Microsoft YaHei, sans-serif', fontSize, fontWeight: 800, padding: '22px 34px', whiteSpace: 'nowrap'}}>
+  return <div style={{position: 'absolute', maxWidth: '84%', ...positions[props.position], opacity, transform: `${positions[props.position].transform ?? ''} scale(${scale})`}}>
+    <div style={{backgroundColor: props.color, borderRadius: 24, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', color: '#111', fontFamily: 'Microsoft YaHei, sans-serif', fontSize, fontWeight: 800, lineHeight: 1.2, padding: '22px 34px', textAlign: 'center', whiteSpace: 'normal', wordBreak: 'break-all'}}>
       {props.text}
     </div>
   </div>;

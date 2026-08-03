@@ -12,6 +12,7 @@
 | 7 Semantic planning rules | COMPLETED | `planning_rules.py` validates grounding, duration, density, overlap, and IDs for both planners | Unit, API failure-path, and Mock E2E tests | Thresholds are deterministic safeguards, not learned editorial scoring |
 | 8 Review and editing UI | COMPLETED | Browser preview, transcript/plan JSON review, review re-render API, SSE event cursor | API tests and actual review re-render E2E | Editing uses JSON rather than form-level controls |
 | 9 Quality and safe areas | COMPLETED | Responsive template layout, safe-area validation, decode/metadata quality gate, `quality.json` artifact | Unit checks and two-pass render E2E; renderer build | No visual-perceptual scoring or device-specific review |
+| 10A Copyright-compliant media visuals | COMPLETED | Task-local original SVG fallback, audit manifest/hash validation, transcript-grounded `media_visual_v1` Remotion template | Unit, API/pipeline E2E, renderer build | External licensed-source provider intentionally deferred until licence verification is implemented |
 | 10 Evaluation/observability | NOT_STARTED | — | — | Metrics, trace IDs, privacy-aware logs |
 | 11 Optional RAG | NOT_STARTED | — | — | Deferred until core chain stabilizes |
 | 12 Optional MCP | NOT_STARTED | — | — | Deferred until services stabilize |
@@ -20,4 +21,4 @@
 
 ## Current execution plan
 
-Stage 9 is complete. Mock mode remains the default. Stage 10 (evaluation and observability) is the next eligible development stage.
+Stage 10A is complete. Mock mode remains the default. Stage 10 (evaluation and observability) is the next eligible development stage.

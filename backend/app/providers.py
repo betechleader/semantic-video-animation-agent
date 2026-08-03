@@ -36,20 +36,44 @@ class TranscriptAnimationPlanningProvider:
     _minimum_gap_ms = 5_000
     _maximum_duration_ms = 2_000
 
-    @staticmethod
-    def _keyword(text: str) -> str:
+    _maximum_keyword_characters = 18
+
+    @classmethod
+    def _keyword(cls, text: str) -> str:
         cleaned = re.sub(r"[^\w\u4e00-\u9fff]+", "", text)
-        # Six CJK glyphs plus the template padding fit the 8% safe area even
-        # at the minimum supported 320 px video width.
-        return (cleaned or text.strip())[:6]
+        # The renderer wraps up to three lines. Keeping a meaningful short
+        # phrase prevents the old six-character hard cut (for example,
+        # "对于自媒体博" instead of "对于自媒体博主来说").
+        return (cleaned or text.strip())[:cls._maximum_keyword_characters]
+
+    @staticmethod
+    def _book_title(text: str) -> str | None:
+        match = re.search(r"《([^》]{1,48})》", text)
+        if match:
+            title = match.group(1).strip()
+            # Faster-whisper can confuse the short function word "与" with
+            # "有" in this commonly cited title. This normalises that ASR
+            # variant without using any external cover artwork.
+            return {"心理学有生活": "心理学与生活"}.get(title, title)
+        if any(token in text.lower() for token in ("book", "reading", "书", "阅读", "心理学")):
+            return "Book topic"
+        return None
 
     def plan(self, transcript: Transcript) -> AnimationPlan:
         animations = []
         semantic_segments = []
         last_start_ms = -self._minimum_gap_ms
         for index, segment in enumerate(transcript.segments, start=1):
-            if segment.start_ms < last_start_ms + self._minimum_gap_ms:
+            book_title = self._book_title(segment.text)
+            if segment.start_ms < last_start_ms + self._minimum_gap_ms and not book_title:
                 continue
+            if book_title and animations and segment.start_ms < last_start_ms + self._minimum_gap_ms:
+                # A title visual is editorially more valuable than a nearby
+                # generic highlight. Replacing the latest highlight preserves
+                # the existing two-starts-per-ten-seconds density guarantee.
+                animations.pop()
+                semantic_segments.pop()
+                last_start_ms = animations[-1]["start_ms"] if animations else -self._minimum_gap_ms
             end_ms = min(segment.end_ms, segment.start_ms + self._maximum_duration_ms)
             if end_ms - segment.start_ms < 300:
                 continue
@@ -57,11 +81,18 @@ class TranscriptAnimationPlanningProvider:
             if not keyword:
                 continue
             identifier = f"{index:03d}"
-            animations.append({
-                "id": f"animation_{identifier}", "type": "keyword_pop", "template_id": "keyword_pop_v1",
-                "start_ms": segment.start_ms, "end_ms": end_ms, "trigger_text": keyword,
-                "parameters": {"text": keyword, "color": "#FFD400", "position": "top-right"},
-            })
+            if book_title:
+                animations.append({
+                    "id": f"animation_{identifier}", "type": "media_visual", "template_id": "media_visual_v1",
+                    "start_ms": segment.start_ms, "end_ms": end_ms, "trigger_text": book_title,
+                    "parameters": {"asset_id": f"media_{identifier}", "title": book_title, "theme": "book", "accent_color": "#A78BFA"},
+                })
+            else:
+                animations.append({
+                    "id": f"animation_{identifier}", "type": "keyword_pop", "template_id": "keyword_pop_v1",
+                    "start_ms": segment.start_ms, "end_ms": end_ms, "trigger_text": keyword,
+                    "parameters": {"text": keyword, "color": "#FFD400", "position": "top-right"},
+                })
             semantic_segments.append({
                 "id": f"semantic_{identifier}", "text": segment.text[:240], "start_ms": segment.start_ms,
                 "end_ms": end_ms, "intent": "emphasis", "keywords": [keyword],
@@ -96,6 +127,7 @@ The object must match this schema exactly:
 }
 Return at least one animation. Each animation must be fully contained in one supplied word or transcript segment, last 300-5000 ms, never overlap another animation, and have no more than two animation starts in any 10-second window.
 For a quote_card use type quote_card, template_id quote_card_v1, and parameters {"headline": "max 48 chars", "body": "max 160 chars", "accent_color": "#RRGGBB"}.
+For a copyright-safe topic visual use type media_visual, template_id media_visual_v1, and parameters {"asset_id": "media_<id>", "title": "generic topic label, never a specific cover", "theme": "book|learning|wellbeing|business|technology", "accent_color": "#RRGGBB"}. The pipeline creates only an original generic illustration locally; never request, name, or link a network image.
 Transcript JSON:
 """ + transcript.model_dump_json()
 

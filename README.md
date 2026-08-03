@@ -33,7 +33,7 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 
 ## Animation templates and API
 
-`keyword_pop_v1` highlights a keyword; `quote_card_v1` shows an emphasized card. The shared `AnimationOverlay` composition renders all validated animations on the timeline.
+`keyword_pop_v1` highlights a keyword; `quote_card_v1` shows an emphasized card; and `media_visual_v1` displays a topic visual during its transcript-grounded interval. The shared `AnimationOverlay` composition renders all validated animations on the timeline.
 
 - `POST /api/videos` uploads an `.mp4` and returns `202 Accepted` plus a task ID.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
@@ -46,6 +46,10 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
 
 Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
+
+## Copyright-safe media visuals
+
+The pipeline never downloads or automatically uses web images. When the semantic planner finds a book/topic mention (such as `《心理学与生活》`), it produces a generic, original task-local SVG book illustration instead of a recognisable cover. The visual is anchored to the matching real transcript interval and follows the same density and conflict rules as other animations. Each admitted asset is recorded in both the saved plan and `storage/{task_id}/media_assets.json` with its source URI, author/provider, licence, allowed transformations, acquisition time, relative local path, and SHA-256 checksum. See [MEDIA_ASSET_POLICY.md](MEDIA_ASSET_POLICY.md) for the acceptance policy and requirements for any future external source.
 
 ## Output quality and safe areas
 

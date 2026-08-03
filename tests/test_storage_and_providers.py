@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from backend.app import storage
 from backend.app.mock_services import create_mock_transcript
+from backend.app.schemas import Transcript
 from backend.app.providers import MockAnimationPlanningProvider, MockSpeechRecognitionProvider, TranscriptAnimationPlanningProvider
 
 
@@ -33,6 +34,18 @@ def test_offline_transcript_planner_uses_real_segment_text_and_timestamps() -> N
     transcript = create_mock_transcript()
     plan = TranscriptAnimationPlanningProvider().plan(transcript)
     assert plan.animations[0].trigger_text in transcript.segments[0].text
-    assert len(plan.animations[0].trigger_text) <= 6
+    assert len(plan.animations[0].trigger_text) <= 18
     assert plan.animations[0].start_ms == transcript.segments[0].start_ms
     assert plan.animations[0].end_ms <= transcript.segments[0].end_ms
+
+
+def test_offline_planner_prioritizes_book_visual_over_nearby_keyword() -> None:
+    transcript = Transcript.model_validate({
+        "language": "zh", "full_text": "\u7b2c\u4e00\u6bb5\u300a\u5fc3\u7406\u5b66\u4e0e\u751f\u6d3b\u300b", "segments": [
+            {"text": "\u7b2c\u4e00\u6bb5", "start_ms": 0, "end_ms": 3000, "words": [{"text": "\u7b2c\u4e00\u6bb5", "start_ms": 0, "end_ms": 3000}]},
+            {"text": "\u4ecb\u7ecd\u300a\u5fc3\u7406\u5b66\u4e0e\u751f\u6d3b\u300b", "start_ms": 3200, "end_ms": 6000, "words": [{"text": "\u4ecb\u7ecd", "start_ms": 3200, "end_ms": 4000}, {"text": "\u4e66", "start_ms": 4000, "end_ms": 6000}]},
+        ],
+    })
+    plan = TranscriptAnimationPlanningProvider().plan(transcript)
+    assert [animation.type for animation in plan.animations] == ["media_visual"]
+    assert plan.animations[0].start_ms == 3200
