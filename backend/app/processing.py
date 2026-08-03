@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
+from .face_safety import FaceSafetyError, analyse_face_safe_areas
 from .database import is_cancellation_requested
 from .media_assets import prepare_media_assets, renderer_media_assets
 from .process_control import process_registry
@@ -58,10 +59,15 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
         plan = prepare_media_assets(safe_dir, plan)
     except ValueError as exc:
         raise ProcessingError(f"Media asset validation failed: {exc}") from exc
+    try:
+        plan = analyse_face_safe_areas(safe_dir, metadata, plan)
+    except FaceSafetyError as exc:
+        raise ProcessingError(f"Local face safety analysis failed: {exc}") from exc
     validate_animation_safe_areas(plan, metadata.width, metadata.height)
     props = {
         "animations": [animation.model_dump() for animation in plan.animations],
         "mediaAssets": renderer_media_assets(safe_dir, plan),
+        "mediaPlacements": [placement.model_dump() for placement in plan.media_placements],
         "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }

@@ -39,6 +39,10 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         media_manifest = json.loads((storage / task_id / "media_assets.json").read_text(encoding="utf-8"))
         assert media_manifest[0]["asset_kind"] == "generated_original"
         assert media_manifest[0]["local_path"].startswith("media-assets/")
+        face_safety = json.loads((storage / task_id / "face_safe_areas.json").read_text(encoding="utf-8"))
+        assert face_safety["detector"] == "opencv-haarcascade-frontalface-default-local-cpu"
+        assert face_safety["sampled_timestamps_ms"] == [0, 1000, 2000, 3000, 4000, 5000]
+        assert task["plan"]["media_placements"] == [{"animation_id": "animation_002", "corner": "top-left", "scale": 1.0, "skipped": False, "reason": "safe_corner"}]
         result = storage / task_id / "result.mp4"
         assert probe_video(result).has_video is True
         quality = json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))

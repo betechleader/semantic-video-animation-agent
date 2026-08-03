@@ -1,8 +1,26 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `797e2ff feat: add transcript-aligned offline planning`
-- Current stage: Stage 10A, copyright-compliant media visuals - completed.
+- Current commit before this stage: `2be3a6b feat: add copyright-safe media visuals`
+- Current stage: Stage 10B, local face-safe media placement - completed.
+
+## Stage 10B delivered
+
+- Added `opencv-python-headless` and a local CPU-only OpenCV Haar face detector. It samples source frames at one-second intervals (up to 120 samples) and sends no frame, crop, identity, embedding, or detection result to a network service.
+- Detected face boxes are expanded into protected talking-head/upper-body zones, so a topic visual avoids the face and likely key subject rather than merely avoiding the face rectangle.
+- The layout engine reserves the ASS subtitle area, tries safe corners in deterministic order, progressively scales a media visual down to 50 percent, and suppresses it when no corner remains safe.
+- Each render writes `face_safe_areas.json` beside the result with local detector details, sampled times, coordinates, protected zones, subtitle reservation, and selected placements. Derived regions and placements are also saved in the task plan returned by the API.
+- Review re-renders repeat local analysis against `source.mp4`; client-supplied layout coordinates are not trusted as final placement.
+
+## Stage 10B verification
+
+- All repository tests under `tests/` pass: `51 passed`, including a real upload/FFmpeg/Remotion end-to-end render that invokes the local detector and checks its task-local report.
+- `npm.cmd run build` passes for the Remotion renderer.
+- Unit tests cover moving a visual away from a detected face, safe skip when no corner remains, protected-subject expansion, report persistence, and API review-plan validation.
+
+## Known limitations
+
+- The bundled Haar cascade is a fast local CPU safeguard for detectable frontal faces. It can miss profiles, very small or occluded faces, and non-human subjects; a future local person/subject-segmentation model can extend the same exclusion-zone interface.
 
 ## Stage 9 delivered
 

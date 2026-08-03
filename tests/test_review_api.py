@@ -43,6 +43,17 @@ def test_review_api_saves_valid_edits_and_starts_rerender(tmp_path: Path, monkey
     assert len(calls) == 1
 
 
+def test_review_api_accepts_saved_local_face_safe_placement(tmp_path: Path, monkeypatch) -> None:
+    task_id, transcript, plan = completed_task(tmp_path, monkeypatch)
+    plan["face_regions"] = [{"timestamp_ms": 3000, "x": 8, "y": 8, "width": 170, "height": 190}]
+    plan["media_placements"] = [{"animation_id": "animation_002", "corner": "top-right", "scale": 1, "skipped": False, "reason": "safe_corner"}]
+    calls = []
+    monkeypatch.setattr(main, "start_review_task", lambda *args: calls.append(args))
+    response = TestClient(main.app).post(f"/api/videos/{task_id}/review", json={"transcript": transcript, "plan": plan})
+    assert response.status_code == 202, response.text
+    assert calls[0][4].media_placements[0].corner == "top-right"
+
+
 def test_review_api_rejects_ungrounded_plan_without_changing_task(tmp_path: Path, monkeypatch) -> None:
     task_id, transcript, plan = completed_task(tmp_path, monkeypatch)
     plan["animations"][0]["start_ms"] = 0

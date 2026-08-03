@@ -97,6 +97,38 @@ class MediaAssetAudit(BaseModel):
     asset_kind: Literal["generated_original"]
 
 
+class FaceRegion(BaseModel):
+    """A non-biometric, timestamped face bounding box in source-video pixels."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    timestamp_ms: int = Field(ge=0)
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+
+
+class MediaPlacement(BaseModel):
+    """Renderer layout chosen locally after face and subtitle safe-area analysis."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    animation_id: str = Field(pattern=r"^animation_[A-Za-z0-9_-]+$")
+    corner: Literal["top-left", "top-right", "bottom-left", "bottom-right"] | None = None
+    scale: float = Field(ge=0, le=1)
+    skipped: bool
+    reason: Literal["safe_corner", "no_safe_area"]
+
+    @model_validator(mode="after")
+    def validate_skip_state(self) -> "MediaPlacement":
+        if self.skipped and (self.corner is not None or self.scale != 0):
+            raise ValueError("skipped media placements must have no corner and zero scale")
+        if not self.skipped and (self.corner is None or self.scale == 0):
+            raise ValueError("visible media placements must have a corner and positive scale")
+        return self
+
+
 class Animation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -146,6 +178,8 @@ class AnimationPlan(BaseModel):
     animations: list[Animation] = Field(min_length=1)
     semantic_segments: list[SemanticSegment] = Field(default_factory=list)
     media_assets: list[MediaAssetAudit] = Field(default_factory=list)
+    face_regions: list[FaceRegion] = Field(default_factory=list)
+    media_placements: list[MediaPlacement] = Field(default_factory=list)
 
 
 class ReviewUpdate(BaseModel):

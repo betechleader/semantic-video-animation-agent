@@ -13,6 +13,7 @@
 | 8 Review and editing UI | COMPLETED | Browser preview, transcript/plan JSON review, review re-render API, SSE event cursor | API tests and actual review re-render E2E | Editing uses JSON rather than form-level controls |
 | 9 Quality and safe areas | COMPLETED | Responsive template layout, safe-area validation, decode/metadata quality gate, `quality.json` artifact | Unit checks and two-pass render E2E; renderer build | No visual-perceptual scoring or device-specific review |
 | 10A Copyright-compliant media visuals | COMPLETED | Task-local original SVG fallback, audit manifest/hash validation, transcript-grounded `media_visual_v1` Remotion template | Unit, API/pipeline E2E, renderer build | External licensed-source provider intentionally deferred until licence verification is implemented |
+| 10B Local face-safe media placement | COMPLETED | Local CPU OpenCV Haar sampling, protected talking-head exclusion zones, deterministic corner/shrink/skip media layouts | Unit, API, actual FFmpeg/Remotion E2E, renderer build | Haar detection is limited to detectable frontal faces; it is not general-purpose subject segmentation |
 | 10 Evaluation/observability | NOT_STARTED | — | — | Metrics, trace IDs, privacy-aware logs |
 | 11 Optional RAG | NOT_STARTED | — | — | Deferred until core chain stabilizes |
 | 12 Optional MCP | NOT_STARTED | — | — | Deferred until services stabilize |
@@ -21,4 +22,4 @@
 
 ## Current execution plan
 
-Stage 10A is complete. Mock mode remains the default. Stage 10 (evaluation and observability) is the next eligible development stage.
+Stages 10A and 10B are complete. Mock mode remains the default. Stage 10 (evaluation and observability) is the next eligible development stage.

@@ -47,6 +47,12 @@ After a task completes, the browser shows the generated video preview together w
 
 Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
 
+## Local face-safe media placement
+
+Before each render, the pipeline samples the local source video on CPU with OpenCV's bundled Haar face detector. No frame, face crop, identity, embedding, or detection result is sent to a network service. Detected faces are expanded to protect the likely talking-head upper body; the media layout then reserves both those zones and the ASS subtitle area. It tries safe corners, reduces the visual down to 50 percent if needed, and skips the visual when no safe placement exists.
+
+The task-local `face_safe_areas.json` records sample timestamps, face coordinates, derived protected-subject zones, subtitle reservation, and chosen media placements. The same derived layout is included in the completed task plan. A review re-render repeats local analysis from `source.mp4` instead of trusting saved or client-submitted coordinates. The current Haar safeguard is best for detectable frontal faces; it is not yet a general person/subject-segmentation model.
+
 ## Copyright-safe media visuals
 
 The pipeline never downloads or automatically uses web images. When the semantic planner finds a book/topic mention (such as `《心理学与生活》`), it produces a generic, original task-local SVG book illustration instead of a recognisable cover. The visual is anchored to the matching real transcript interval and follows the same density and conflict rules as other animations. Each admitted asset is recorded in both the saved plan and `storage/{task_id}/media_assets.json` with its source URI, author/provider, licence, allowed transformations, acquisition time, relative local path, and SHA-256 checksum. See [MEDIA_ASSET_POLICY.md](MEDIA_ASSET_POLICY.md) for the acceptance policy and requirements for any future external source.

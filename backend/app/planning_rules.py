@@ -50,6 +50,13 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
         if any(asset.asset_kind != "generated_original" for asset in plan.media_assets):
             raise PlanningRuleError("only generated_original media assets are currently permitted")
 
+    if plan.media_placements:
+        placement_ids = [placement.animation_id for placement in plan.media_placements]
+        if len(placement_ids) != len(set(placement_ids)):
+            raise PlanningRuleError("media placement animation IDs must be unique")
+        if set(placement_ids) != {animation.id for animation in plan.animations if animation.type == "media_visual"}:
+            raise PlanningRuleError("media placements must exactly match media visual animations")
+
     for animation in plan.animations:
         duration_ms = animation.end_ms - animation.start_ms
         if duration_ms < MIN_ANIMATION_DURATION_MS or duration_ms > MAX_ANIMATION_DURATION_MS:

@@ -41,9 +41,18 @@ export type RendererAnimation =
 
 export type RendererMediaAsset = {asset_id: string; data_uri: string};
 
+export type MediaPlacement = {
+  animation_id: string;
+  corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | null;
+  scale: number;
+  skipped: boolean;
+  reason: 'safe_corner' | 'no_safe_area';
+};
+
 export type AnimationOverlayProps = {
   animations: RendererAnimation[];
   mediaAssets?: RendererMediaAsset[];
+  mediaPlacements?: MediaPlacement[];
   width: number;
   height: number;
   fps: number;
