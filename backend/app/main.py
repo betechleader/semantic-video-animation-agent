@@ -13,6 +13,7 @@ from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, STORAGE_ROOT
 from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, start_review_render, update_transcript
 from .errors import AppError
 from .logging_config import configure_logging
+from .metrics import TaskMetrics, initialize_initial_metrics, read_metrics
 from .process_control import process_registry
 from .planning_rules import PlanningRuleError, validate_animation_plan
 from .schemas import ReviewUpdate, Transcript, VideoMetadata
@@ -67,10 +68,12 @@ async def upload_video(request: Request, file: UploadFile = File(...)) -> dict:
     storage = StorageService(STORAGE_ROOT)
     task_dir = storage.create_task_directory(task_id)
     source = task_dir / "source.mp4"
+    upload_probe_started_at = time.perf_counter()
     try:
         await save_mp4(file, source)
         metadata = probe_video(source)
         create_task(task_id, metadata.model_dump(), request.state.trace_id)
+        initialize_initial_metrics(task_dir, task_id, request.state.trace_id, round((time.perf_counter() - upload_probe_started_at) * 1000))
         start_task(task_id, task_dir, metadata, request.state.trace_id)
     except HTTPException:
         storage.remove_task_directory(task_id)
@@ -87,6 +90,20 @@ def get_video_task(task_id: str) -> dict:
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@app.get("/api/videos/{task_id}/metrics")
+def get_video_metrics(task_id: str) -> dict:
+    if get_task(task_id) is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Task metrics not found") from None
+    metrics = read_metrics(task_dir, task_id)
+    if metrics is None:
+        raise HTTPException(status_code=404, detail="Task metrics not found")
+    return metrics
 
 
 @app.get("/api/videos/{task_id}/download")
@@ -149,6 +166,15 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
     if not start_review_render(task_id, review.transcript.model_dump(), plan.model_dump()):
         raise HTTPException(status_code=409, detail="Review edits are only available for completed tasks")
     task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
+    metrics = TaskMetrics(task_dir, task_id)
+    try:
+        metrics.current_or_start_attempt("review")
+    except RuntimeError:
+        # Older successful tasks predate metrics.json. Preserve review support
+        # while recording the newly requested review attempt.
+        metrics = initialize_initial_metrics(task_dir, task_id, task["trace_id"], 0)
+        metrics.finalize(1, "completed")
+        metrics.current_or_start_attempt("review")
     start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), review.transcript, plan, task["trace_id"])
     return {"task_id": task_id, "status": "rendering", "transcript": review.transcript, "plan": plan}
 

@@ -11,6 +11,7 @@ from backend.app.models import TaskStatus
 def configure_database(tmp_path: Path, monkeypatch) -> Path:
     storage = tmp_path / "storage"
     monkeypatch.setattr(main, "STORAGE_ROOT", storage)
+    monkeypatch.setattr("backend.app.video.STORAGE_ROOT", storage)
     monkeypatch.setattr("backend.app.database.STORAGE_ROOT", storage)
     monkeypatch.setattr("backend.app.database.DATABASE_PATH", storage / "tasks.sqlite3")
     database._engine = None

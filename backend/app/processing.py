@@ -1,6 +1,9 @@
 import json
 import subprocess
+from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
+from typing import TypeVar
 
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .face_safety import FaceSafetyError, analyse_face_safe_areas
@@ -19,6 +22,10 @@ class ProcessingError(RuntimeError):
 
 class ProcessingCancelled(ProcessingError):
     pass
+
+
+T = TypeVar("T")
+StageRunner = Callable[[str, Callable[[], T]], T]
 
 
 def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = None) -> None:
@@ -49,21 +56,35 @@ def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = N
         raise ProcessingError(stderr.strip() or stdout.strip() or "External command failed")
 
 
-def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, task_id: str | None = None) -> tuple[dict, dict]:
+def render_and_composite(
+    task_dir: Path,
+    metadata: VideoMetadata,
+    transcript: Transcript,
+    plan: AnimationPlan,
+    task_id: str | None = None,
+    stage_runner: StageRunner | None = None,
+) -> tuple[dict, dict, dict]:
+    def run_stage(stage: str, action: Callable[[], T]) -> T:
+        return stage_runner(stage, action) if stage_runner else action()
+
     safe_dir = ensure_storage_path(task_dir)
     source = safe_dir / "source.mp4"
     overlay = safe_dir / "animation.mov"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
-    try:
-        plan = prepare_media_assets(safe_dir, plan)
-    except ValueError as exc:
-        raise ProcessingError(f"Media asset validation failed: {exc}") from exc
-    try:
-        plan = analyse_face_safe_areas(safe_dir, metadata, plan)
-    except FaceSafetyError as exc:
-        raise ProcessingError(f"Local face safety analysis failed: {exc}") from exc
-    validate_animation_safe_areas(plan, metadata.width, metadata.height)
+    def prepare_safe_media() -> AnimationPlan:
+        try:
+            prepared_plan = prepare_media_assets(safe_dir, plan)
+        except ValueError as exc:
+            raise ProcessingError(f"Media asset validation failed: {exc}") from exc
+        try:
+            prepared_plan = analyse_face_safe_areas(safe_dir, metadata, prepared_plan)
+        except FaceSafetyError as exc:
+            raise ProcessingError(f"Local face safety analysis failed: {exc}") from exc
+        validate_animation_safe_areas(prepared_plan, metadata.width, metadata.height)
+        return prepared_plan
+
+    plan = run_stage("media_safety_analysis", prepare_safe_media)
     props = {
         "animations": [animation.model_dump() for animation in plan.animations],
         "mediaAssets": renderer_media_assets(safe_dir, plan),
@@ -71,28 +92,40 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
         "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }
-    _run([
-        "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
-        "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le", "--props=" + json.dumps(props, ensure_ascii=False),
-    ], cwd=RENDERER_ROOT, task_id=task_id)
-    try:
-        verify_overlay_has_alpha(overlay)
-    except QualityValidationError as exc:
-        raise ProcessingError(f"Animation overlay validation failed: {exc}") from exc
-    write_ass(transcript, subtitles, metadata.width, metadata.height)
-    command = [
-        "ffmpeg", "-y", "-i", str(source), "-i", str(overlay),
-        "-filter_complex", f"[0:v][1:v]overlay=0:0:format=auto[v0];[v0]subtitles='{ffmpeg_filter_path(subtitles)}'[v]", "-map", "[v]",
-    ]
-    if metadata.has_audio:
-        command += ["-map", "0:a:0?", "-c:a", "aac"]
-    command += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-shortest", str(result)]
-    _run(command, task_id=task_id)
-    if not result.is_file() or result.stat().st_size == 0:
-        raise ProcessingError("Rendering completed without producing result.mp4")
-    try:
-        quality = verify_output_quality(result, metadata)
-        write_quality_report(safe_dir / "quality.json", quality)
-    except QualityValidationError as exc:
-        raise ProcessingError(f"Output quality validation failed: {exc}") from exc
-    return transcript.model_dump(), plan.model_dump()
+    def render_overlay() -> None:
+        _run([
+            "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
+            "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le", "--props=" + json.dumps(props, ensure_ascii=False),
+        ], cwd=RENDERER_ROOT, task_id=task_id)
+        try:
+            verify_overlay_has_alpha(overlay)
+        except QualityValidationError as exc:
+            raise ProcessingError(f"Animation overlay validation failed: {exc}") from exc
+
+    run_stage("remotion_render", render_overlay)
+
+    def composite() -> None:
+        write_ass(transcript, subtitles, metadata.width, metadata.height)
+        command = [
+            "ffmpeg", "-y", "-i", str(source), "-i", str(overlay),
+            "-filter_complex", f"[0:v][1:v]overlay=0:0:format=auto[v0];[v0]subtitles='{ffmpeg_filter_path(subtitles)}'[v]", "-map", "[v]",
+        ]
+        if metadata.has_audio:
+            command.extend(["-map", "0:a:0?", "-c:a", "aac"])
+        command.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-shortest", str(result)])
+        _run(command, task_id=task_id)
+        if not result.is_file() or result.stat().st_size == 0:
+            raise ProcessingError("Rendering completed without producing result.mp4")
+
+    run_stage("compositing", composite)
+
+    def check_quality() -> dict:
+        try:
+            quality = verify_output_quality(result, metadata)
+            write_quality_report(safe_dir / "quality.json", quality)
+            return asdict(quality)
+        except QualityValidationError as exc:
+            raise ProcessingError(f"Output quality validation failed: {exc}") from exc
+
+    quality_data = run_stage("quality_check", check_quality)
+    return transcript.model_dump(), plan.model_dump(), quality_data

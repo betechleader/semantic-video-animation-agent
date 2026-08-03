@@ -1,8 +1,23 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `2be3a6b feat: add copyright-safe media visuals`
-- Current stage: Stage 10B, local face-safe media placement - completed.
+- Current commit before this stage: `63b1c30 feat: add local face-safe media placement`
+- Current stage: Stage 10, evaluation and observability - completed.
+
+## Stage 10 delivered
+
+- Every accepted task now creates task-local `metrics.json`. It uses a SHA-256 fingerprint of the existing `trace_id` for correlation rather than copying a caller-provided trace header into the artifact.
+- Metrics are grouped by attempt: the initial upload/probe plus processing attempt is retained, and every review re-render adds its own attempt instead of overwriting earlier timings.
+- The initial attempt measures upload/probe, audio extraction, ASR, planning, local media-safety analysis, Remotion rendering, FFmpeg compositing, and quality checking. A review attempt measures the render-side phases it actually runs.
+- Each attempt records terminal status, summed stage duration, controlled output technical quality (dimensions, duration, frame rate, frame count, audio presence), and a failure category without copying an exception message.
+- `metrics.json` explicitly excludes frames, audio, transcript text, absolute paths, identity data, face coordinates, and exception messages. All work remains local; no telemetry or cloud service is contacted.
+- Added `GET /api/videos/{task_id}/metrics`, a read-only JSON endpoint for the task-local report. It is available while a task is running and never creates or modifies artifacts.
+- Failure, cancellation, and review-render failure paths finalize the relevant attempt with an accurate terminal status and category.
+
+## Stage 10 verification
+
+- Unit and API tests cover privacy exclusions, hashed trace correlation, read-only metrics lookup, failed audio extraction, pre-start cancellation, and separate review attempts.
+- The actual FFmpeg/Remotion end-to-end test verifies all eight initial stages, output technical quality, and a completed second review attempt.
 
 ## Stage 10B delivered
 

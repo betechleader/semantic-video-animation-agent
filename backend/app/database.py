@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from pathlib import Path
+from threading import Lock
 
 from alembic import command
 from alembic.config import Config
@@ -13,6 +14,7 @@ from .models import TaskEvent, TaskStatus, VideoTask
 _engine: Engine | None = None
 _engine_path: Path | None = None
 _session_factory: sessionmaker[Session] | None = None
+_initialization_lock = Lock()
 
 
 def _database_url(path: Path) -> str:
@@ -38,11 +40,14 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def initialize_database() -> None:
-    STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
-    config = Config(str(PROJECT_ROOT / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", _database_url(DATABASE_PATH))
-    command.upgrade(config, "head")
-    get_engine()
+    # A task worker and an API request can both reach this function. Alembic's
+    # module-level environment is not safe to initialise concurrently.
+    with _initialization_lock:
+        STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
+        config = Config(str(PROJECT_ROOT / "alembic.ini"))
+        config.set_main_option("sqlalchemy.url", _database_url(DATABASE_PATH))
+        command.upgrade(config, "head")
+        get_engine()
 
 
 def _event(task_id: str, event_type: str, message: str, payload: dict | None = None) -> TaskEvent:

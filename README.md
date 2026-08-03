@@ -37,6 +37,7 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 
 - `POST /api/videos` uploads an `.mp4` and returns `202 Accepted` plus a task ID.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
+- `GET /api/videos/{task_id}/metrics` returns the privacy-safe, task-local execution report (read-only).
 - `GET /api/videos/{task_id}/download` downloads `result.mp4` after completion.
 - `GET /api/videos/{task_id}/events` streams task-state events with SSE.
 - `POST /api/videos/{task_id}/cancel` requests cancellation.
@@ -46,6 +47,12 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
 
 Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
+
+## Local evaluation and observability
+
+Each accepted task writes `storage/{task_id}/metrics.json`. The report is local-only and tracks an opaque SHA-256 fingerprint of the task's existing trace ID, terminal status, failure category, and per-attempt stage durations. The initial attempt measures upload/probe, audio extraction, ASR, planning, media-safety analysis, Remotion rendering, compositing, and output quality checking; review re-renders create a second attempt with the render-side stages they actually execute.
+
+Successful attempts include only delivery-safe technical output quality: duration, dimensions, frame rate, frame count, and audio presence. The report never contains video frames, audio, full transcript text, absolute local paths, identity information, face coordinates, or exception messages. Query it during processing or after completion with `GET /api/videos/{task_id}/metrics`; the endpoint only reads the existing report and performs no writes.
 
 ## Local face-safe media placement
 

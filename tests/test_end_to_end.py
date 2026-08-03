@@ -48,6 +48,16 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         quality = json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))
         assert quality["frame_count"] > 0
         assert quality["has_audio"] is True
+        metrics = client.get(f"/api/videos/{task_id}/metrics")
+        assert metrics.status_code == 200
+        initial_metrics = metrics.json()
+        assert initial_metrics["status"] == "completed"
+        assert initial_metrics["trace_id_sha256"]
+        assert set(initial_metrics["attempts"][0]["stages"]) == {
+            "upload_probe", "audio_extraction", "asr", "planning", "media_safety_analysis",
+            "remotion_render", "compositing", "quality_check",
+        }
+        assert initial_metrics["attempts"][0]["output_quality"]["width"] == 320
         overlay_probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt", "-of", "json", str(storage / task_id / "animation.mov")], check=True, capture_output=True, text=True)
         assert "a" in json.loads(overlay_probe.stdout)["streams"][0]["pix_fmt"]
         download = client.get(f"/api/videos/{task_id}/download")
@@ -64,6 +74,11 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert reviewed_task["status"] == "completed"
         assert probe_video(result).has_video is True
         assert json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))["width"] == 320
+        reviewed_metrics = client.get(f"/api/videos/{task_id}/metrics").json()
+        assert reviewed_metrics["attempt_count"] == 2
+        assert reviewed_metrics["attempts"][1]["kind"] == "review"
+        assert reviewed_metrics["attempts"][1]["status"] == "completed"
+        assert "upload_probe" not in reviewed_metrics["attempts"][1]["stages"]
         events = client.get(f"/api/videos/{task_id}/events")
         assert "event: rendering" in events.text
         assert "event: review_rendering" in events.text
