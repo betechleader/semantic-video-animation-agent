@@ -22,3 +22,9 @@
 
 - The quality gate is deterministic and technical. It does not yet score perceptual quality, speaker framing, or device-specific appearance.
 - Stage 10 (evaluation and observability) is the next eligible stage.
+
+## Offline content-aligned mode
+
+- `ASR_PROVIDER=faster_whisper` and `PLANNER_PROVIDER=rule_based` run without a local LLM service. The planner selects readable highlights from real ASR segments and anchors every animation to that segment's real timestamps.
+- On 2026-08-03, the local `small` faster-whisper model processed the available 94-second Chinese video into 27 segments and 283 word timestamps; the offline planner produced 13 validated highlights.
+- `PLANNER_PROVIDER=local_llm` remains available for richer semantic selection after a loopback-compatible local LLM service is started.

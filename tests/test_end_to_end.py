@@ -41,6 +41,8 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         quality = json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))
         assert quality["frame_count"] > 0
         assert quality["has_audio"] is True
+        overlay_probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt", "-of", "json", str(storage / task_id / "animation.mov")], check=True, capture_output=True, text=True)
+        assert "a" in json.loads(overlay_probe.stdout)["streams"][0]["pix_fmt"]
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")

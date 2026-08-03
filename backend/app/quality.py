@@ -40,6 +40,23 @@ def validate_animation_safe_areas(plan: AnimationPlan, width: int, height: int) 
         raise QualityValidationError("video dimensions are too small for the supported safe-area layout")
 
 
+def verify_overlay_has_alpha(overlay: Path) -> None:
+    """Require the Remotion overlay to preserve transparency before compositing."""
+    overlay = ensure_storage_path(overlay)
+    result = _run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=pix_fmt", "-of", "json", str(overlay),
+    ])
+    if result.returncode != 0:
+        raise QualityValidationError(f"overlay probe failed: {result.stderr.strip()}")
+    try:
+        pixel_format = json.loads(result.stdout)["streams"][0]["pix_fmt"]
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+        raise QualityValidationError("overlay probe returned incomplete metadata") from exc
+    if "a" not in pixel_format:
+        raise QualityValidationError("animation overlay has no alpha channel")
+
+
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=COMMAND_TIMEOUT_SECONDS, check=False)

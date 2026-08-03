@@ -5,7 +5,7 @@ from pathlib import Path
 from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .database import is_cancellation_requested
 from .process_control import process_registry
-from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, write_quality_report
+from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, verify_overlay_has_alpha, write_quality_report
 from .schemas import AnimationPlan, Transcript, VideoMetadata
 from .subtitles import ffmpeg_filter_path, write_ass
 from .video import ensure_storage_path
@@ -61,8 +61,12 @@ def render_and_composite(task_dir: Path, metadata: VideoMetadata, transcript: Tr
     }
     _run([
         "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
-        "--codec=prores", "--prores-profile=4444", "--props=" + json.dumps(props, ensure_ascii=False),
+        "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le", "--props=" + json.dumps(props, ensure_ascii=False),
     ], cwd=RENDERER_ROOT, task_id=task_id)
+    try:
+        verify_overlay_has_alpha(overlay)
+    except QualityValidationError as exc:
+        raise ProcessingError(f"Animation overlay validation failed: {exc}") from exc
     write_ass(transcript, subtitles, metadata.width, metadata.height)
     command = [
         "ffmpeg", "-y", "-i", str(source), "-i", str(overlay),

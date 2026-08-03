@@ -25,7 +25,7 @@ npm.cmd run build
 
 ## Providers
 
-`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` are the defaults, so the full local workflow is available without a model service. `ASR_PROVIDER=faster_whisper` uses a local CPU int8 model and word timestamps. `PLANNER_PROVIDER=local_llm` uses a local, OpenAI Chat Completions-compatible server; its base URL must resolve to a loopback host (`127.0.0.1`, `localhost`, or `::1`).
+`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` are the defaults, so the full local workflow is available without a model service. `ASR_PROVIDER=faster_whisper` uses a local CPU int8 model and word timestamps. Pair it with `PLANNER_PROVIDER=rule_based` for an offline planner that highlights text from real transcript segments at their real timestamps. `PLANNER_PROVIDER=local_llm` uses a local, OpenAI Chat Completions-compatible server for richer semantic selection; its base URL must resolve to a loopback host (`127.0.0.1`, `localhost`, or `::1`).
 
 ## Semantic planning safety rules
 

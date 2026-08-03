@@ -7,7 +7,7 @@ from .config import MODEL_ROOT, SETTINGS
 from .database import transition_task
 from .models import TaskStatus
 from .processing import ProcessingCancelled, ProcessingError, render_and_composite
-from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider
+from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider, TranscriptAnimationPlanningProvider
 from .planning_rules import PlanningRuleError, validate_animation_plan
 from .schemas import AnimationPlan, Transcript, VideoMetadata
 
@@ -25,12 +25,14 @@ def process_task(task_id: str, task_dir: Path, metadata: VideoMetadata, trace_id
         transcript = provider.transcribe(audio_path)
         if SETTINGS.planner_provider == "mock":
             planner = MockAnimationPlanningProvider()
+        elif SETTINGS.planner_provider == "rule_based":
+            planner = TranscriptAnimationPlanningProvider()
         elif SETTINGS.planner_provider == "local_llm":
             planner = LocalLlmAnimationPlanningProvider(
                 SETTINGS.planner_model, SETTINGS.planner_base_url, SETTINGS.planner_timeout_seconds,
             )
         else:
-            raise ProcessingError("PLANNER_PROVIDER must be mock or local_llm")
+            raise ProcessingError("PLANNER_PROVIDER must be mock, rule_based, or local_llm")
         # Providers validate their normal outputs, and the workflow validates again
         # at the trust boundary before an untrusted plan can reach the renderer.
         plan = validate_animation_plan(planner.plan(transcript), transcript)

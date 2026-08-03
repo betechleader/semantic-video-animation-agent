@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
@@ -27,6 +28,48 @@ class MockSpeechRecognitionProvider:
 class MockAnimationPlanningProvider:
     def plan(self, transcript: Transcript) -> AnimationPlan:
         return create_mock_plan(transcript)
+
+
+class TranscriptAnimationPlanningProvider:
+    """Offline planner that anchors readable highlights to real ASR segments."""
+
+    _minimum_gap_ms = 5_000
+    _maximum_duration_ms = 2_000
+
+    @staticmethod
+    def _keyword(text: str) -> str:
+        cleaned = re.sub(r"[^\w\u4e00-\u9fff]+", "", text)
+        # Six CJK glyphs plus the template padding fit the 8% safe area even
+        # at the minimum supported 320 px video width.
+        return (cleaned or text.strip())[:6]
+
+    def plan(self, transcript: Transcript) -> AnimationPlan:
+        animations = []
+        semantic_segments = []
+        last_start_ms = -self._minimum_gap_ms
+        for index, segment in enumerate(transcript.segments, start=1):
+            if segment.start_ms < last_start_ms + self._minimum_gap_ms:
+                continue
+            end_ms = min(segment.end_ms, segment.start_ms + self._maximum_duration_ms)
+            if end_ms - segment.start_ms < 300:
+                continue
+            keyword = self._keyword(segment.text)
+            if not keyword:
+                continue
+            identifier = f"{index:03d}"
+            animations.append({
+                "id": f"animation_{identifier}", "type": "keyword_pop", "template_id": "keyword_pop_v1",
+                "start_ms": segment.start_ms, "end_ms": end_ms, "trigger_text": keyword,
+                "parameters": {"text": keyword, "color": "#FFD400", "position": "top-right"},
+            })
+            semantic_segments.append({
+                "id": f"semantic_{identifier}", "text": segment.text[:240], "start_ms": segment.start_ms,
+                "end_ms": end_ms, "intent": "emphasis", "keywords": [keyword],
+            })
+            last_start_ms = segment.start_ms
+        if not animations:
+            raise RuntimeError("Transcript has no segment long enough for a safe animation")
+        return validate_animation_plan(AnimationPlan(animations=animations, semantic_segments=semantic_segments), transcript)
 
 
 class LocalLlmAnimationPlanningProvider:
