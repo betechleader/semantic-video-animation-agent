@@ -13,6 +13,7 @@
 - `metrics.json` explicitly excludes frames, audio, transcript text, absolute paths, identity data, face coordinates, and exception messages. All work remains local; no telemetry or cloud service is contacted.
 - Added `GET /api/videos/{task_id}/metrics`, a read-only JSON endpoint for the task-local report. It is available while a task is running and never creates or modifies artifacts.
 - Failure, cancellation, and review-render failure paths finalize the relevant attempt with an accurate terminal status and category.
+- Remotion input props are stored in task-local `remotion_props.json` and passed by filename, avoiding the Windows command-line length limit for long plans or embedded original SVG visuals.
 
 ## Stage 10 verification
 

@@ -46,7 +46,7 @@ The Mock and local LLM planners use the same transcript-aware validation after p
 
 After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
 
-Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `animation.mov`, `subtitles.ass`, and `result.mp4`. SQLite task records are stored in `storage/tasks.sqlite3`.
+Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `remotion_props.json`, `animation.mov`, `subtitles.ass`, and `result.mp4`. Remotion reads its input props from that task-local JSON file, so long plans and embedded local SVGs do not hit the Windows command-line length limit. SQLite task records are stored in `storage/tasks.sqlite3`.
 
 ## Local evaluation and observability
 

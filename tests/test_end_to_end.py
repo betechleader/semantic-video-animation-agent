@@ -58,6 +58,8 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
             "remotion_render", "compositing", "quality_check",
         }
         assert initial_metrics["attempts"][0]["output_quality"]["width"] == 320
+        remotion_props = json.loads((storage / task_id / "remotion_props.json").read_text(encoding="utf-8"))
+        assert remotion_props["mediaAssets"][0]["data_uri"].startswith("data:image/svg+xml;base64,")
         overlay_probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt", "-of", "json", str(storage / task_id / "animation.mov")], check=True, capture_output=True, text=True)
         assert "a" in json.loads(overlay_probe.stdout)["streams"][0]["pix_fmt"]
         download = client.get(f"/api/videos/{task_id}/download")

@@ -56,6 +56,21 @@ def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = N
         raise ProcessingError(stderr.strip() or stdout.strip() or "External command failed")
 
 
+def write_remotion_props(destination: Path, props: dict) -> Path:
+    """Keep render input out of the Windows command line length limit."""
+    destination = ensure_storage_path(destination)
+    destination.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
+    return destination
+
+
+def remotion_render_command(overlay: Path, props_file: Path) -> list[str]:
+    return [
+        "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
+        "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le",
+        f"--props={props_file}",
+    ]
+
+
 def render_and_composite(
     task_dir: Path,
     metadata: VideoMetadata,
@@ -70,6 +85,7 @@ def render_and_composite(
     safe_dir = ensure_storage_path(task_dir)
     source = safe_dir / "source.mp4"
     overlay = safe_dir / "animation.mov"
+    props_file = safe_dir / "remotion_props.json"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
     def prepare_safe_media() -> AnimationPlan:
@@ -92,11 +108,10 @@ def render_and_composite(
         "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }
+    write_remotion_props(props_file, props)
+
     def render_overlay() -> None:
-        _run([
-            "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
-            "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le", "--props=" + json.dumps(props, ensure_ascii=False),
-        ], cwd=RENDERER_ROOT, task_id=task_id)
+        _run(remotion_render_command(overlay, props_file), cwd=RENDERER_ROOT, task_id=task_id)
         try:
             verify_overlay_has_alpha(overlay)
         except QualityValidationError as exc:
