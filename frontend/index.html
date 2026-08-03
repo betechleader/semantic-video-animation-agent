@@ -45,6 +45,11 @@
 
     const pretty = (value) => JSON.stringify(value, null, 2);
     const setStatus = (message) => { status.textContent = message; };
+    function showResult(id) {
+      preview.src = `/api/videos/${id}/download?preview=${Date.now()}`;
+      download.href = `/api/videos/${id}/download`;
+      result.classList.remove('hidden');
+    }
     async function loadTask(id) {
       const response = await fetch(`/api/videos/${id}`);
       if (!response.ok) throw new Error('Could not load the task.');
@@ -52,9 +57,7 @@
       if (task.status === 'completed') {
         transcript.value = pretty(task.transcript);
         plan.value = pretty(task.plan);
-        preview.src = `/api/videos/${id}/download?preview=${Date.now()}`;
-        download.href = `/api/videos/${id}/download`;
-        result.classList.remove('hidden');
+        showResult(id);
         setStatus(`Completed. ${task.metadata.duration_seconds.toFixed(2)} seconds, ${task.metadata.width} x ${task.metadata.height}.`);
       }
       return task;
@@ -63,7 +66,14 @@
       const events = new EventSource(`/api/videos/${id}/events?after_event_id=${lastEventId}`);
       const readEvent = event => { const detail = JSON.parse(event.data); lastEventId = Math.max(lastEventId, detail.id); return detail; };
       ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, event => setStatus(readEvent(event).message)));
-      events.addEventListener('completed', async event => { const detail = readEvent(event); events.close(); setStatus(detail.message); await loadTask(id); });
+      events.addEventListener('completed', async event => {
+        const detail = readEvent(event);
+        events.close();
+        showResult(id);
+        setStatus(detail.message);
+        try { await loadTask(id); }
+        catch (error) { setStatus(`${detail.message}\nDownload is ready; transcript and plan could not be loaded: ${error.message}`); }
+      });
       ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, event => { const detail = readEvent(event); events.close(); setStatus(detail.message); }));
     }
     form.addEventListener('submit', async event => {
