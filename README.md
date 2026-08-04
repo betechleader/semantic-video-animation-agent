@@ -13,7 +13,7 @@ cd ..
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.app.main:app --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The web form defaults to **real local `faster_whisper` + rule-based semantic planning** and no-key Wikimedia search; choose Mock explicitly only for a fast engineering smoke test.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The web form defaults to **real local `faster_whisper` + rule-based semantic planning** and no-key Wikimedia search; choose Mock explicitly only for a fast engineering smoke test. Use the page-header language selector to switch the complete upload/review workflow between Chinese and English; the browser remembers the selection after refresh.
 
 ## Visual style
 

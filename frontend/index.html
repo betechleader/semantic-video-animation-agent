@@ -3,66 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chinese Semantic Video Animation</title>
+  <title>语义视频动画</title>
   <style>
     :root { color-scheme: dark; font-family: "Microsoft YaHei", sans-serif; background: #10131c; color: #f5f7ff; }
     main { max-width: 1000px; margin: 5vh auto; padding: 28px; background: #1d2331; border-radius: 16px; }
     button, input, textarea, select { font: inherit; } button { margin: 8px 8px 8px 0; padding: 10px 16px; cursor: pointer; background: #ffd400; border: 0; border-radius: 8px; color: #111; font-weight: 700; } button:disabled { opacity: .5; cursor: default; }
     .upload-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; } .upload-options label { display: grid; gap: 6px; color: #cbd5e1; } .upload-options select { border-radius: 8px; border: 1px solid #475569; padding: 10px; color: #e2e8f0; background: #0f172a; }
-    #status { white-space: pre-wrap; color: #cbd5e1; min-height: 1.5em; } a { color: #ffd400; } .review { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; } textarea { width: 100%; min-height: 320px; box-sizing: border-box; background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; padding: 12px; font: 13px ui-monospace, monospace; } video { width: 100%; margin-top: 12px; border-radius: 10px; background: #000; } .hidden { display: none; } .media-review { margin-top: 24px; padding: 18px; background: #121a2a; border: 1px solid #334155; border-radius: 12px; } .media-controls { display: grid; grid-template-columns: 1fr auto auto 1fr; gap: 8px; } .media-controls input, .media-controls select { min-width: 0; border-radius: 8px; border: 1px solid #475569; padding: 10px; color: #e2e8f0; background: #0f172a; } .media-list, .candidate-list { display: grid; gap: 10px; margin-top: 14px; } .media-card { padding: 12px; border-radius: 9px; background: #0f172a; border-left: 4px solid #ffd400; } .media-card small { display: block; color: #94a3b8; margin-top: 4px; overflow-wrap: anywhere; } .media-card button { padding: 6px 10px; margin: 10px 6px 0 0; } .review-note { color: #fbbf24; } @media (max-width: 700px) { .review { grid-template-columns: 1fr; } .media-controls { grid-template-columns: 1fr; } }
+    .page-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; } .language-control { display: grid; gap: 6px; min-width: 150px; color: #cbd5e1; } .language-control select { border-radius: 8px; border: 1px solid #475569; padding: 9px; color: #e2e8f0; background: #0f172a; }
+    .file-picker { display: flex; align-items: center; gap: 12px; margin: 14px 0; } .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); } .file-button { padding: 10px 16px; border-radius: 8px; background: #334155; color: #f8fafc; cursor: pointer; font-weight: 700; } .file-button:focus-within, .file-button:hover { background: #475569; } #file-name { color: #cbd5e1; overflow-wrap: anywhere; }
+    #status { white-space: pre-wrap; color: #cbd5e1; min-height: 1.5em; } a { color: #ffd400; } .review { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; } textarea { width: 100%; min-height: 320px; box-sizing: border-box; background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; padding: 12px; font: 13px ui-monospace, monospace; } video { width: 100%; margin-top: 12px; border-radius: 10px; background: #000; } .hidden { display: none; } .media-review { margin-top: 24px; padding: 18px; background: #121a2a; border: 1px solid #334155; border-radius: 12px; } .media-controls { display: grid; grid-template-columns: 1fr auto auto 1fr; gap: 8px; } .media-controls input, .media-controls select { min-width: 0; border-radius: 8px; border: 1px solid #475569; padding: 10px; color: #e2e8f0; background: #0f172a; } .media-list, .candidate-list { display: grid; gap: 10px; margin-top: 14px; } .media-card { padding: 12px; border-radius: 9px; background: #0f172a; border-left: 4px solid #ffd400; } .media-card small { display: block; color: #94a3b8; margin-top: 4px; overflow-wrap: anywhere; } .media-card button { padding: 6px 10px; margin: 10px 6px 0 0; } .review-note { color: #fbbf24; } @media (max-width: 700px) { .page-header { flex-direction: column; } .language-control { width: 100%; } .upload-options, .review { grid-template-columns: 1fr; } .media-controls { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>Chinese Semantic Video Animation</h1>
-    <p>上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。</p>
+    <header class="page-header">
+      <div>
+        <h1 data-i18n="pageTitle">语义视频动画</h1>
+        <p data-i18n="pageDescription">上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。</p>
+      </div>
+      <label class="language-control"><span data-i18n="languageLabel">界面语言</span>
+        <select id="language-select" aria-label="界面语言" data-i18n-aria-label="languageLabel">
+          <option value="zh-CN">中文</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+    </header>
     <form id="upload-form">
-      <input id="video-file" type="file" accept="video/mp4,.mp4" required />
+      <div class="file-picker">
+        <label class="file-button" for="video-file" data-i18n="chooseVideo">选择视频</label>
+        <span id="file-name">未选择文件</span>
+        <input id="video-file" class="file-input" type="file" accept="video/mp4,.mp4" required />
+      </div>
       <div class="upload-options">
-        <label>处理模式
+        <label><span data-i18n="processingMode">处理模式</span>
           <select id="processing-profile">
-            <option value="real" selected>真实转写 + 语义规划（推荐）</option>
-            <option value="mock">Mock 测试文案</option>
-            <option value="configured">使用服务端环境变量</option>
+            <option value="real" selected data-i18n="profileReal">真实转写 + 语义规划（推荐）</option>
+            <option value="mock" data-i18n="profileMock">Mock 测试文案</option>
+            <option value="configured" data-i18n="profileConfigured">使用服务端环境变量</option>
           </select>
         </label>
-        <label>外部素材
+        <label><span data-i18n="externalMedia">外部素材</span>
           <select id="upload-media-provider">
-            <option value="wikimedia_commons" selected>Wikimedia Commons（无需 Key）</option>
-            <option value="pexels">Pexels（需要 PEXELS_API_KEY）</option>
-            <option value="mock">本地原创信息图</option>
-            <option value="manual">仅人工候选 URL</option>
+            <option value="wikimedia_commons" selected data-i18n="providerWikimedia">Wikimedia Commons（无需 Key）</option>
+            <option value="pexels" data-i18n="providerPexels">Pexels（需要 PEXELS_API_KEY）</option>
+            <option value="mock" data-i18n="providerMock">本地原创信息图</option>
+            <option value="manual" data-i18n="providerManual">仅人工候选 URL</option>
           </select>
         </label>
       </div>
-      <button type="submit">上传并生成成片</button>
+      <button type="submit" data-i18n="uploadButton">上传并生成成片</button>
     </form>
-    <p id="status">Choose an MP4 file to begin.</p>
+    <p id="status">请选择一个 MP4 视频开始处理。</p>
     <section id="result" class="hidden">
       <video id="preview" controls></video>
-      <p><a id="download">Download result video</a></p>
+      <p><a id="download" data-i18n="downloadResult">下载生成的视频</a></p>
       <div class="review">
-        <label>Transcript JSON<textarea id="transcript"></textarea></label>
-        <label>Animation plan JSON<textarea id="plan"></textarea></label>
+        <label><span data-i18n="transcriptJson">转写文本 JSON</span><textarea id="transcript"></textarea></label>
+        <label><span data-i18n="planJson">动画计划 JSON</span><textarea id="plan"></textarea></label>
       </div>
       <section class="media-review">
-        <h2>External B-roll review</h2>
-        <p class="review-note">External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.</p>
+        <h2 data-i18n="reviewTitle">外部 B-roll 素材审核</h2>
+        <p class="review-note" data-i18n="reviewNote">外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。</p>
         <div id="media-list" class="media-list"></div>
         <div class="media-controls">
-          <input id="media-query" placeholder="Search B-roll, e.g. supermarket product" />
-          <select id="media-kind"><option value="external_image">Image</option><option value="external_video">Video</option></select>
-          <button id="search-media" type="button">Search</button>
-          <input id="manual-media-url" placeholder="Or add an image/video URL" />
+          <input id="media-query" placeholder="搜索 B-roll，例如：supermarket product" data-i18n-placeholder="searchPlaceholder" />
+          <select id="media-kind"><option value="external_image" data-i18n="imageKind">图片</option><option value="external_video" data-i18n="videoKind">视频</option></select>
+          <button id="search-media" type="button" data-i18n="searchButton">搜索</button>
+          <input id="manual-media-url" placeholder="或添加图片/视频 URL" data-i18n-placeholder="manualUrlPlaceholder" />
         </div>
         <div id="candidate-list" class="candidate-list"></div>
       </section>
-      <button id="save-review" type="button">Save review edits and re-render</button>
+      <button id="save-review" type="button" data-i18n="saveReview">保存审核修改并重新渲染</button>
     </section>
   </main>
   <script>
     const form = document.querySelector('#upload-form');
     const input = document.querySelector('#video-file');
+    const fileName = document.querySelector('#file-name');
     const processingProfile = document.querySelector('#processing-profile');
     const uploadMediaProvider = document.querySelector('#upload-media-provider');
     const status = document.querySelector('#status');
@@ -78,23 +95,99 @@
     const searchMedia = document.querySelector('#search-media');
     const manualMediaUrl = document.querySelector('#manual-media-url');
     const candidateList = document.querySelector('#candidate-list');
+    const languageSelect = document.querySelector('#language-select');
+    const translations = {
+      'zh-CN': {
+        documentTitle: '语义视频动画', pageTitle: '语义视频动画',
+        pageDescription: '上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。',
+        languageLabel: '界面语言', chooseVideo: '选择视频', noFileChosen: '未选择文件', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）',
+        profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '外部素材',
+        providerWikimedia: 'Wikimedia Commons（无需 Key）', providerPexels: 'Pexels（需要 PEXELS_API_KEY）',
+        providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', uploadButton: '上传并生成成片',
+        downloadResult: '下载生成的视频', transcriptJson: '转写文本 JSON', planJson: '动画计划 JSON',
+        reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。',
+        searchPlaceholder: '搜索 B-roll，例如：supermarket product', imageKind: '图片', videoKind: '视频',
+        searchButton: '搜索', manualUrlPlaceholder: '或添加图片/视频 URL', saveReview: '保存审核修改并重新渲染',
+        ready: '请选择一个 MP4 视频开始处理。', chooseTarget: '替换 B-roll 前，请先选择要应用的语义画面。',
+        selectedCandidate: '已选择“{title}”。请保存审核修改，以下载并渲染任务内素材副本。',
+        brollDisabled: '已禁用该 B-roll。请保存审核修改并重新渲染。', generatedOriginal: '本地原创信息图',
+        pendingSelection: '等待选择或渲染', disabled: '已禁用', disable: '禁用', enable: '启用',
+        useFor: '用于：{title}', useThis: '使用此素材', imageAsset: '外部图片', videoAsset: '外部视频',
+        taskLoadFailed: '无法加载任务。', completed: '处理完成：{seconds} 秒，{width} × {height}。',
+        downloadFallback: '{message}\n视频已可下载，但无法加载转写文本和动画计划：{error}',
+        event_created: '任务已创建。', event_processing: '正在提取音频并进行语音转写…', event_rendering: '正在生成动画并合成视频…',
+        event_review_rendering: '正在根据审核修改重新渲染…', event_cancel_requested: '已请求取消任务。',
+        event_failed: '任务失败：{message}', event_cancelled: '任务已取消。', uploading: '正在上传视频…',
+        uploadFailed: '上传失败：{message}', validatingReview: '正在校验审核修改并重新渲染…',
+        reviewFailed: '审核重渲染失败：{message}', searching: '正在搜索外部 B-roll 候选…',
+        searchFailed: '素材搜索失败：{message}', foundCandidates: '找到 {count} 个候选。请选择素材，然后保存审核修改。',
+        manualFailed: '添加人工候选失败：{message}', manualVisual: '人工素材', unknownError: '未知错误',
+      },
+      en: {
+        documentTitle: 'Semantic Video Animation', pageTitle: 'Semantic Video Animation',
+        pageDescription: 'Upload source footage to generate a polished knowledge-talk video. Real speech recognition and semantic planning are recommended; Mock is for engineering tests only.',
+        languageLabel: 'Language', chooseVideo: 'Choose video', noFileChosen: 'No file selected', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)',
+        profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'External media',
+        providerWikimedia: 'Wikimedia Commons (No key required)', providerPexels: 'Pexels (Requires PEXELS_API_KEY)',
+        providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', uploadButton: 'Upload and generate',
+        downloadResult: 'Download result video', transcriptJson: 'Transcript JSON', planJson: 'Animation plan JSON',
+        reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.',
+        searchPlaceholder: 'Search B-roll, e.g. supermarket product', imageKind: 'Image', videoKind: 'Video',
+        searchButton: 'Search', manualUrlPlaceholder: 'Or add an image/video URL', saveReview: 'Save review edits and re-render',
+        ready: 'Choose an MP4 file to begin.', chooseTarget: 'Choose a target visual before replacing its B-roll.',
+        selectedCandidate: 'Selected “{title}”. Save review edits to download and render the task-local copy.',
+        brollDisabled: 'B-roll disabled. Save review edits to re-render.', generatedOriginal: 'Generated original',
+        pendingSelection: 'Pending selection/render', disabled: 'Disabled', disable: 'Disable', enable: 'Enable',
+        useFor: 'Use for: {title}', useThis: 'Use this', imageAsset: 'external image', videoAsset: 'external video',
+        taskLoadFailed: 'Could not load the task.', completed: 'Completed: {seconds} seconds, {width} × {height}.',
+        downloadFallback: '{message}\nDownload is ready, but the transcript and plan could not be loaded: {error}',
+        event_created: 'Task created.', event_processing: 'Extracting audio and transcribing speech…', event_rendering: 'Rendering animation and compositing video…',
+        event_review_rendering: 'Re-rendering the reviewed changes…', event_cancel_requested: 'Task cancellation requested.',
+        event_failed: 'Task failed: {message}', event_cancelled: 'Task cancelled.', uploading: 'Uploading video…',
+        uploadFailed: 'Upload failed: {message}', validatingReview: 'Validating review edits and re-rendering…',
+        reviewFailed: 'Review re-render failed: {message}', searching: 'Searching external B-roll candidates…',
+        searchFailed: 'Media search failed: {message}', foundCandidates: 'Found {count} candidates. Choose one, then save review edits.',
+        manualFailed: 'Could not add manual candidate: {message}', manualVisual: 'manual visual', unknownError: 'Unknown error',
+      },
+    };
+    let currentLanguage = localStorage.getItem('semantic-video-language') || 'zh-CN';
     let taskId = null;
     let lastEventId = 0;
+    let lastCandidates = [];
+    let statusState = {key: 'ready', params: {}};
 
     const pretty = (value) => JSON.stringify(value, null, 2);
-    const setStatus = (message) => { status.textContent = message; };
+    const t = (key, params = {}) => {
+      const template = translations[currentLanguage][key] || translations['zh-CN'][key] || key;
+      return Object.entries(params).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), template);
+    };
+    const setStatusKey = (key, params = {}) => { statusState = {key, params}; status.textContent = t(key, params); };
+    const updateFileName = () => { fileName.textContent = input.files[0]?.name || t('noFileChosen'); };
+    function applyLanguage(language) {
+      currentLanguage = translations[language] ? language : 'zh-CN';
+      localStorage.setItem('semantic-video-language', currentLanguage);
+      languageSelect.value = currentLanguage;
+      document.documentElement.lang = currentLanguage;
+      document.title = t('documentTitle');
+      document.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(element => { element.placeholder = t(element.dataset.i18nPlaceholder); });
+      document.querySelectorAll('[data-i18n-aria-label]').forEach(element => { element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel)); });
+      updateFileName();
+      status.textContent = t(statusState.key, statusState.params);
+      if (plan.value.trim()) renderMediaReview(currentPlan(), lastCandidates);
+    }
     const currentPlan = () => JSON.parse(plan.value);
     function writePlan(value) { plan.value = pretty(value); }
     function useCandidate(candidate) {
       const editable = currentPlan();
       const animation = editable.animations.find(item => item.type === 'media_visual' && item.parameters.asset_id === candidate.targetAssetId);
-      if (!animation) { setStatus('Choose a target visual before replacing its B-roll.'); return; }
+      if (!animation) { setStatusKey('chooseTarget'); return; }
       animation.parameters.selected_candidate_id = candidate.id;
       animation.parameters.enabled = true;
       editable.media_assets = (editable.media_assets || []).filter(asset => asset.asset_id !== animation.parameters.asset_id);
       editable.media_placements = (editable.media_placements || []).filter(item => item.animation_id !== animation.id);
       writePlan(editable); renderMediaReview(editable, []);
-      setStatus(`Selected ${candidate.title}. Save review edits to download and render the task-local copy.`);
+      setStatusKey('selectedCandidate', {title: candidate.title});
     }
     function disableMedia(assetId) {
       const editable = currentPlan();
@@ -104,9 +197,10 @@
       editable.media_assets = (editable.media_assets || []).filter(asset => asset.asset_id !== assetId);
       editable.media_placements = (editable.media_placements || []).filter(item => item.animation_id !== animation.id);
       writePlan(editable); renderMediaReview(editable, []);
-      setStatus('B-roll disabled. Save review edits to re-render.');
+      setStatusKey('brollDisabled');
     }
     function renderMediaReview(editablePlan, candidates) {
+      lastCandidates = candidates;
       const visuals = editablePlan.animations.filter(item => item.type === 'media_visual');
       const audits = new Map((editablePlan.media_assets || []).map(asset => [asset.asset_id, asset]));
       mediaList.replaceChildren();
@@ -114,18 +208,19 @@
         const audit = audits.get(animation.parameters.asset_id);
         const card = document.createElement('article'); card.className = 'media-card';
         const title = document.createElement('strong'); title.textContent = `${animation.parameters.title} · ${animation.start_ms}-${animation.end_ms} ms`;
-        const source = document.createElement('small'); source.textContent = audit ? `${audit.provider} · ${audit.search_query} · ${audit.source_url || 'generated original'} · ${audit.license}` : (animation.parameters.enabled ? 'Pending selection/render' : 'Disabled');
-        const disable = document.createElement('button'); disable.type = 'button'; disable.textContent = animation.parameters.enabled ? 'Disable' : 'Enable';
+        const source = document.createElement('small'); source.textContent = audit ? `${audit.provider} · ${audit.search_query} · ${audit.source_url || t('generatedOriginal')} · ${audit.license}` : (animation.parameters.enabled ? t('pendingSelection') : t('disabled'));
+        const disable = document.createElement('button'); disable.type = 'button'; disable.textContent = animation.parameters.enabled ? t('disable') : t('enable');
         disable.addEventListener('click', () => { if (animation.parameters.enabled) disableMedia(animation.parameters.asset_id); else { const next = currentPlan(); next.animations.find(item => item.id === animation.id).parameters.enabled = true; writePlan(next); renderMediaReview(next, []); } });
         card.append(title, source, disable); mediaList.append(card);
       });
       candidateList.replaceChildren();
       candidates.forEach(candidate => {
         const card = document.createElement('article'); card.className = 'media-card';
-        const title = document.createElement('strong'); title.textContent = `${candidate.title} (${candidate.asset_kind})`;
+        const kindLabel = candidate.asset_kind === 'external_video' ? t('videoAsset') : t('imageAsset');
+        const title = document.createElement('strong'); title.textContent = `${candidate.title} (${kindLabel})`;
         const source = document.createElement('small'); source.textContent = `${candidate.provider} · ${candidate.author_or_provider} · ${candidate.license} · ${candidate.source_url}`;
-        const target = document.createElement('select'); visuals.filter(item => item.parameters.enabled).forEach(item => { const option = document.createElement('option'); option.value = item.parameters.asset_id; option.textContent = `Use for: ${item.parameters.title}`; target.append(option); });
-        const use = document.createElement('button'); use.type = 'button'; use.textContent = 'Use this'; use.addEventListener('click', () => useCandidate({...candidate, targetAssetId: target.value}));
+        const target = document.createElement('select'); visuals.filter(item => item.parameters.enabled).forEach(item => { const option = document.createElement('option'); option.value = item.parameters.asset_id; option.textContent = t('useFor', {title: item.parameters.title}); target.append(option); });
+        const use = document.createElement('button'); use.type = 'button'; use.textContent = t('useThis'); use.addEventListener('click', () => useCandidate({...candidate, targetAssetId: target.value}));
         card.append(title, source, target, use); candidateList.append(card);
       });
     }
@@ -140,74 +235,77 @@
     }
     async function loadTask(id) {
       const response = await fetch(`/api/videos/${id}`);
-      if (!response.ok) throw new Error('Could not load the task.');
+      if (!response.ok) throw new Error(t('taskLoadFailed'));
       const task = await response.json();
       if (task.status === 'completed') {
         transcript.value = pretty(task.transcript);
         plan.value = pretty(task.plan);
         showResult(id);
         loadMediaReview(id);
-        setStatus(`Completed. ${task.metadata.duration_seconds.toFixed(2)} seconds, ${task.metadata.width} x ${task.metadata.height}.`);
+        setStatusKey('completed', {seconds: task.metadata.duration_seconds.toFixed(2), width: task.metadata.width, height: task.metadata.height});
       }
       return task;
     }
     function watchTask(id) {
       const events = new EventSource(`/api/videos/${id}/events?after_event_id=${lastEventId}`);
       const readEvent = event => { const detail = JSON.parse(event.data); lastEventId = Math.max(lastEventId, detail.id); return detail; };
-      ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, event => setStatus(readEvent(event).message)));
+      ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, event => { readEvent(event); setStatusKey(`event_${name}`); }));
       events.addEventListener('completed', async event => {
         const detail = readEvent(event);
         events.close();
         showResult(id);
-        setStatus(detail.message);
+        setStatusKey('event_rendering');
         try { await loadTask(id); }
-        catch (error) { setStatus(`${detail.message}\nDownload is ready; transcript and plan could not be loaded: ${error.message}`); }
+        catch (error) { setStatusKey('downloadFallback', {message: detail.message, error: error.message}); }
       });
-      ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, event => { const detail = readEvent(event); events.close(); setStatus(detail.message); }));
+      ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, event => { const detail = readEvent(event); events.close(); setStatusKey(`event_${name}`, {message: detail.message || t('unknownError')}); }));
     }
     form.addEventListener('submit', async event => {
       event.preventDefault();
       if (!input.files[0]) return;
-      result.classList.add('hidden'); setStatus('正在上传视频…');
+      result.classList.add('hidden'); setStatusKey('uploading');
       const data = new FormData();
       data.append('file', input.files[0]);
       data.append('processing_profile', processingProfile.value);
       data.append('media_provider', uploadMediaProvider.value);
       try {
         const response = await fetch('/api/videos', { method: 'POST', body: data });
-        const body = await response.json(); if (!response.ok) throw new Error(body.detail || 'Upload failed.');
+        const body = await response.json(); if (!response.ok) throw new Error(body.detail || t('unknownError'));
         taskId = body.task_id; watchTask(taskId);
-      } catch (error) { setStatus(`Failed: ${error.message}`); }
+      } catch (error) { setStatusKey('uploadFailed', {message: error.message}); }
     });
     saveReview.addEventListener('click', async () => {
       if (!taskId) return;
       try {
         const body = { transcript: JSON.parse(transcript.value), plan: JSON.parse(plan.value) };
-        saveReview.disabled = true; setStatus('正在校验审核修改并重新渲染…');
+        saveReview.disabled = true; setStatusKey('validatingReview');
         const response = await fetch(`/api/videos/${taskId}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || 'Review update failed.');
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
         watchTask(taskId);
-      } catch (error) { setStatus(`Review update failed: ${error.message}`); }
+      } catch (error) { setStatusKey('reviewFailed', {message: error.message}); }
       finally { saveReview.disabled = false; }
     });
     searchMedia.addEventListener('click', async () => {
       if (!taskId || !mediaQuery.value.trim()) return;
       try {
-        searchMedia.disabled = true; setStatus('正在搜索外部 B-roll 候选…');
+        searchMedia.disabled = true; setStatusKey('searching');
         const response = await fetch(`/api/videos/${taskId}/media/search`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: mediaQuery.value.trim(), asset_kind: mediaKind.value})});
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || 'Search failed.');
-        renderMediaReview(currentPlan(), payload.candidates); setStatus(`Found ${payload.candidates.length} candidates. Choose one, then save review edits.`);
-      } catch (error) { setStatus(`Media search failed: ${error.message}`); } finally { searchMedia.disabled = false; }
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
+        renderMediaReview(currentPlan(), payload.candidates); setStatusKey('foundCandidates', {count: payload.candidates.length});
+      } catch (error) { setStatusKey('searchFailed', {message: error.message}); } finally { searchMedia.disabled = false; }
     });
     manualMediaUrl.addEventListener('change', async () => {
       if (!taskId || !manualMediaUrl.value.trim()) return;
       try {
-        const query = mediaQuery.value.trim() || 'manual visual';
+        const query = mediaQuery.value.trim() || t('manualVisual');
         const response = await fetch(`/api/videos/${taskId}/media/candidates`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, source_url: manualMediaUrl.value.trim(), title: query, asset_kind: mediaKind.value, mime_type: mediaKind.value === 'external_video' ? 'video/mp4' : 'image/jpeg'})});
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || 'Could not add manual candidate.');
+        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
         renderMediaReview(currentPlan(), [payload.candidate]); manualMediaUrl.value = '';
-      } catch (error) { setStatus(`Manual candidate failed: ${error.message}`); }
+      } catch (error) { setStatusKey('manualFailed', {message: error.message}); }
     });
+    input.addEventListener('change', updateFileName);
+    languageSelect.addEventListener('change', () => applyLanguage(languageSelect.value));
+    applyLanguage(currentLanguage);
   </script>
 </body>
 </html>
