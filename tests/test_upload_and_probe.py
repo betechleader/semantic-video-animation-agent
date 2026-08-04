@@ -52,6 +52,29 @@ def test_upload_mp4_and_probe(client: TestClient, sample_mp4: Path) -> None:
     assert (main.STORAGE_ROOT / body["task_id"] / "source.mp4").is_file()
 
 
+def test_upload_forwards_real_processing_choices(
+    client: TestClient, sample_mp4: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    monkeypatch.setattr(main, "start_task", lambda *args: calls.append(args))
+    response = client.post(
+        "/api/videos",
+        files={"file": ("speech.mp4", sample_mp4.read_bytes(), "video/mp4")},
+        data={"processing_profile": "real", "media_provider": "wikimedia_commons"},
+    )
+    assert response.status_code == 202, response.text
+    assert calls[0][-2:] == ("real", "wikimedia_commons")
+
+
+def test_upload_rejects_unknown_processing_profile(client: TestClient, sample_mp4: Path) -> None:
+    response = client.post(
+        "/api/videos",
+        files={"file": ("speech.mp4", sample_mp4.read_bytes(), "video/mp4")},
+        data={"processing_profile": "not-real"},
+    )
+    assert response.status_code == 422
+
+
 def test_upload_rejects_non_mp4(client: TestClient) -> None:
     response = client.post("/api/videos", files={"file": ("speech.txt", b"not-video", "text/plain")})
     assert response.status_code == 400

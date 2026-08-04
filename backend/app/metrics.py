@@ -24,6 +24,7 @@ STAGE_NAMES = (
     "audio_extraction",
     "asr",
     "planning",
+    "media_asset_acquisition",
     "media_safety_analysis",
     "remotion_render",
     "compositing",

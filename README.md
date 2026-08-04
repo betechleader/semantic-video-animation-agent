@@ -1,6 +1,6 @@
 # Chinese Talking-head Semantic Video Animation
 
-This local Windows pipeline accepts an MP4, extracts speech, produces a time-grounded animation plan, renders a transparent Remotion overlay, burns ASS subtitles, and composites a downloadable MP4 with FFmpeg.
+本地 Windows 口播视频管线：上传 MP4、抽取语音、生成时间对齐语义计划、渲染动态字幕与知识口播包装、再用 FFmpeg 输出成片。输出是单一完整成片，不会保留参考视频中的“原片/成片”对照或剪辑台。
 
 ## Start
 
@@ -13,7 +13,65 @@ cd ..
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.app.main:app --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), and wait for processing to finish.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The web form defaults to **real local `faster_whisper` + rule-based semantic planning** and no-key Wikimedia search; choose Mock explicitly only for a fast engineering smoke test.
+
+## Visual style
+
+`knowledge_talking_head_v1` is rendered by the shared Remotion overlay:
+
+- short, transcript-derived readable captions stay at the bottom; matching phrase/word timing changes colour, scale, outline, and pop motion for important wording;
+- `keyword_pop_v1` makes a key phrase large with strong outline/shadow rather than showing one uniform subtitle style;
+- `media_visual_v1` presents an image/video as a face-safe side card or a brief full-screen B-roll cut while captions remain on top;
+- `knowledge_infographic_v1` supports transcript-grounded numbered lists, comparison cards, and flow/relationship diagrams;
+- local Haar face-safe analysis reserves the caption area and moves/shrinks/skips side cards. Full-screen B-roll is intentional short substitution, not a talking-head overlay.
+
+The rule-based planner derives compact retrieval queries for books, factories, products, money, learning, people, places, and concepts. It keeps the shared grounding, overlap, and density rules: no more than two semantic visuals start in a 10-second window.
+
+## Providers and external-media warning
+
+> **External-material prototype, not suitable for direct commercial publication.**
+
+`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` remain the server/configuration defaults, so tests and the baseline work without a model service or network. The browser overrides those defaults per upload with its recommended real profile. `ASR_PROVIDER=faster_whisper` plus `PLANNER_PROVIDER=rule_based` uses local CPU ASR with real word timings; emphasized phrases are anchored to the matching word span instead of the beginning of the containing ASR segment. `PLANNER_PROVIDER=local_llm` is restricted to a loopback OpenAI-compatible endpoint.
+
+External B-roll is optional and never becomes a factual source:
+
+```powershell
+# Default: no network; use original task-local concept graphics.
+$env:MEDIA_PROVIDER = 'mock'
+
+# Actual no-key image/video candidate search through Wikimedia Commons.
+$env:MEDIA_PROVIDER = 'wikimedia_commons'
+
+# Optional Pexels image/video search.
+$env:MEDIA_PROVIDER = 'pexels'
+$env:PEXELS_API_KEY = '...'
+```
+
+`MEDIA_PROVIDER=manual` disables automatic search and asks the reviewer to add an explicit `http(s)` URL. Missing `PEXELS_API_KEY` returns a clear API error. Network access to Wikimedia/Pexels and the downloaded source must be permitted by the environment. The reviewer must inspect source, licence/terms, factual relevance, people/trademark rights, and platform suitability before publishing; the application neither claims copyright clearance nor waives human review. See [MEDIA_ASSET_POLICY.md](MEDIA_ASSET_POLICY.md).
+
+Automatic Wikimedia search/download timeouts or rate limits fall back to the authored task-local knowledge graphic so a long render is not lost. An explicitly reviewer-selected candidate remains strict: a failed download is shown as an error rather than silently replaced.
+
+## Review workflow and API
+
+The browser preview keeps the transcript and plan JSON editor. Its B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save review edits and re-render** to download a selected candidate into the task and render the new result.
+
+- `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart fields `processing_profile=configured|real|mock` and `media_provider=mock|manual|wikimedia_commons|pexels` select the task-local providers.
+- `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
+- `GET /api/videos/{task_id}/media` returns adopted assets, use intervals, and stored candidates.
+- `POST /api/videos/{task_id}/media/search` searches the configured provider with `{query, asset_kind}`.
+- `POST /api/videos/{task_id}/media/candidates` adds a manual candidate URL.
+- `GET /api/videos/{task_id}/metrics` returns the privacy-safe metrics report.
+- `GET /api/videos/{task_id}/download` downloads completed `result.mp4`.
+- `GET /api/videos/{task_id}/events` streams status events; `POST /api/videos/{task_id}/cancel` cancels an active task.
+- `PUT /api/videos/{task_id}/transcript` edits the transcript; `POST /api/videos/{task_id}/review` validates and re-renders the transcript/plan.
+
+Runtime files live under `storage/{task_id}/`: source/audio, `remotion_props.json`, `animation.mov`, ASS fallback subtitles, `result.mp4`, `quality.json`, `face_safe_areas.json`, `media_candidates.json`, `media_assets.json`, and `metrics.json`. Props stay in the task-local file, so no complete plan or base64 media is placed on the Windows command line.
+
+## Provenance, safety, and quality
+
+Every adopted asset is downloaded into `media-assets/`; the plan and `media_assets.json` record the provider, search query, download/source-page URLs, acquisition time, SHA-256 digest, MIME type, and exact use interval. Remotion receives only a hash-verified task-local data URI. When no candidate is available, it uses a designed original concept graphic rather than a simple book SVG placeholder.
+
+Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` records only a SHA-256 trace fingerprint, stage durations (including media acquisition and local safety analysis), terminal category, and technical output facts—never transcript text, media bytes, absolute paths, identity data, face coordinates, or exception messages.
 
 ## Verification
 
@@ -22,48 +80,3 @@ D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv
 cd animation-renderer
 npm.cmd run build
 ```
-
-## Providers
-
-`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` are the defaults, so the full local workflow is available without a model service. `ASR_PROVIDER=faster_whisper` uses a local CPU int8 model and word timestamps. Pair it with `PLANNER_PROVIDER=rule_based` for an offline planner that highlights text from real transcript segments at their real timestamps. `PLANNER_PROVIDER=local_llm` uses a local, OpenAI Chat Completions-compatible server for richer semantic selection; its base URL must resolve to a loopback host (`127.0.0.1`, `localhost`, or `::1`).
-
-## Semantic planning safety rules
-
-The Mock and local LLM planners use the same transcript-aware validation after planning. Every animation must fit completely inside one transcript word or segment, last 300–5000 ms, and use a unique ID. Plans may start at most two animations in any rolling 10-second window, and animation time ranges cannot overlap. Semantic segments must fit inside one transcript segment. Invalid plans fail before Remotion or FFmpeg rendering begins.
-
-## Animation templates and API
-
-`keyword_pop_v1` highlights a keyword; `quote_card_v1` shows an emphasized card; and `media_visual_v1` displays a topic visual during its transcript-grounded interval. The shared `AnimationOverlay` composition renders all validated animations on the timeline.
-
-- `POST /api/videos` uploads an `.mp4` and returns `202 Accepted` plus a task ID.
-- `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
-- `GET /api/videos/{task_id}/metrics` returns the privacy-safe, task-local execution report (read-only).
-- `GET /api/videos/{task_id}/download` downloads `result.mp4` after completion.
-- `GET /api/videos/{task_id}/events` streams task-state events with SSE.
-- `POST /api/videos/{task_id}/cancel` requests cancellation.
-- `PUT /api/videos/{task_id}/transcript` edits the transcript after processing completes.
-- `POST /api/videos/{task_id}/review` accepts a completed task's `{transcript, plan}`, validates the plan against that transcript, saves both, and creates an updated result video.
-
-After a task completes, the browser shows the generated video preview together with editable transcript and plan JSON. Saving those review edits starts a new render and the preview reloads when it completes. SSE clients may pass `after_event_id` to `/api/videos/{task_id}/events` to receive only newer task events.
-
-Runtime data is under `storage/{task_id}/`, including `source.mp4`, `audio.wav`, `remotion_props.json`, `animation.mov`, `subtitles.ass`, and `result.mp4`. Remotion reads its input props from that task-local JSON file, so long plans and embedded local SVGs do not hit the Windows command-line length limit. SQLite task records are stored in `storage/tasks.sqlite3`.
-
-## Local evaluation and observability
-
-Each accepted task writes `storage/{task_id}/metrics.json`. The report is local-only and tracks an opaque SHA-256 fingerprint of the task's existing trace ID, terminal status, failure category, and per-attempt stage durations. The initial attempt measures upload/probe, audio extraction, ASR, planning, media-safety analysis, Remotion rendering, compositing, and output quality checking; review re-renders create a second attempt with the render-side stages they actually execute.
-
-Successful attempts include only delivery-safe technical output quality: duration, dimensions, frame rate, frame count, and audio presence. The report never contains video frames, audio, full transcript text, absolute local paths, identity information, face coordinates, or exception messages. Query it during processing or after completion with `GET /api/videos/{task_id}/metrics`; the endpoint only reads the existing report and performs no writes.
-
-## Local face-safe media placement
-
-Before each render, the pipeline samples the local source video on CPU with OpenCV's bundled Haar face detector. No frame, face crop, identity, embedding, or detection result is sent to a network service. Detected faces are expanded to protect the likely talking-head upper body; the media layout then reserves both those zones and the ASS subtitle area. It tries safe corners, reduces the visual down to 50 percent if needed, and skips the visual when no safe placement exists.
-
-The task-local `face_safe_areas.json` records sample timestamps, face coordinates, derived protected-subject zones, subtitle reservation, and chosen media placements. The same derived layout is included in the completed task plan. A review re-render repeats local analysis from `source.mp4` instead of trusting saved or client-submitted coordinates. The current Haar safeguard is best for detectable frontal faces; it is not yet a general person/subject-segmentation model.
-
-## Copyright-safe media visuals
-
-The pipeline never downloads or automatically uses web images. When the semantic planner finds a book/topic mention (such as `《心理学与生活》`), it produces a generic, original task-local SVG book illustration instead of a recognisable cover. The visual is anchored to the matching real transcript interval and follows the same density and conflict rules as other animations. Each admitted asset is recorded in both the saved plan and `storage/{task_id}/media_assets.json` with its source URI, author/provider, licence, allowed transformations, acquisition time, relative local path, and SHA-256 checksum. See [MEDIA_ASSET_POLICY.md](MEDIA_ASSET_POLICY.md) for the acceptance policy and requirements for any future external source.
-
-## Output quality and safe areas
-
-Before rendering, keyword text is checked against an 8 percent horizontal safe margin and templates scale typography to the target video width. After each render, the pipeline uses `ffprobe` to check dimensions, duration, frame rate, frame count, and expected audio, then uses `ffmpeg` to decode every required stream. Successful tasks also contain `quality.json` with the measured output values.

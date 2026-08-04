@@ -72,3 +72,19 @@ def test_events_support_after_event_cursor(tmp_path: Path, monkeypatch) -> None:
     response = client.get(f"/api/videos/{task_id}/events?after_event_id={events[-1]['id']}")
     assert response.status_code == 200
     assert response.text == ""
+
+
+def test_media_review_api_lists_assets_and_accepts_a_manual_candidate(tmp_path: Path, monkeypatch) -> None:
+    task_id, _, _ = completed_task(tmp_path, monkeypatch)
+    client = TestClient(main.app)
+    initial = client.get(f"/api/videos/{task_id}/media")
+    assert initial.status_code == 200
+    assert initial.json()["assets"] == []
+    added = client.post(f"/api/videos/{task_id}/media/candidates", json={
+        "query": "supermarket product", "source_url": "https://example.test/product.jpg", "title": "Product shelf",
+    })
+    assert added.status_code == 200, added.text
+    assert added.json()["candidate"]["provider"] == "manual"
+    listed = client.get(f"/api/videos/{task_id}/media")
+    assert listed.status_code == 200
+    assert listed.json()["candidates"][0]["source_url"] == "https://example.test/product.jpg"

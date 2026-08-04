@@ -37,7 +37,9 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert task["transcript"]["language"] == "zh"
         assert [animation["type"] for animation in task["plan"]["animations"]] == ["keyword_pop", "media_visual"]
         media_manifest = json.loads((storage / task_id / "media_assets.json").read_text(encoding="utf-8"))
-        assert media_manifest[0]["asset_kind"] == "generated_original"
+        assert media_manifest[0]["asset_kind"] == "generated_infographic"
+        assert media_manifest[0]["provider"] == "original_infographic"
+        assert media_manifest[0]["usage_start_ms"] < media_manifest[0]["usage_end_ms"]
         assert media_manifest[0]["local_path"].startswith("media-assets/")
         face_safety = json.loads((storage / task_id / "face_safe_areas.json").read_text(encoding="utf-8"))
         assert face_safety["detector"] == "opencv-haarcascade-frontalface-default-local-cpu"
@@ -54,12 +56,13 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert initial_metrics["status"] == "completed"
         assert initial_metrics["trace_id_sha256"]
         assert set(initial_metrics["attempts"][0]["stages"]) == {
-            "upload_probe", "audio_extraction", "asr", "planning", "media_safety_analysis",
+            "upload_probe", "audio_extraction", "asr", "planning", "media_asset_acquisition", "media_safety_analysis",
             "remotion_render", "compositing", "quality_check",
         }
         assert initial_metrics["attempts"][0]["output_quality"]["width"] == 320
         remotion_props = json.loads((storage / task_id / "remotion_props.json").read_text(encoding="utf-8"))
         assert remotion_props["mediaAssets"][0]["data_uri"].startswith("data:image/svg+xml;base64,")
+        assert remotion_props["subtitleCues"][0]["words"]
         overlay_probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt", "-of", "json", str(storage / task_id / "animation.mov")], check=True, capture_output=True, text=True)
         assert "a" in json.loads(overlay_probe.stdout)["streams"][0]["pix_fmt"]
         download = client.get(f"/api/videos/{task_id}/download")

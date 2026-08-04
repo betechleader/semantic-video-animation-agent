@@ -1,11 +1,12 @@
 """ASS subtitle generation and deterministic layout checks."""
 
 from dataclasses import dataclass
+import base64
 import os
 from pathlib import Path
 import re
 
-from .schemas import Transcript, TranscriptSegment
+from .schemas import AnimationPlan, Transcript, TranscriptSegment
 
 
 @dataclass(frozen=True)
@@ -28,20 +29,35 @@ def _escape_ass(text: str) -> str:
 
 
 def _font_dirs() -> list[Path]:
-    candidates = [Path(os.environ["WINDIR"]) / "Fonts"] if os.environ.get("WINDIR") else []
+    windows_root = os.environ.get("WINDIR") or os.environ.get("SystemRoot") or r"C:\Windows"
+    candidates = [Path(windows_root) / "Fonts", Path(r"C:\Windows\Fonts")]
     candidates += [Path("/usr/share/fonts"), Path("/usr/local/share/fonts"), Path(__file__).resolve().parents[2] / "assets" / "fonts"]
     return [path for path in candidates if path.is_dir()]
 
 
 def resolve_local_font(font_name: str = "Microsoft YaHei", font_dirs: list[Path] | None = None) -> Path | None:
     """Return an installed local font file; never downloads or contacts a network."""
-    aliases = {"Microsoft YaHei": ("msyh", "msyh.ttc", "msyhbd"), "Noto Sans CJK SC": ("NotoSansCJK",)}
+    aliases = {"Microsoft YaHei": ("msyh", "msyh.ttc", "msyhbd"), "Noto Sans CJK SC": ("NotoSansCJK", "NotoSansSC")}
     needles = aliases.get(font_name, (font_name,))
     for directory in font_dirs or _font_dirs():
         for path in sorted(directory.rglob("*")):
             if path.is_file() and path.suffix.lower() in {".ttf", ".otf", ".ttc"} and any(needle.lower() in path.name.lower() for needle in needles):
                 return path
     return None
+
+
+def renderer_font_data_uri(font_name: str = "Noto Sans CJK SC") -> str | None:
+    """Embed an installed font in render props so headless Chromium has CJK glyphs.
+
+    This avoids a browser-side network font request and keeps the font out of
+    the Windows command line. It is intentionally task-local render input, not
+    copied into the output or any metrics artifact.
+    """
+    path = resolve_local_font(font_name) or resolve_local_font("Microsoft YaHei")
+    if path is None:
+        return None
+    mime_type = "font/ttf" if path.suffix.lower() == ".ttf" else "font/collection"
+    return f"data:{mime_type};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
 def _layout_for(width: int, height: int) -> SubtitleLayout:
@@ -94,6 +110,49 @@ def write_ass(transcript: Transcript, destination: Path, width: int, height: int
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(generate_ass(transcript, width, height, font_name=font_name), encoding="utf-8-sig", newline="\n")
     return destination
+
+
+def _subtitle_normalize(text: str) -> str:
+    return re.sub(r"[^\w\u4e00-\u9fff]+", "", text).lower()
+
+
+def build_dynamic_subtitle_cues(transcript: Transcript, plan: AnimationPlan) -> list[dict]:
+    """Build short phrase cues with word-level emphasis for the Remotion overlay.
+
+    Captions remain transcript-derived.  Planner triggers only influence the
+    appearance of matching words; they never create new spoken text.
+    """
+    emphasis_triggers = {
+        _subtitle_normalize(animation.trigger_text)
+        for animation in plan.animations
+        if animation.type in {"keyword_pop", "quote_card", "info_graphic"}
+    }
+    cues: list[dict] = []
+    max_phrase_chars = 15
+    for segment in transcript.segments:
+        phrase_words = []
+        phrase_chars = 0
+        for word in segment.words:
+            clean = word.text.strip()
+            if not clean:
+                continue
+            normalized = _subtitle_normalize(clean)
+            emphasized = bool(normalized and any(normalized in trigger or trigger in normalized for trigger in emphasis_triggers))
+            phrase_words.append({
+                "text": clean, "start_ms": word.start_ms, "end_ms": word.end_ms, "emphasized": emphasized,
+            })
+            phrase_chars += len(normalized or clean)
+            duration = word.end_ms - phrase_words[0]["start_ms"]
+            if phrase_chars >= max_phrase_chars or duration >= 1_600:
+                cues.append({
+                    "start_ms": phrase_words[0]["start_ms"], "end_ms": phrase_words[-1]["end_ms"], "words": phrase_words,
+                })
+                phrase_words, phrase_chars = [], 0
+        if phrase_words:
+            cues.append({
+                "start_ms": phrase_words[0]["start_ms"], "end_ms": phrase_words[-1]["end_ms"], "words": phrase_words,
+            })
+    return cues
 
 
 def ffmpeg_filter_path(path: Path) -> str:

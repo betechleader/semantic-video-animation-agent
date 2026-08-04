@@ -12,9 +12,10 @@
 | 7 Semantic planning rules | COMPLETED | `planning_rules.py` validates grounding, duration, density, overlap, and IDs for both planners | Unit, API failure-path, and Mock E2E tests | Thresholds are deterministic safeguards, not learned editorial scoring |
 | 8 Review and editing UI | COMPLETED | Browser preview, transcript/plan JSON review, review re-render API, SSE event cursor | API tests and actual review re-render E2E | Editing uses JSON rather than form-level controls |
 | 9 Quality and safe areas | COMPLETED | Responsive template layout, safe-area validation, decode/metadata quality gate, `quality.json` artifact | Unit checks and two-pass render E2E; renderer build | No visual-perceptual scoring or device-specific review |
-| 10A Copyright-compliant media visuals | COMPLETED | Task-local original SVG fallback, audit manifest/hash validation, transcript-grounded `media_visual_v1` Remotion template | Unit, API/pipeline E2E, renderer build | External licensed-source provider intentionally deferred until licence verification is implemented |
+| 10A Local original-media fallback | COMPLETED | Task-local original concept graphic and audit/hash validation | Unit and initial pipeline E2E | Superseded as the only allowed source by 10C |
 | 10B Local face-safe media placement | COMPLETED | Local CPU OpenCV Haar sampling, protected talking-head exclusion zones, deterministic corner/shrink/skip media layouts | Unit, API, actual FFmpeg/Remotion E2E, renderer build | Haar detection is limited to detectable frontal faces; it is not general-purpose subject segmentation |
 | 10 Evaluation/observability | COMPLETED | Task-local privacy-safe `metrics.json`, hashed trace correlation, per-attempt stage timings, output technical quality, failure categories, and read-only API | Unit/API tests plus actual FFmpeg/Remotion initial and review re-render E2E | No perceptual/editorial scoring yet |
+| 10C Knowledge-talk visual prototype | COMPLETED | Word/phrase dynamic captions, `knowledge_infographic_v1`, full/side B-roll, no-key Wikimedia/Pexels/manual Provider interface, task-local candidate and provenance manifests, review UI/API | Provider/unit/API tests, actual FFmpeg/Remotion initial and review re-render E2E, renderer build | No learned visual ranking, no commercial rights or factual validation, limited subject segmentation |
 | 11 Optional RAG | NOT_STARTED | — | — | Deferred until core chain stabilizes |
 | 12 Optional MCP | NOT_STARTED | — | — | Deferred until services stabilize |
 | 13 LangGraph assessment | NOT_STARTED | — | — | Assess when human resume/checkpoint complexity warrants it |
@@ -22,4 +23,4 @@
 
 ## Current execution plan
 
-Stages 10A, 10B, and 10 are complete. Mock mode remains the default. Stage 11 is optional and remains deferred while the local core chain stabilizes.
+Stages 10, 10A, 10B, and 10C are complete. Mock remains the offline server/test default, while the upload page recommends real local ASR/rule planning and selects its media Provider per task. External-source mode is explicitly a non-commercial effect-validation prototype. Stage 11 is optional and remains deferred while the core chain stabilizes.

@@ -9,10 +9,11 @@ from .config import COMMAND_TIMEOUT_SECONDS, RENDERER_ROOT
 from .face_safety import FaceSafetyError, analyse_face_safe_areas
 from .database import is_cancellation_requested
 from .media_assets import prepare_media_assets, renderer_media_assets
+from .media_providers import MediaProviderError
 from .process_control import process_registry
 from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, verify_overlay_has_alpha, write_quality_report
 from .schemas import AnimationPlan, Transcript, VideoMetadata
-from .subtitles import ffmpeg_filter_path, write_ass
+from .subtitles import build_dynamic_subtitle_cues, renderer_font_data_uri, write_ass
 from .video import ensure_storage_path
 
 
@@ -88,13 +89,17 @@ def render_and_composite(
     props_file = safe_dir / "remotion_props.json"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
+    def acquire_media() -> AnimationPlan:
+        try:
+            return prepare_media_assets(safe_dir, plan)
+        except (ValueError, MediaProviderError) as exc:
+            raise ProcessingError(f"Media asset validation failed: {exc}") from exc
+
+    plan = run_stage("media_asset_acquisition", acquire_media)
+
     def prepare_safe_media() -> AnimationPlan:
         try:
-            prepared_plan = prepare_media_assets(safe_dir, plan)
-        except ValueError as exc:
-            raise ProcessingError(f"Media asset validation failed: {exc}") from exc
-        try:
-            prepared_plan = analyse_face_safe_areas(safe_dir, metadata, prepared_plan)
+            prepared_plan = analyse_face_safe_areas(safe_dir, metadata, plan)
         except FaceSafetyError as exc:
             raise ProcessingError(f"Local face safety analysis failed: {exc}") from exc
         validate_animation_safe_areas(prepared_plan, metadata.width, metadata.height)
@@ -105,6 +110,8 @@ def render_and_composite(
         "animations": [animation.model_dump() for animation in plan.animations],
         "mediaAssets": renderer_media_assets(safe_dir, plan),
         "mediaPlacements": [placement.model_dump() for placement in plan.media_placements],
+        "subtitleCues": build_dynamic_subtitle_cues(transcript, plan),
+        "fontDataUri": renderer_font_data_uri(),
         "width": metadata.width, "height": metadata.height,
         "fps": metadata.frame_rate, "durationInFrames": max(1, round(metadata.duration_seconds * metadata.frame_rate)),
     }
@@ -120,10 +127,13 @@ def render_and_composite(
     run_stage("remotion_render", render_overlay)
 
     def composite() -> None:
+        # Keep ASS as a task artifact/export fallback. The visible captions are
+        # rendered in Remotion so word-level emphasis and kinetic timing can be
+        # synchronized to the same props file as the semantic visual plan.
         write_ass(transcript, subtitles, metadata.width, metadata.height)
         command = [
             "ffmpeg", "-y", "-i", str(source), "-i", str(overlay),
-            "-filter_complex", f"[0:v][1:v]overlay=0:0:format=auto[v0];[v0]subtitles='{ffmpeg_filter_path(subtitles)}'[v]", "-map", "[v]",
+            "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto[v]", "-map", "[v]",
         ]
         if metadata.has_audio:
             command.extend(["-map", "0:a:0?", "-c:a", "aac"])

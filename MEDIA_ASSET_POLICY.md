@@ -1,9 +1,16 @@
-# Media asset and copyright policy
+# External-media prototype policy
 
-The pipeline must not download, scrape, or automatically place network images into a video. A web image is not eligible merely because it is publicly visible.
+> **External-material prototype; not suitable for direct commercial publication.**
 
-The current implementation permits only `generated_original` task-local SVG illustrations. They are generic topic visuals (for example, an open-book illustration) and must not reproduce a specific book cover, logo, trademarked artwork, or recognisable cover composition.
+This phase may search, download, and composite external images or short video B-roll to validate semantic-animation effects. An external visual is only an illustrative editing asset: it must never be used as factual evidence or cause the planner to assert a fact not present in the transcript.
 
-Each rendered asset has a corresponding `media_assets.json` record and plan entry containing its source URI, author/provider, licence, permitted transformations, acquisition time, local path, SHA-256 digest, and asset kind. The renderer verifies the file and digest before it can be passed to Remotion.
+Each adopted asset is copied into `storage/{task_id}/media-assets/`; Remotion receives only the hash-verified local copy, never a remote URL. `media_assets.json` records the provider, search query, downloaded URL, source page URL when known, named author/provider, declared licence text, acquisition time, task-relative path, SHA-256 digest, MIME type, and exact use interval. Search results that have not been selected stay in `media_candidates.json` for reviewer inspection.
 
-Future external providers may be added only after they enforce all of these conditions before download and render: a traceable source URL, named provider or author, an explicit licence that permits commercial short-video/social-platform distribution, and permission to crop, scale, composite, and overlay text. Their original licence terms must be stored with the audit record. If any condition is missing or ambiguous, use the original-illustration fallback.
+## Provider modes
+
+- `MEDIA_PROVIDER=mock` is the default: no network call is made and a designed original information graphic is used.
+- `MEDIA_PROVIDER=wikimedia_commons` searches Wikimedia Commons with its no-key Action API and downloads a selected task-local copy.
+- `MEDIA_PROVIDER=pexels` supports image/video search when `PEXELS_API_KEY` is set. Without it the API returns an actionable configuration error.
+- `MEDIA_PROVIDER=manual` intentionally performs no automatic search. A reviewer can add an explicit `http(s)` image/video URL in the review panel.
+
+The system records metadata but **does not determine whether a licence, person release, trademark, editorial use, or platform use is commercially adequate**. A human must inspect the source page, current terms, factual relevance, visual suitability, and rights before any public/commercial release. If search has no candidate, the download fails, or the default Mock mode is active, the renderer falls back to an original task-local concept graphic.

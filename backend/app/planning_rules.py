@@ -38,7 +38,11 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
     if len(animation_ids) != len(set(animation_ids)):
         raise PlanningRuleError("animation IDs must be unique")
 
-    media_animation_ids = [animation.parameters.asset_id for animation in plan.animations if animation.type == "media_visual"]
+    media_animation_ids = [
+        animation.parameters.asset_id
+        for animation in plan.animations
+        if animation.type == "media_visual" and animation.parameters.enabled
+    ]
     if len(media_animation_ids) != len(set(media_animation_ids)):
         raise PlanningRuleError("media visual asset IDs must be unique")
     if plan.media_assets:
@@ -47,14 +51,17 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
             raise PlanningRuleError("media asset audit IDs must be unique")
         if asset_ids != set(media_animation_ids):
             raise PlanningRuleError("media asset audit metadata must exactly match media visual references")
-        if any(asset.asset_kind != "generated_original" for asset in plan.media_assets):
-            raise PlanningRuleError("only generated_original media assets are currently permitted")
+        if any(asset.usage_end_ms <= asset.usage_start_ms for asset in plan.media_assets):
+            raise PlanningRuleError("media asset usage intervals must be valid")
 
     if plan.media_placements:
         placement_ids = [placement.animation_id for placement in plan.media_placements]
         if len(placement_ids) != len(set(placement_ids)):
             raise PlanningRuleError("media placement animation IDs must be unique")
-        if set(placement_ids) != {animation.id for animation in plan.animations if animation.type == "media_visual"}:
+        if set(placement_ids) != {
+            animation.id for animation in plan.animations
+            if animation.type == "media_visual" and animation.parameters.enabled
+        }:
             raise PlanningRuleError("media placements must exactly match media visual animations")
 
     for animation in plan.animations:

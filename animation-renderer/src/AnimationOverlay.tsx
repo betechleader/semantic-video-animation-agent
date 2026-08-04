@@ -3,9 +3,12 @@ import {AbsoluteFill} from 'remotion';
 import {KeywordPop} from './KeywordPop';
 import {QuoteCard} from './QuoteCard';
 import {MediaVisual} from './MediaVisual';
+import {KnowledgeInfographic} from './KnowledgeInfographic';
+import {DynamicSubtitles} from './DynamicSubtitles';
+import {ChineseFontLoader} from './ChineseFontLoader';
 import type {AnimationOverlayProps} from './types';
 
-export const AnimationOverlay: React.FC<AnimationOverlayProps> = (props) => <AbsoluteFill style={{backgroundColor: 'transparent'}}>
+export const AnimationOverlay: React.FC<AnimationOverlayProps> = (props) => <ChineseFontLoader fontDataUri={props.fontDataUri}><AbsoluteFill style={{backgroundColor: 'transparent'}}>
   {props.animations.map((animation) => {
     if (animation.type === 'keyword_pop') {
       return <KeywordPop key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} fps={props.fps} durationInFrames={props.durationInFrames} />;
@@ -13,8 +16,12 @@ export const AnimationOverlay: React.FC<AnimationOverlayProps> = (props) => <Abs
     if (animation.type === 'quote_card') {
       return <QuoteCard key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} />;
     }
+    if (animation.type === 'info_graphic') {
+      return <KnowledgeInfographic key={animation.id} {...animation.parameters} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} />;
+    }
     const asset = props.mediaAssets?.find((candidate) => candidate.asset_id === animation.parameters.asset_id);
     const placement = props.mediaPlacements?.find((candidate) => candidate.animation_id === animation.id);
-    return <MediaVisual key={animation.id} {...animation.parameters} data_uri={asset?.data_uri} placement={placement} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} />;
+    return <MediaVisual key={animation.id} {...animation.parameters} data_uri={asset?.data_uri} mime_type={asset?.mime_type} placement={placement} start_ms={animation.start_ms} end_ms={animation.end_ms} width={props.width} height={props.height} />;
   })}
-</AbsoluteFill>;
+  <DynamicSubtitles cues={props.subtitleCues} width={props.width} />
+</AbsoluteFill></ChineseFontLoader>;

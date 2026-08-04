@@ -21,6 +21,10 @@ class Settings:
     planner_model: str
     planner_base_url: str
     planner_timeout_seconds: int
+    media_provider: str
+    media_search_timeout_seconds: int
+    media_max_download_mb: int
+    pexels_api_key: str | None
 
     @property
     def max_upload_bytes(self) -> int:
@@ -39,6 +43,10 @@ def load_settings() -> Settings:
         planner_model=os.getenv("PLANNER_MODEL", "qwen2.5:7b-instruct"),
         planner_base_url=os.getenv("PLANNER_BASE_URL", "http://127.0.0.1:11434/v1"),
         planner_timeout_seconds=int(os.getenv("PLANNER_TIMEOUT_SECONDS", "60")),
+        media_provider=os.getenv("MEDIA_PROVIDER", "mock").lower(),
+        media_search_timeout_seconds=int(os.getenv("MEDIA_SEARCH_TIMEOUT_SECONDS", "20")),
+        media_max_download_mb=int(os.getenv("MEDIA_MAX_DOWNLOAD_MB", "20")),
+        pexels_api_key=os.getenv("PEXELS_API_KEY") or None,
     )
 
 

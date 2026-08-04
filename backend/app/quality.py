@@ -28,7 +28,7 @@ class OutputQuality:
 def validate_animation_safe_areas(plan: AnimationPlan, width: int, height: int) -> None:
     """Reject text that cannot fit inside the renderer's 8% horizontal safe area."""
     safe_width = width * 0.84
-    keyword_font_size = max(28, min(72, round(width / 10)))
+    keyword_font_size = max(42, min(118, round(width / 7.4)))
     for animation in plan.animations:
         if animation.type == "keyword_pop":
             available_text_width = safe_width - 68
@@ -38,7 +38,7 @@ def validate_animation_safe_areas(plan: AnimationPlan, width: int, height: int) 
                 raise QualityValidationError(
                     f"{animation.id} keyword text exceeds the {round(safe_width)} px horizontal safe area"
                 )
-        if animation.type == "media_visual" and width * 0.27 > safe_width:
+        if animation.type == "media_visual" and animation.parameters.display_mode == "side_card" and width * 0.34 > safe_width:
             raise QualityValidationError(f"{animation.id} media visual exceeds the horizontal safe area")
     if width < 240 or height < 240:
         raise QualityValidationError("video dimensions are too small for the supported safe-area layout")

@@ -21,9 +21,9 @@ export const KeywordPop: React.FC<KeywordPopProps> = (props) => {
   const opacity = interpolate(scale, [0, 0.25, 1], [0, 1, 1], {extrapolateRight: 'clamp'});
 
   if (!visible) return null;
-  const fontSize = Math.max(28, Math.min(72, Math.round(props.width / 10)));
+  const fontSize = Math.max(42, Math.min(118, Math.round(props.width / 7.4)));
   return <div style={{position: 'absolute', maxWidth: '84%', ...positions[props.position], opacity, transform: `${positions[props.position].transform ?? ''} scale(${scale})`}}>
-    <div style={{backgroundColor: props.color, borderRadius: 24, boxShadow: '0 12px 28px rgba(0,0,0,0.35)', color: '#111', fontFamily: 'Microsoft YaHei, sans-serif', fontSize, fontWeight: 800, lineHeight: 1.2, padding: '22px 34px', textAlign: 'center', whiteSpace: 'normal', wordBreak: 'break-all'}}>
+    <div style={{color: props.color, fontFamily: 'KnowledgeChinese, Microsoft YaHei, PingFang SC, sans-serif', fontSize, fontWeight: 900, lineHeight: 1.04, padding: '8px 12px', textAlign: 'center', whiteSpace: 'normal', wordBreak: 'break-all', textShadow: '-3px -3px 0 rgba(15,18,25,.94), 3px -3px 0 rgba(15,18,25,.94), -3px 3px 0 rgba(15,18,25,.94), 3px 3px 0 rgba(15,18,25,.94), 0 8px 0 rgba(0,0,0,.20), 0 12px 20px rgba(0,0,0,.48)', letterSpacing: '.03em'}}>
       {props.text}
     </div>
   </div>;

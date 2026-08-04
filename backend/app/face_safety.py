@@ -88,8 +88,8 @@ def detect_face_regions(source: Path, metadata: VideoMetadata) -> list[FaceRegio
 
 
 def _media_size(width: int) -> tuple[int, int]:
-    size = max(96, min(168, round(width * 0.27)))
-    return size, round(size * 1.2)
+    size = max(112, min(300, round(width * 0.34)))
+    return size, round(size * 1.28)
 
 
 def _corner_rect(corner: str, scale: float, width: int, height: int) -> _Rect:
@@ -106,8 +106,8 @@ def _corner_rect(corner: str, scale: float, width: int, height: int) -> _Rect:
 
 def _subtitle_rect(width: int, height: int) -> _Rect:
     layout = _layout_for(width, height)
-    font_size = max(28, min(64, round(width / 18)))
-    # ASS may show two lines plus outline/shadow. Reserve a little extra above it.
+    font_size = max(34, min(74, round(width / 12)))
+    # Dynamic captions may show two outlined lines plus a phrase highlight.
     top = max(0, height - layout.margin_v - font_size * layout.max_lines - 24)
     return _Rect(0, top, width, height - top)
 
@@ -131,7 +131,10 @@ def choose_media_placements(plan: AnimationPlan, metadata: VideoMetadata) -> lis
     """Select an unoccupied corner, shrink it when possible, otherwise skip it."""
     placements: list[MediaPlacement] = []
     for animation in plan.animations:
-        if animation.type != "media_visual":
+        if animation.type != "media_visual" or not animation.parameters.enabled:
+            continue
+        if animation.parameters.display_mode == "full_screen":
+            placements.append(MediaPlacement(animation_id=animation.id, corner=None, scale=1, skipped=False, reason="full_screen"))
             continue
         forbidden = _forbidden_regions(plan.face_regions, animation.start_ms, animation.end_ms, metadata.width, metadata.height)
         selected: tuple[str, float] | None = None
