@@ -11,6 +11,7 @@ from .database import is_cancellation_requested
 from .media_assets import prepare_media_assets, renderer_media_assets
 from .media_providers import MediaProviderError
 from .process_control import process_registry
+from .planning_rules import PlanningRuleError, validate_animation_plan
 from .quality import QualityValidationError, validate_animation_safe_areas, verify_output_quality, verify_overlay_has_alpha, write_quality_report
 from .schemas import AnimationPlan, Transcript, VideoMetadata
 from .subtitles import build_dynamic_subtitle_cues, renderer_font_data_uri, write_ass
@@ -96,6 +97,10 @@ def render_and_composite(
             raise ProcessingError(f"Media asset validation failed: {exc}") from exc
 
     plan = run_stage("media_asset_acquisition", acquire_media)
+    try:
+        validate_animation_plan(plan, transcript)
+    except PlanningRuleError as exc:
+        raise ProcessingError(f"Prepared media plan validation failed: {exc}") from exc
 
     def prepare_safe_media() -> AnimationPlan:
         try:
@@ -106,6 +111,10 @@ def render_and_composite(
         return prepared_plan
 
     plan = run_stage("media_safety_analysis", prepare_safe_media)
+    try:
+        validate_animation_plan(plan, transcript)
+    except PlanningRuleError as exc:
+        raise ProcessingError(f"Final animation plan validation failed: {exc}") from exc
     props = {
         "animations": [animation.model_dump() for animation in plan.animations],
         "mediaAssets": renderer_media_assets(safe_dir, plan),

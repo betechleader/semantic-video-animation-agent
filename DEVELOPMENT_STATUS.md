@@ -1,8 +1,32 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `4fb1963 fix: load remotion props from task file`
-- Current stage: Stage 10C, knowledge-talk external-media prototype - completed.
+- Current commit before this stage: `28c24fb 新增网页中英文切换`
+- Current stage: Stage 10D, transcript correction and review robustness - completed, pending user-approved commit.
+
+## Stage 10D delivered
+
+- Added a configurable post-ASR Chinese correction layer backed by `config/asr_corrections.json`. Contextual replacements merge only existing word intervals and persist both an immutable `raw_asr` snapshot and timestamped correction records; no replacement creates a new time point.
+- Corrected `会姑娘` to `灰姑娘` in story/rewriting context and `心理学有生活` to `心理学与生活` in book context. Subtitles, semantic segments, trigger text, titles, keywords, retrieval queries, and infographic content now consume the corrected transcript.
+- Improved rule planning by stripping weak openings such as `然后`, `对于……来说`, `比如说`, and `而不是说`, limiting portrait keyword text to the renderer's three-line safe area, and merging at most two adjacent ASR fragments when a sentence split would otherwise create a residual phrase.
+- Review saves now compare submitted and stored transcript content. A text change safely normalizes the edited segment onto its existing interval and automatically rebuilds the rule-based animation plan. Unchanged reviews retain reviewer animation/candidate decisions.
+- The review API no longer trusts or requires the browser to synchronize `media_assets`, `face_regions`, or `media_placements`. It clears these derived fields before validation; media preparation then reloads only hash-valid task-local audits, reconciles enabled visuals and candidate selections, repeats placement analysis, and performs strict final validation. Missing or failed explicit candidates remain visible errors.
+- The web preview is centred and responsive with `max-width`, viewport-relative `max-height`, and `object-fit: contain`; portrait preview sizing does not affect the 540×960 downloaded output.
+
+## Stage 10D verification
+
+- Full Python suite: `79 passed in 47.43s`, including actual FFmpeg/Remotion initial processing and a review re-render with a disabled media visual plus stale derived metadata.
+- The original audit error was reproduced against task `482cabd9-9495-4edf-964d-4e2d038657d4` by disabling `animation_004` while retaining its audit metadata; the old entry raised `media asset audit metadata must exactly match media visual references` before rendering.
+- Real source `D:\桌面\常用\自媒体创新性.mp4` completed as validation task `fc606fb1-59b5-47ee-a6ad-bc9dd5d95b91` with local `faster_whisper + rule_based`, Mock media, two recorded corrections, nine animations, and verified 94.362 s 540×960 audio/video output.
+- The same real task accepted a review request that disabled `animation_004` while submitting two stale assets and placements. The review re-render completed and rebuilt the final plan to one enabled media visual, one audit, and one placement.
+- Browser checks used 1440×900 and 390×844 viewports. Desktop preview max height resolved to 648 px; narrow preview max height resolved to 540.16 px, the review editor became one column, and document scroll width stayed equal to 390 px.
+- Standard `npm.cmd run build` still fails because Windows denies removal of the locked `animation-renderer/build` directory (`EPERM`). `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260804_final` completed successfully.
+
+## Stage 10D known limitations
+
+- Phrase correction is deterministic and dictionary-driven rather than a general Chinese language model; new domains require reviewed dictionary/context entries.
+- Reviewer editing remains JSON-based. Editing `segment.text` is supported and automatically reuses that segment's existing timing; there is no dedicated word-level correction form yet.
+- Local LLM planning remains supported but was not live-model quality tested in this stage; the automatic review replan path intentionally uses the deterministic rule planner.
 
 ## Stage 10C delivered
 

@@ -56,7 +56,7 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert initial_metrics["status"] == "completed"
         assert initial_metrics["trace_id_sha256"]
         assert set(initial_metrics["attempts"][0]["stages"]) == {
-            "upload_probe", "audio_extraction", "asr", "planning", "media_asset_acquisition", "media_safety_analysis",
+            "upload_probe", "audio_extraction", "asr", "asr_correction", "planning", "media_asset_acquisition", "media_safety_analysis",
             "remotion_render", "compositing", "quality_check",
         }
         assert initial_metrics["attempts"][0]["output_quality"]["width"] == 320
@@ -68,7 +68,11 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
-        review = client.post(f"/api/videos/{task_id}/review", json={"transcript": task["transcript"], "plan": task["plan"]})
+        # A real review render must accept a disabled media visual even while
+        # the submitted JSON still contains its stale audit and placement.
+        reviewed_plan = task["plan"]
+        reviewed_plan["animations"][1]["parameters"]["enabled"] = False
+        review = client.post(f"/api/videos/{task_id}/review", json={"transcript": task["transcript"], "plan": reviewed_plan})
         assert review.status_code == 202, review.text
         deadline = time.monotonic() + 120
         while True:
@@ -77,6 +81,8 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
                 break
             time.sleep(0.25)
         assert reviewed_task["status"] == "completed"
+        assert reviewed_task["plan"]["media_assets"] == []
+        assert reviewed_task["plan"]["media_placements"] == []
         assert probe_video(result).has_video is True
         assert json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))["width"] == 320
         reviewed_metrics = client.get(f"/api/videos/{task_id}/metrics").json()

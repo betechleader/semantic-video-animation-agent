@@ -90,6 +90,26 @@ def test_selected_external_candidate_is_downloaded_hashed_and_exposed_only_as_ta
     assert manifest[0]["sha256"] == audit.sha256
 
 
+def test_missing_or_failed_explicit_candidate_is_never_silently_replaced(tmp_path, monkeypatch) -> None:
+    raw_plan = TranscriptAnimationPlanningProvider().plan(source_transcript())
+    data = raw_plan.model_dump()
+    data["animations"][0]["parameters"]["selected_candidate_id"] = "candidate_missing"
+    with pytest.raises(MediaProviderError, match="does not exist in this task"):
+        prepare_media_assets(tmp_path, AnimationPlan.model_validate(data))
+
+    candidate = manual_candidate(ManualMediaCandidateInput(
+        query="product", source_url="https://example.test/fail.jpg", title="Reviewed selection",
+    ))
+    save_candidates(tmp_path, [candidate])
+    data["animations"][0]["parameters"]["selected_candidate_id"] = candidate.id
+    monkeypatch.setattr(
+        "backend.app.media_assets._download_candidate",
+        lambda *_args: (_ for _ in ()).throw(MediaProviderError("explicit download failed")),
+    )
+    with pytest.raises(MediaProviderError, match="explicit download failed"):
+        prepare_media_assets(tmp_path, AnimationPlan.model_validate(data))
+
+
 def test_pexels_without_key_has_a_clear_actionable_error() -> None:
     with pytest.raises(MediaProviderError, match="PEXELS_API_KEY"):
         PexelsProvider(None).search("factory", "external_video")

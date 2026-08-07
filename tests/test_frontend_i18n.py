@@ -22,3 +22,13 @@ def test_all_static_translation_keys_exist_in_both_languages() -> None:
     key_pattern = re.compile(r"(?:^|,)\s*([A-Za-z][A-Za-z0-9_]*):", re.MULTILINE)
     assert static_keys <= set(key_pattern.findall(chinese_block))
     assert static_keys <= set(key_pattern.findall(english_block))
+
+
+def test_video_preview_is_responsive_on_desktop_and_narrow_screens() -> None:
+    html = FRONTEND.read_text(encoding="utf-8")
+    assert '.preview-shell { display: flex; justify-content: center;' in html
+    assert 'max-width: 100%' in html
+    assert 'max-height: min(72vh, 760px)' in html
+    assert 'object-fit: contain' in html
+    assert '@media (max-width: 700px)' in html
+    assert '#preview { max-height: 64vh; }' in html

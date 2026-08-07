@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from pydantic import ValidationError
 
 from .config import SETTINGS
 from .media_providers import ExternalMediaProvider, MediaProviderError, get_media_provider_by_name, load_candidates, save_candidates
@@ -75,6 +76,21 @@ def _asset_path(task_dir: Path, asset_id: str, mime_type: str) -> Path:
 def _audit_matches_local_file(task_dir: Path, audit: MediaAssetAudit) -> bool:
     path = (task_dir / audit.local_path).resolve()
     return task_dir in path.parents and path.is_file() and _sha256(path) == audit.sha256
+
+
+def _load_existing_audits(task_dir: Path) -> dict[str, MediaAssetAudit]:
+    """Load only structurally valid prior render output; stale entries are reconciled below."""
+    path = task_dir / "media_assets.json"
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        audits = [MediaAssetAudit.model_validate(item) for item in payload]
+    except (OSError, json.JSONDecodeError, ValidationError, TypeError):
+        return {}
+    if len({audit.asset_id for audit in audits}) != len(audits):
+        return {}
+    return {audit.asset_id: audit for audit in audits}
 
 
 def _download_candidate(candidate: MediaCandidate, destination: Path, max_download_bytes: int) -> None:
@@ -148,7 +164,10 @@ def prepare_media_assets(
     task_dir = task_dir.resolve()
     asset_dir = task_dir / "media-assets"
     asset_dir.mkdir(parents=True, exist_ok=True)
-    existing = {asset.asset_id: asset for asset in plan.media_assets}
+    # The submitted review plan deliberately has derived audit metadata
+    # cleared. Reuse only hash-valid task-local output from the previous render.
+    existing = _load_existing_audits(task_dir)
+    existing.update({asset.asset_id: asset for asset in plan.media_assets})
     known_candidates = {candidate.id: candidate for candidate in load_candidates(task_dir)}
     active_provider = provider or get_media_provider_by_name(plan.media_provider, SETTINGS)
     limit = max_download_bytes or SETTINGS.media_max_download_mb * 1024 * 1024
@@ -159,7 +178,13 @@ def prepare_media_assets(
             continue
         params = animation.parameters
         previous = existing.get(params.asset_id)
-        selection_unchanged = previous and (params.selected_candidate_id is None or params.selected_candidate_id == previous.candidate_id)
+        if params.selected_candidate_id and params.selected_candidate_id not in known_candidates:
+            raise MediaProviderError(f"Selected media candidate does not exist in this task: {params.selected_candidate_id}")
+        selection_unchanged = (
+            previous
+            and previous.search_query == params.search_query
+            and (params.selected_candidate_id is None or params.selected_candidate_id == previous.candidate_id)
+        )
         if selection_unchanged and _audit_matches_local_file(task_dir, previous):
             audits.append(previous.model_copy(update={
                 "search_query": params.search_query, "usage_start_ms": animation.start_ms, "usage_end_ms": animation.end_ms,

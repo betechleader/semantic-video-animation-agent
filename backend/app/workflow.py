@@ -3,6 +3,7 @@ import threading
 from pathlib import Path
 
 from .audio import AudioExtractionError, AudioService
+from .asr_corrections import correct_transcript, load_phrase_corrections
 from .config import MODEL_ROOT, SETTINGS
 from .database import get_task, transition_task
 from .metrics import TaskMetrics, initialize_initial_metrics
@@ -39,6 +40,11 @@ def process_task(
         asr_name = "faster_whisper" if processing_profile == "real" else "mock" if processing_profile == "mock" else SETTINGS.asr_provider
         provider = MockSpeechRecognitionProvider() if asr_name == "mock" else FasterWhisperProvider(SETTINGS.asr_model, MODEL_ROOT, SETTINGS.asr_local_files_only)
         transcript = metrics.record_stage(attempt, "asr", lambda: provider.transcribe(audio_path))
+        transcript = metrics.record_stage(
+            attempt,
+            "asr_correction",
+            lambda: correct_transcript(transcript, load_phrase_corrections(SETTINGS.asr_correction_dictionary_path)),
+        )
 
         def build_plan() -> AnimationPlan:
             planner_name = "rule_based" if processing_profile == "real" else "mock" if processing_profile == "mock" else SETTINGS.planner_provider

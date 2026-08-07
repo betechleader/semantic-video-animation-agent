@@ -23,6 +23,7 @@ STAGE_NAMES = (
     "upload_probe",
     "audio_extraction",
     "asr",
+    "asr_correction",
     "planning",
     "media_asset_acquisition",
     "media_safety_analysis",

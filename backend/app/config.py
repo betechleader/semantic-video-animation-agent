@@ -7,6 +7,7 @@ STORAGE_ROOT = PROJECT_ROOT / "storage"
 RENDERER_ROOT = PROJECT_ROOT / "animation-renderer"
 MODEL_ROOT = PROJECT_ROOT / "storage" / "models"
 DATABASE_PATH = STORAGE_ROOT / "tasks.sqlite3"
+ASR_CORRECTION_DICTIONARY_PATH = PROJECT_ROOT / "config" / "asr_corrections.json"
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class Settings:
     asr_provider: str
     asr_model: str
     asr_local_files_only: bool
+    asr_correction_dictionary_path: Path
     planner_provider: str
     planner_model: str
     planner_base_url: str
@@ -39,6 +41,7 @@ def load_settings() -> Settings:
         asr_provider=os.getenv("ASR_PROVIDER", "mock"),
         asr_model=os.getenv("ASR_MODEL", "small"),
         asr_local_files_only=os.getenv("ASR_LOCAL_FILES_ONLY", "true").lower() == "true",
+        asr_correction_dictionary_path=Path(os.getenv("ASR_CORRECTION_DICTIONARY", str(ASR_CORRECTION_DICTIONARY_PATH))),
         planner_provider=os.getenv("PLANNER_PROVIDER", "mock"),
         planner_model=os.getenv("PLANNER_MODEL", "qwen2.5:7b-instruct"),
         planner_base_url=os.getenv("PLANNER_BASE_URL", "http://127.0.0.1:11434/v1"),

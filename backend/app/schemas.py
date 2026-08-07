@@ -45,6 +45,36 @@ class TranscriptSegment(BaseModel):
         return self
 
 
+class RawAsrTranscript(BaseModel):
+    """Immutable ASR provider output retained for reviewer comparison."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    language: str = Field(min_length=2, max_length=16)
+    language_confidence: float | None = Field(default=None, ge=0, le=1)
+    full_text: str = Field(min_length=1)
+    segments: list[TranscriptSegment] = Field(min_length=1)
+
+
+class TranscriptCorrection(BaseModel):
+    """A text correction tied only to an interval already emitted by ASR."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str = Field(min_length=1)
+    target: str = Field(min_length=1)
+    segment_index: int = Field(ge=0)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(gt=0)
+    kind: Literal["dictionary", "manual"] = "dictionary"
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "TranscriptCorrection":
+        if self.end_ms <= self.start_ms:
+            raise ValueError("end_ms must be greater than start_ms")
+        return self
+
+
 class Transcript(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,6 +82,8 @@ class Transcript(BaseModel):
     language_confidence: float | None = Field(default=None, ge=0, le=1)
     full_text: str = Field(min_length=1)
     segments: list[TranscriptSegment] = Field(min_length=1)
+    raw_asr: RawAsrTranscript | None = None
+    corrections: list[TranscriptCorrection] = Field(default_factory=list)
 
 
 class KeywordPopParameters(BaseModel):

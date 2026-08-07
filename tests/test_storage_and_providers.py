@@ -49,3 +49,19 @@ def test_offline_planner_prioritizes_book_visual_over_nearby_keyword() -> None:
     plan = TranscriptAnimationPlanningProvider().plan(transcript)
     assert [animation.type for animation in plan.animations] == ["media_visual"]
     assert plan.animations[0].start_ms == 3200
+
+
+def test_offline_planner_finitely_merges_adjacent_split_sentence() -> None:
+    transcript = Transcript.model_validate({
+        "language": "zh", "full_text": "设想一年之后干什么而不是只想明天", "segments": [
+            {"text": "设想一年之后干什么", "start_ms": 0, "end_ms": 1800,
+             "words": [{"text": "设想一年之后干什么", "start_ms": 0, "end_ms": 1800}]},
+            {"text": "而不是只想明天", "start_ms": 1800, "end_ms": 3400,
+             "words": [{"text": "而不是只想明天", "start_ms": 1800, "end_ms": 3400}]},
+        ],
+    })
+    plan = TranscriptAnimationPlanningProvider().plan(transcript)
+    comparison = plan.animations[0]
+    assert comparison.type == "info_graphic"
+    assert comparison.parameters.items == ["设想一年之后干什么", "只想明天"]
+    assert comparison.end_ms <= 3400

@@ -28,6 +28,12 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
     is grounded in the particular transcript being rendered.
     """
     segment_intervals = [(segment.start_ms, segment.end_ms) for segment in transcript.segments]
+    adjacent_segment_intervals = [
+        (current.start_ms, following.end_ms)
+        for current, following in zip(transcript.segments, transcript.segments[1:])
+        if 0 <= following.start_ms - current.end_ms <= 1_200
+    ]
+    grounded_segment_intervals = segment_intervals + adjacent_segment_intervals
     word_intervals = [
         (word.start_ms, word.end_ms)
         for segment in transcript.segments
@@ -71,13 +77,13 @@ def validate_animation_plan(plan: AnimationPlan, transcript: Transcript) -> Anim
                 f"{animation.id} duration must be between "
                 f"{MIN_ANIMATION_DURATION_MS} and {MAX_ANIMATION_DURATION_MS} ms"
             )
-        if not _is_bound_to_interval(animation.start_ms, animation.end_ms, word_intervals + segment_intervals):
+        if not _is_bound_to_interval(animation.start_ms, animation.end_ms, word_intervals + grounded_segment_intervals):
             raise PlanningRuleError(
                 f"{animation.id} must be fully contained in one transcript word or segment"
             )
 
     for semantic_segment in plan.semantic_segments:
-        if not _is_bound_to_interval(semantic_segment.start_ms, semantic_segment.end_ms, segment_intervals):
+        if not _is_bound_to_interval(semantic_segment.start_ms, semantic_segment.end_ms, grounded_segment_intervals):
             raise PlanningRuleError(
                 f"{semantic_segment.id} must be fully contained in one transcript segment"
             )

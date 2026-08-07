@@ -1,5 +1,6 @@
 import json
 import re
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
@@ -36,7 +37,9 @@ class TranscriptAnimationPlanningProvider:
     _minimum_gap_ms = 5_000
     _maximum_duration_ms = 2_000
 
-    _maximum_keyword_characters = 18
+    # The 540 px portrait renderer fits five CJK glyphs per line at the
+    # keyword-pop size and supports at most three lines.
+    _maximum_keyword_characters = 15
 
     _emphasis_patterns = (
         r"三种[^，。]{0,12}创新性[^，。]{0,8}方法",
@@ -51,7 +54,8 @@ class TranscriptAnimationPlanningProvider:
         # The renderer wraps up to three lines. Keeping a meaningful short
         # phrase prevents the old six-character hard cut (for example,
         # "对于自媒体博" instead of "对于自媒体博主来说").
-        return (cleaned or text.strip())[:cls._maximum_keyword_characters]
+        clipped = (cleaned or text.strip())[:cls._maximum_keyword_characters]
+        return clipped.rstrip("的了是") or clipped
 
     @classmethod
     def _meaningful_phrase(cls, text: str) -> str:
@@ -62,8 +66,49 @@ class TranscriptAnimationPlanningProvider:
                 return cls._keyword(match.group(0))
         if compact.startswith("对于") and compact.endswith("来说"):
             return ""
-        compact = re.sub(r"^(?:然后|因为|比如说|而不是|对于|就是|去)+", "", compact)
+        compact = re.sub(r"^对于[^，。]{0,24}?来说", "", compact)
+        compact = re.sub(r"^(?:(?:然后|因为|就比如说|比如说|而不是说|而不是|就是|去)[，,]?)+", "", compact)
+        compact = re.sub(r"(?:的时候|的话)$", "", compact)
+        if compact in {"然后", "而不是", "而不是说", "对于来说"}:
+            return ""
         return cls._keyword(compact or text)
+
+    @staticmethod
+    def _planning_segments(transcript: Transcript) -> list:
+        """Merge at most two adjacent ASR fragments when one sentence was split."""
+        merged = []
+        index = 0
+        while index < len(transcript.segments):
+            current = transcript.segments[index]
+            if index + 1 < len(transcript.segments):
+                following = transcript.segments[index + 1]
+                gap = following.start_ms - current.end_ms
+                compact = re.sub(r"\s+", "", current.text)
+                next_compact = re.sub(r"\s+", "", following.text)
+                incomplete = (
+                    compact.endswith(("介绍了", "对比了", "而不是说", "比如说", "然后"))
+                    or next_compact.startswith(("而不是", "提高"))
+                    or ("三种" in compact and len(compact) <= 12)
+                )
+                if 0 <= gap <= 1_200 and incomplete:
+                    merged.append(SimpleNamespace(
+                        text=current.text + following.text,
+                        start_ms=current.start_ms,
+                        end_ms=following.end_ms,
+                        words=current.words + following.words,
+                    ))
+                    index += 2
+                    continue
+            merged.append(current)
+            index += 1
+        return merged
+
+    @classmethod
+    def _clean_clause(cls, text: str, maximum: int = 36) -> str:
+        compact = re.sub(r"\s+", "", text).strip("，,。 ")
+        compact = re.sub(r"^对于[^，。]{0,24}?来说", "", compact)
+        compact = re.sub(r"^(?:(?:然后|就比如说|比如说|而不是说|而不是|就是|去)[，,]?)+", "", compact)
+        return compact[:maximum]
 
     @staticmethod
     def _time_anchor(segment, phrase: str, maximum_duration_ms: int) -> tuple[int, int]:
@@ -139,13 +184,16 @@ class TranscriptAnimationPlanningProvider:
         compact = re.sub(r"\s+", "", text).strip()
         numbered = re.search(r"第([一二三四五六七八九十]+)个(?:方法)?(?:是|就是)?(.+)", compact)
         if numbered:
-            item = numbered.group(2).strip("，,。 ") or compact
+            item = TranscriptAnimationPlanningProvider._clean_clause(numbered.group(2)) or compact
             return {"variant": "number_list", "headline": f"第{numbered.group(1)}个方法", "items": [item[:36]]}
         if "而不是" in compact:
             left, right = compact.split("而不是", 1)
             left = left or re.sub(r"\s+", "", previous_text)
             if left and right:
-                return {"variant": "comparison", "headline": "两种思考方式", "items": [left[-24:], right[:24]]}
+                return {"variant": "comparison", "headline": "两种思考方式", "items": [
+                    TranscriptAnimationPlanningProvider._clean_clause(left[-24:], 24),
+                    TranscriptAnimationPlanningProvider._clean_clause(right, 24),
+                ]}
         culture_match = re.search(r"只接触(.+?)和接触(.+?)两组", compact)
         if culture_match:
             return {"variant": "comparison", "headline": "两组文化接触实验", "items": [culture_match.group(1), culture_match.group(2)]}
@@ -168,8 +216,9 @@ class TranscriptAnimationPlanningProvider:
         animations = []
         semantic_segments = []
         last_start_ms = -self._minimum_gap_ms
-        for index, segment in enumerate(transcript.segments, start=1):
-            previous_text = transcript.segments[index - 2].text if index > 1 else ""
+        planning_segments = self._planning_segments(transcript)
+        for index, segment in enumerate(planning_segments, start=1):
+            previous_text = planning_segments[index - 2].text if index > 1 else ""
             book_title = self._book_title(segment.text)
             visual = self._visual_spec(segment.text)
             if book_title:
@@ -206,6 +255,8 @@ class TranscriptAnimationPlanningProvider:
             identifier = f"{index:03d}"
             if book_title or visual:
                 spec = visual or {"theme": "book", "query": "book reading", "kind": "external_image", "display_mode": "side_card", "title": book_title}
+                if not book_title:
+                    spec = {**spec, "title": self._clean_clause(str(spec["title"]), 42) or keyword}
                 animations.append({
                     "id": f"animation_{identifier}", "type": "media_visual", "template_id": "media_visual_v1",
                     "start_ms": start_ms, "end_ms": end_ms, "trigger_text": anchor_phrase,

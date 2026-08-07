@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, STORAGE_ROOT
+from .asr_corrections import normalize_review_transcript
 from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, start_review_render, update_transcript
 from .errors import AppError
 from .logging_config import configure_logging
@@ -17,6 +18,7 @@ from .metrics import TaskMetrics, initialize_initial_metrics, read_metrics
 from .media_providers import MediaProviderError, get_media_provider_by_name, load_candidates, manual_candidate, save_candidates
 from .process_control import process_registry
 from .planning_rules import PlanningRuleError, validate_animation_plan
+from .providers import TranscriptAnimationPlanningProvider
 from .schemas import ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
@@ -222,14 +224,27 @@ def edit_transcript(task_id: str, transcript: Transcript) -> dict:
 
 @app.post("/api/videos/{task_id}/review", status_code=status.HTTP_202_ACCEPTED)
 def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
-    try:
-        plan = validate_animation_plan(review.plan, review.transcript)
-    except PlanningRuleError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
     task = get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    if not start_review_render(task_id, review.transcript.model_dump(), plan.model_dump()):
+    try:
+        stored_transcript = Transcript.model_validate(task["transcript"])
+        transcript, transcript_changed = normalize_review_transcript(review.transcript, stored_transcript)
+        if transcript_changed:
+            plan = TranscriptAnimationPlanningProvider().plan(transcript).model_copy(update={
+                "media_provider": review.plan.media_provider,
+            })
+        else:
+            # Provenance, face detections, and placements are renderer-derived.
+            # Never require a browser editor to keep them synchronized with
+            # enabled visuals or candidate changes.
+            plan = review.plan.model_copy(update={
+                "media_assets": [], "face_regions": [], "media_placements": [],
+            })
+        plan = validate_animation_plan(plan, transcript)
+    except (PlanningRuleError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not start_review_render(task_id, transcript.model_dump(), plan.model_dump()):
         raise HTTPException(status_code=409, detail="Review edits are only available for completed tasks")
     task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
     metrics = TaskMetrics(task_dir, task_id)
@@ -241,8 +256,8 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
         metrics = initialize_initial_metrics(task_dir, task_id, task["trace_id"], 0)
         metrics.finalize(1, "completed")
         metrics.current_or_start_attempt("review")
-    start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), review.transcript, plan, task["trace_id"])
-    return {"task_id": task_id, "status": "rendering", "transcript": review.transcript, "plan": plan}
+    start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), transcript, plan, task["trace_id"])
+    return {"task_id": task_id, "status": "rendering", "transcript": transcript, "plan": plan, "replanned": transcript_changed}
 
 
 app.mount("/", StaticFiles(directory=PROJECT_ROOT / "frontend", html=True), name="frontend")

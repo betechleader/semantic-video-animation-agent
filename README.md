@@ -15,6 +15,12 @@ D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The web form defaults to **real local `faster_whisper` + rule-based semantic planning** and no-key Wikimedia search; choose Mock explicitly only for a fast engineering smoke test. Use the page-header language selector to switch the complete upload/review workflow between Chinese and English; the browser remembers the selection after refresh.
 
+The generated-video preview is display-only and responsive: portrait output is centred with `max-width: 100%`, a viewport-relative `max-height`, and `object-fit: contain`. This does not resize or recompress the downloadable result.
+
+## Post-ASR correction
+
+Real and Mock transcripts pass through a configurable Chinese phrase-correction layer before semantic planning. Rules live in `config/asr_corrections.json` (override with `ASR_CORRECTION_DICTIONARY`) and may require nearby context. A replacement reuses the matched ASR word interval; it never invents a timestamp. The task transcript exposes corrected `full_text`/`segments`, an immutable `raw_asr` snapshot, and timestamped `corrections` for review. The baseline dictionary covers `会姑娘` → `灰姑娘` in story context and `心理学有生活` → `心理学与生活` in book context.
+
 ## Visual style
 
 `knowledge_talking_head_v1` is rendered by the shared Remotion overlay:
@@ -53,7 +59,7 @@ Automatic Wikimedia search/download timeouts or rate limits fall back to the aut
 
 ## Review workflow and API
 
-The browser preview keeps the transcript and plan JSON editor. Its B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save review edits and re-render** to download a selected candidate into the task and render the new result.
+The browser preview keeps the transcript and plan JSON editor. Its B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save review edits and re-render** to download a selected candidate into the task and render the new result. If transcript segment text changed, the backend automatically rebuilds the animation plan from the edited transcript. Media audit metadata, face regions, and placements are renderer-derived: the review endpoint discards stale client copies, materializes enabled visuals, repeats local placement analysis, and then performs strict final validation. An explicitly selected missing or failed candidate remains an error.
 
 - `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart fields `processing_profile=configured|real|mock` and `media_provider=mock|manual|wikimedia_commons|pexels` select the task-local providers.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
