@@ -44,7 +44,8 @@
         </label>
         <label><span data-i18n="externalMedia">外部素材</span>
           <select id="upload-media-provider">
-            <option value="wikimedia_commons" selected data-i18n="providerWikimedia">Wikimedia Commons（无需 Key）</option>
+            <option value="knowledge" selected data-i18n="providerKnowledge">Open Library 图书 + Wikimedia B-roll（无需 Key）</option>
+            <option value="wikimedia_commons" data-i18n="providerWikimedia">仅 Wikimedia Commons（无需 Key）</option>
             <option value="pexels" data-i18n="providerPexels">Pexels（需要 PEXELS_API_KEY）</option>
             <option value="mock" data-i18n="providerMock">本地原创信息图</option>
             <option value="manual" data-i18n="providerManual">仅人工候选 URL</option>
@@ -103,7 +104,7 @@
         pageDescription: '上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。',
         languageLabel: '界面语言', chooseVideo: '选择视频', noFileChosen: '未选择文件', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）',
         profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '外部素材',
-        providerWikimedia: 'Wikimedia Commons（无需 Key）', providerPexels: 'Pexels（需要 PEXELS_API_KEY）',
+        providerKnowledge: 'Open Library 图书 + Wikimedia B-roll（无需 Key）', providerWikimedia: '仅 Wikimedia Commons（无需 Key）', providerPexels: 'Pexels（需要 PEXELS_API_KEY）',
         providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', uploadButton: '上传并生成成片',
         downloadResult: '下载生成的视频', transcriptJson: '转写文本 JSON', planJson: '动画计划 JSON',
         reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。', replanNote: '修改转写后保存时，后端会根据修改后的文本自动重新生成动画计划，并清理旧素材派生数据。',
@@ -129,7 +130,7 @@
         pageDescription: 'Upload source footage to generate a polished knowledge-talk video. Real speech recognition and semantic planning are recommended; Mock is for engineering tests only.',
         languageLabel: 'Language', chooseVideo: 'Choose video', noFileChosen: 'No file selected', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)',
         profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'External media',
-        providerWikimedia: 'Wikimedia Commons (No key required)', providerPexels: 'Pexels (Requires PEXELS_API_KEY)',
+        providerKnowledge: 'Open Library books + Wikimedia B-roll (No key required)', providerWikimedia: 'Wikimedia Commons only (No key required)', providerPexels: 'Pexels (Requires PEXELS_API_KEY)',
         providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', uploadButton: 'Upload and generate',
         downloadResult: 'Download result video', transcriptJson: 'Transcript JSON', planJson: 'Animation plan JSON',
         reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.', replanNote: 'When transcript text changes, saving automatically rebuilds the animation plan from the edited transcript and clears stale media-derived data.',
@@ -230,7 +231,11 @@
       const payload = await response.json(); renderMediaReview(currentPlan(), payload.candidates || []);
     }
     function showResult(id) {
-      preview.src = `/api/videos/${id}/download?preview=${Date.now()}`;
+      const sourceKey = `${id}:${lastEventId}`;
+      if (preview.dataset.sourceKey !== sourceKey) {
+        preview.src = `/api/videos/${id}/download?preview=true&version=${lastEventId}`;
+        preview.dataset.sourceKey = sourceKey;
+      }
       download.href = `/api/videos/${id}/download`;
       result.classList.remove('hidden');
     }
@@ -254,7 +259,6 @@
       events.addEventListener('completed', async event => {
         const detail = readEvent(event);
         events.close();
-        showResult(id);
         setStatusKey('event_rendering');
         try { await loadTask(id); }
         catch (error) { setStatusKey('downloadFallback', {message: detail.message, error: error.message}); }

@@ -18,7 +18,7 @@ export const MediaVisual: React.FC<PositionedMediaVisualProps> = (props) => {
   const media = props.data_uri
     ? props.mime_type?.startsWith('video/')
       ? <OffthreadVideo src={props.data_uri} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-      : <Img src={props.data_uri} style={{width: '100%', height: '100%', objectFit: isFullScreen ? 'cover' : 'cover'}} />
+      : <Img src={props.data_uri} style={{width: '100%', height: '100%', objectFit: isFullScreen ? 'contain' : 'cover'}} />
     : null;
   if (isFullScreen) {
     return <div style={{position: 'absolute', inset: 0, opacity, transform: `scale(${scale})`, transformOrigin: 'center', overflow: 'hidden', zIndex: 7, background: '#111827'}}>

@@ -8,13 +8,15 @@ directory with a recorded source URL and SHA-256 digest.
 import base64
 import hashlib
 import json
+import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 from pydantic import ValidationError
 
-from .config import SETTINGS
+from .config import KNOWLEDGE_ASSET_ROOT, SETTINGS
 from .media_providers import ExternalMediaProvider, MediaProviderError, get_media_provider_by_name, load_candidates, save_candidates
 from .schemas import AnimationPlan, MediaAssetAudit, MediaCandidate
 
@@ -30,6 +32,40 @@ _EXTENSIONS = {
     "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif",
     "video/mp4": ".mp4", "video/webm": ".webm", "video/ogg": ".ogv",
 }
+
+
+_CURATED_KNOWLEDGE_ASSETS = (
+    {
+        "terms": ("psychology and life", "心理学与生活"),
+        "filename": "psychology-and-life-reference.png",
+        "provider": "curated_user_reference",
+        "source_url": "user-provided://psychology-and-life-cover-reference",
+        "title": "《心理学与生活》书籍封面",
+        "author_or_provider": "User-provided exact book-cover reference",
+        "license": "User-provided cover reference; publication rights require human review",
+        "asset_kind": "external_image",
+    },
+    {
+        "terms": ("cinderella", "灰姑娘"),
+        "filename": "cinderella-original.png",
+        "provider": "curated_original",
+        "source_url": "generated://semantic-video-animation-agent/cinderella-original-v1",
+        "title": "灰姑娘与玻璃鞋原创插画",
+        "author_or_provider": "semantic-video-animation-agent original image",
+        "license": "Original generated project asset",
+        "asset_kind": "generated_original",
+    },
+)
+
+
+def _curated_knowledge_asset(query: str) -> dict[str, str] | None:
+    normalized = query.lower()
+    for asset in _CURATED_KNOWLEDGE_ASSETS:
+        if any(term in normalized for term in asset["terms"]):
+            source = KNOWLEDGE_ASSET_ROOT / asset["filename"]
+            if source.is_file():
+                return {**asset, "path": str(source)}
+    return None
 
 
 def _escape_xml(value: str) -> str:
@@ -121,20 +157,53 @@ def _download_candidate(candidate: MediaCandidate, destination: Path, max_downlo
         raise MediaProviderError("External media download produced an empty file")
 
 
-def _choose_candidate(candidates: list[MediaCandidate]) -> MediaCandidate | None:
+_GENERIC_QUERY_TERMS = {
+    "a", "an", "and", "book", "cover", "fairy", "image", "illustration", "of", "photo", "story", "tale", "the", "video",
+}
+_QUERY_ALIASES = {
+    "supermarket": ("supermarket", "market"),
+    "manufacturing": ("manufacturing", "factory"),
+    "learning": ("learning", "education", "study"),
+}
+
+
+def _query_terms(value: str) -> list[str]:
+    normalized = value.split(":", 1)[1] if value.lower().startswith("book:") else value
+    terms = re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]+", normalized.lower())
+    return [term for term in terms if len(term) > 1 and term not in _GENERIC_QUERY_TERMS]
+
+
+def _candidate_relevance(candidate: MediaCandidate, query: str) -> float:
+    terms = _query_terms(query)
+    if not terms:
+        return 1.0
+    haystack = f"{candidate.title} {candidate.author_or_provider}".lower()
+    matches = sum(
+        1 for term in terms
+        if any(alias in haystack for alias in _QUERY_ALIASES.get(term, (term,)))
+    )
+    return matches / len(terms)
+
+
+def _choose_candidate(candidates: list[MediaCandidate], query: str) -> MediaCandidate | None:
     if not candidates:
         return None
 
-    def score(candidate: MediaCandidate) -> tuple[float, int, str]:
+    def score(candidate: MediaCandidate) -> tuple[float, float, int]:
+        relevance = _candidate_relevance(candidate, query)
         if candidate.width and candidate.height:
             ratio = candidate.height / candidate.width
             portrait_score = 3.0 - abs(ratio - 1.35)
             pixels = candidate.width * candidate.height
         else:
             portrait_score, pixels = 0.0, 0
-        return portrait_score, pixels, candidate.id
+        # max() keeps the provider's relevance order when these values tie.
+        return relevance, portrait_score, pixels
 
-    return max(candidates, key=score)
+    selected = max(candidates, key=score)
+    terms = _query_terms(query)
+    minimum_relevance = 1.0 if len(terms) == 1 else 0.34
+    return selected if _candidate_relevance(selected, query) >= minimum_relevance else None
 
 
 def _make_audit(
@@ -178,6 +247,11 @@ def prepare_media_assets(
             continue
         params = animation.parameters
         previous = existing.get(params.asset_id)
+        curated = (
+            _curated_knowledge_asset(params.search_query)
+            if active_provider.name == "knowledge" and not params.selected_candidate_id
+            else None
+        )
         if params.selected_candidate_id and params.selected_candidate_id not in known_candidates:
             raise MediaProviderError(f"Selected media candidate does not exist in this task: {params.selected_candidate_id}")
         selection_unchanged = (
@@ -185,10 +259,22 @@ def prepare_media_assets(
             and previous.search_query == params.search_query
             and (params.selected_candidate_id is None or params.selected_candidate_id == previous.candidate_id)
         )
-        if selection_unchanged and _audit_matches_local_file(task_dir, previous):
+        obsolete_fallback = bool(curated and previous and previous.provider == "original_infographic")
+        if selection_unchanged and not obsolete_fallback and _audit_matches_local_file(task_dir, previous):
             audits.append(previous.model_copy(update={
                 "search_query": params.search_query, "usage_start_ms": animation.start_ms, "usage_end_ms": animation.end_ms,
             }))
+            continue
+
+        if curated:
+            path = _asset_path(task_dir, params.asset_id, "image/png")
+            shutil.copyfile(curated["path"], path)
+            audits.append(_make_audit(
+                task_dir, animation, path, asset_kind=curated["asset_kind"], provider=curated["provider"],
+                query=params.search_query, source_url=curated["source_url"], source_page_url=None,
+                author_or_provider=curated["author_or_provider"], license=curated["license"],
+                candidate_id=None, mime_type="image/png",
+            ))
             continue
 
         candidate: MediaCandidate | None = None
@@ -204,19 +290,19 @@ def prepare_media_assets(
                 # failure must not discard a long ASR/render job: the authored
                 # task-local infographic below remains available. Pexels key
                 # errors stay explicit so configuration mistakes are visible.
-                if active_provider.name not in {"mock", "wikimedia_commons", "manual"}:
+                if active_provider.name not in {"mock", "knowledge", "wikimedia_commons", "manual"}:
                     raise
                 found = []
             if found:
                 known_candidates = {candidate.id: candidate for candidate in save_candidates(task_dir, found)}
-                candidate = _choose_candidate(found)
+                candidate = _choose_candidate(found, params.search_query)
 
         if candidate:
             path = _asset_path(task_dir, params.asset_id, candidate.mime_type)
             try:
                 _download_candidate(candidate, path, limit)
             except MediaProviderError:
-                if params.selected_candidate_id or active_provider.name != "wikimedia_commons":
+                if params.selected_candidate_id or active_provider.name not in {"knowledge", "wikimedia_commons"}:
                     raise
                 candidate = None
             if candidate:

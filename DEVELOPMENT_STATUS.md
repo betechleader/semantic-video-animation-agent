@@ -1,8 +1,46 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `28c24fb 新增网页中英文切换`
-- Current stage: Stage 10D, transcript correction and review robustness - completed, pending user-approved commit.
+- Current commit before this stage: `37d1aab 修复转写纠错与审核重渲染`
+- Current stage: Stage 10F, deterministic exact-entity visual fallback - completed, pending user-approved commit.
+
+## Stage 10F delivered
+
+- Diagnosed the latest real task's two generic knowledge cards as two consecutive 20-second network timeouts: neither Open Library nor Wikimedia produced a candidate manifest, so the prior resilience path correctly but silently emitted `original_infographic` SVGs.
+- Added deterministic local exact-entity assets for the user-confirmed `Psychology and Life` edition and an original Cinderella story illustration. `knowledge` mode now prefers these assets before network search and records their provider, query, rights note, hash, and usage interval in the normal task-local audit.
+- Existing completed tasks no longer reuse an `original_infographic` when a matching curated entity asset is now available; a review re-render replaces the stale fallback automatically.
+- Full-screen static B-roll now uses `object-fit: contain`, preserving the complete book cover or illustration instead of cropping the left and right edges.
+
+## Stage 10F verification
+
+- Full Python suite: `91 passed in 49.10s`, including exact book/Cinderella routing and stale-fallback replacement coverage.
+- Both `openlibrary.org` and `commons.wikimedia.org` timed out with inherited proxy settings and with `requests.Session.trust_env = False`, confirming that search wording was not the failure cause in this local environment.
+- Standard `npm.cmd run build` still encounters the pre-existing locked `animation-renderer/build` `EPERM`; the same renderer source bundled successfully to `storage/renderer_build_validation_20260807_stage10f`.
+
+## Stage 10F known limitations
+
+- The exact book cover is a user-provided prototype reference and still requires publication-rights review. Curated mappings currently cover only the confirmed book and Cinderella entities; unrecognized entities continue through provider search and then the authored concept-card fallback.
+
+## Stage 10E delivered
+
+- Replaced the 1.6-second dynamic-caption hard cut with complete short-phrase windows capped for a two-line portrait layout. The reference opening now keeps `对于自媒体博主来说` in one cue, so character-level ASR words no longer split `博/主` across consecutive screens; inter-word spacing is also tighter.
+- Preview responses now use inline `video/mp4` delivery with byte-range support and no-store caching. The completion handler loads task data before assigning the source, and a task/event version key prevents duplicate assignments from resetting playback.
+- Added the browser-recommended no-key `knowledge` provider. Planner-marked book queries resolve through Open Library Search/Covers with title/author provenance; other B-roll continues through Wikimedia Commons. Automatic selection now requires meaningful query terms to match candidate title/author metadata before portrait ratio or resolution can break ties.
+- `心理学与生活` now searches the exact work and authors Richard J. Gerrig / Philip G. Zimbardo. The `灰姑娘` rewrite uses the entity query `Cinderella fairy tale illustration`; unrelated portrait candidates are rejected and exact-match failure falls back to the original task-local graphic.
+- Split animation timing copy from display copy: `trigger_text` remains verbatim transcript text for grounding, while keyword, media-title, numbered-list, and comparison boxes receive concise context-aware labels such as `接触多元文化`, `着眼长远未来`, `设想一年后 / 只想明天`, and `思考行动带来的结果`.
+- Extended reviewed ASR corrections for reference-video phrases including `对抑` → `可以`, `应有` → `拥有`, `更加好的创新性` → `更高的创新性`, and `你的拍的` → `你拍的`. Review re-renders apply the current dictionary before deciding whether to replan, so an older completed task can pick up these corrections safely.
+
+## Stage 10E verification
+
+- Full Python suite: `88 passed in 47.76s`, including actual FFmpeg/Remotion initial and review renders plus new subtitle, preview-range, provider-routing, relevance-ranking, correction, review-upgrade, and copy-summary coverage.
+- Live no-key checks returned eight bibliographically matched Open Library candidates for `Psychology and Life` and selected a Gerrig/Zimbardo work cover. Wikimedia returned 18 Cinderella candidates and selected `Helen Stratton Cinderella.jpg`; the prior `David Rice Atchison` portrait is below the relevance threshold.
+- In-app browser playback against a 94.362-second completed task remained `paused=false`, `ended=false`, `readyState=4`, and error-free while advancing from 25.795 s to 28.833 s over a three-second observation. The preview request returned `206 Partial Content`, `Content-Disposition: inline`, and `Accept-Ranges: bytes`.
+- Standard `npm.cmd run build` still stops at the pre-existing locked `animation-renderer/build` directory with `EPERM`. The same source bundled successfully to `storage/renderer_build_validation_20260807_stage10e`.
+
+## Stage 10E known limitations
+
+- Open Library provides bibliographically matched covers but may not carry the exact Chinese edition shown in a reference image. Exact edition/cover approval remains a reviewer decision through the existing candidate/manual URL workflow.
+- Display-copy summarization and ASR correction are deterministic, context-aware rules rather than a generative language model; additional domains need reviewed rules or a validated local LLM profile.
 
 ## Stage 10D delivered
 

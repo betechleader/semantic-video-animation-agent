@@ -289,7 +289,7 @@ class SemanticSegment(BaseModel):
 class AnimationPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    media_provider: Literal["mock", "manual", "wikimedia_commons", "pexels"] = "mock"
+    media_provider: Literal["mock", "manual", "knowledge", "wikimedia_commons", "pexels"] = "mock"
     animations: list[Animation] = Field(min_length=1)
     semantic_segments: list[SemanticSegment] = Field(default_factory=list)
     media_assets: list[MediaAssetAudit] = Field(default_factory=list)

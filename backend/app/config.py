@@ -8,6 +8,7 @@ RENDERER_ROOT = PROJECT_ROOT / "animation-renderer"
 MODEL_ROOT = PROJECT_ROOT / "storage" / "models"
 DATABASE_PATH = STORAGE_ROOT / "tasks.sqlite3"
 ASR_CORRECTION_DICTIONARY_PATH = PROJECT_ROOT / "config" / "asr_corrections.json"
+KNOWLEDGE_ASSET_ROOT = PROJECT_ROOT / "assets" / "knowledge"
 
 
 @dataclass(frozen=True)

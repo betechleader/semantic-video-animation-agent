@@ -63,5 +63,40 @@ def test_offline_planner_finitely_merges_adjacent_split_sentence() -> None:
     plan = TranscriptAnimationPlanningProvider().plan(transcript)
     comparison = plan.animations[0]
     assert comparison.type == "info_graphic"
-    assert comparison.parameters.items == ["设想一年之后干什么", "只想明天"]
+    assert comparison.parameters.items == ["设想一年后", "只想明天"]
     assert comparison.end_ms <= 3400
+
+
+def test_offline_planner_uses_entity_specific_media_queries() -> None:
+    transcript = Transcript.model_validate({
+        "language": "zh", "full_text": "读心理学与生活重新改写灰姑娘的故事", "segments": [
+            {"text": "读心理学与生活这本书", "start_ms": 0, "end_ms": 2200,
+             "words": [{"text": "心理学与生活", "start_ms": 400, "end_ms": 1500}, {"text": "这本书", "start_ms": 1500, "end_ms": 2200}]},
+            {"text": "重新改写灰姑娘的故事", "start_ms": 6000, "end_ms": 9000,
+             "words": [{"text": "重新改写", "start_ms": 6000, "end_ms": 7000}, {"text": "灰姑娘", "start_ms": 7000, "end_ms": 8000}, {"text": "的故事", "start_ms": 8000, "end_ms": 9000}]},
+        ],
+    })
+
+    plan = TranscriptAnimationPlanningProvider().plan(transcript)
+
+    book, cinderella = plan.animations
+    assert book.parameters.search_query == "book: Psychology and Life Richard J. Gerrig Philip G. Zimbardo"
+    assert cinderella.parameters.search_query == "Cinderella fairy tale illustration"
+    assert cinderella.parameters.title == "改写《灰姑娘》故事"
+
+
+def test_offline_planner_summarizes_animation_box_copy() -> None:
+    transcript = Transcript.model_validate({
+        "language": "zh", "full_text": "第三个就是去设想这个事情是如果你这么做了会怎么样", "segments": [
+            {"text": "第三个就是去设想这个事情", "start_ms": 0, "end_ms": 2200,
+             "words": [{"text": "第三个就是去设想这个事情", "start_ms": 0, "end_ms": 2200}]},
+            {"text": "是如果你这么做了会怎么样", "start_ms": 2200, "end_ms": 4200,
+             "words": [{"text": "是如果你这么做了会怎么样", "start_ms": 2200, "end_ms": 4200}]},
+        ],
+    })
+
+    graphic = TranscriptAnimationPlanningProvider().plan(transcript).animations[0]
+
+    assert graphic.type == "info_graphic"
+    assert graphic.parameters.headline == "第三个方法"
+    assert graphic.parameters.items == ["思考行动带来的结果"]

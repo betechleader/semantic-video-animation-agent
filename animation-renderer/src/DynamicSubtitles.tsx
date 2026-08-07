@@ -19,7 +19,7 @@ export const DynamicSubtitles: React.FC<{cues?: SubtitleCue[]; width: number}> =
       const wordFrame = Math.max(0, frame - Math.round((word.start_ms / 1000) * fps));
       const pop = word.emphasized ? spring({fps, frame: wordFrame, config: {damping: 10, stiffness: 220, mass: 0.45}}) : 1;
       const emphasis = word.emphasized || active;
-      return <span key={`${word.start_ms}-${index}`} style={{display: 'inline-block', margin: '0 .07em', color: word.emphasized ? '#FFD400' : '#FFFFFF', transform: `scale(${emphasis ? 0.96 + pop * 0.12 : 1})`, filter: word.emphasized ? 'drop-shadow(0 2px 0 #402600)' : undefined}}>{word.text}</span>;
+      return <span key={`${word.start_ms}-${index}`} style={{display: 'inline-block', margin: '0 .025em', color: word.emphasized ? '#FFD400' : '#FFFFFF', transform: `scale(${emphasis ? 0.96 + pop * 0.12 : 1})`, filter: word.emphasized ? 'drop-shadow(0 2px 0 #402600)' : undefined}}>{word.text}</span>;
     })}
   </div>;
 };

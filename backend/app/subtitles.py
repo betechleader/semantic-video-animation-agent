@@ -128,7 +128,10 @@ def build_dynamic_subtitle_cues(transcript: Transcript, plan: AnimationPlan) -> 
         if animation.type in {"keyword_pop", "quote_card", "info_graphic"}
     }
     cues: list[dict] = []
-    max_phrase_chars = 15
+    # Keep a complete short ASR phrase in one visual window. The former
+    # 1.6-second hard cut split character-level words such as "博/主" across
+    # consecutive captions even though the full phrase comfortably fits.
+    max_phrase_chars = 18
     for segment in transcript.segments:
         phrase_words = []
         phrase_chars = 0
@@ -142,8 +145,7 @@ def build_dynamic_subtitle_cues(transcript: Transcript, plan: AnimationPlan) -> 
                 "text": clean, "start_ms": word.start_ms, "end_ms": word.end_ms, "emphasized": emphasized,
             })
             phrase_chars += len(normalized or clean)
-            duration = word.end_ms - phrase_words[0]["start_ms"]
-            if phrase_chars >= max_phrase_chars or duration >= 1_600:
+            if phrase_chars >= max_phrase_chars:
                 cues.append({
                     "start_ms": phrase_words[0]["start_ms"], "end_ms": phrase_words[-1]["end_ms"], "words": phrase_words,
                 })

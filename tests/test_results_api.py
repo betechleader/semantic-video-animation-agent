@@ -26,6 +26,13 @@ def test_task_lookup_and_download(tmp_path: Path, monkeypatch) -> None:
     download = client.get(f"/api/videos/{task_id}/download")
     assert download.status_code == 200
     assert download.content == b"video"
+    assert download.headers["content-disposition"].startswith("attachment;")
+
+    preview = client.get(f"/api/videos/{task_id}/download?preview=true", headers={"Range": "bytes=0-1"})
+    assert preview.status_code == 206
+    assert preview.content == b"vi"
+    assert preview.headers["content-disposition"] == "inline"
+    assert preview.headers["accept-ranges"] == "bytes"
 
 
 def test_missing_task_is_not_found() -> None:

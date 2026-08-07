@@ -7,7 +7,8 @@ from backend.app import database, main
 from backend.app.mock_services import create_mock_plan, create_mock_transcript
 from backend.app.media_assets import prepare_media_assets
 from backend.app.models import TaskStatus
-from backend.app.schemas import AnimationPlan
+from backend.app.providers import TranscriptAnimationPlanningProvider
+from backend.app.schemas import AnimationPlan, Transcript
 
 
 def configure_database(tmp_path: Path, monkeypatch) -> Path:
@@ -110,6 +111,37 @@ def test_review_api_replans_when_transcript_text_changes(tmp_path: Path, monkeyp
     reviewed_transcript, reviewed_plan = calls[0][3], calls[0][4]
     assert reviewed_transcript.segments[0].words[0].text == "重新改写灰姑娘的故事"
     assert any("灰姑娘" in animation.trigger_text or "灰姑娘" in str(animation.parameters) for animation in reviewed_plan.animations)
+
+
+def test_review_api_applies_new_dictionary_rules_to_an_older_completed_task(tmp_path: Path, monkeypatch) -> None:
+    storage = configure_database(tmp_path, monkeypatch)
+    task_id = str(uuid4())
+    (storage / task_id).mkdir(parents=True)
+    transcript = Transcript.model_validate({
+        "language": "zh", "full_text": "介绍三种对抑提高创新性的方法", "segments": [{
+            "text": "介绍三种对抑提高创新性的方法", "start_ms": 0, "end_ms": 3000,
+            "words": [
+                {"text": "介绍三种", "start_ms": 0, "end_ms": 900},
+                {"text": "对抑", "start_ms": 900, "end_ms": 1200},
+                {"text": "提高创新性的方法", "start_ms": 1200, "end_ms": 3000},
+            ],
+        }],
+    })
+    plan = TranscriptAnimationPlanningProvider().plan(transcript)
+    metadata = {"duration_seconds": 3, "width": 320, "height": 568, "frame_rate": 30, "video_codec": "h264", "audio_codec": "aac", "has_video": True, "has_audio": True}
+    database.create_task(task_id, metadata, "trace")
+    database.transition_task(task_id, TaskStatus.COMPLETED, "Done", transcript=transcript.model_dump(), plan=plan.model_dump())
+    calls = []
+    monkeypatch.setattr(main, "start_review_task", lambda *args: calls.append(args))
+
+    response = TestClient(main.app).post(
+        f"/api/videos/{task_id}/review",
+        json={"transcript": transcript.model_dump(), "plan": plan.model_dump()},
+    )
+
+    assert response.status_code == 202, response.text
+    assert response.json()["replanned"] is True
+    assert calls[0][3].full_text == "介绍三种可以提高创新性的方法"
 
 
 def test_review_api_rejects_ungrounded_plan_without_changing_task(tmp_path: Path, monkeypatch) -> None:

@@ -32,3 +32,11 @@ def test_video_preview_is_responsive_on_desktop_and_narrow_screens() -> None:
     assert 'object-fit: contain' in html
     assert '@media (max-width: 700px)' in html
     assert '#preview { max-height: 64vh; }' in html
+
+
+def test_preview_source_is_only_refreshed_after_task_data_loads() -> None:
+    html = FRONTEND.read_text(encoding="utf-8")
+    completed_handler = html.split("events.addEventListener('completed'", 1)[1].split("});", 1)[0]
+    assert "showResult(id)" not in completed_handler
+    assert "await loadTask(id)" in completed_handler
+    assert "preview.dataset.sourceKey" in html

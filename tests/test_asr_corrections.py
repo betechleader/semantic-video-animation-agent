@@ -1,4 +1,5 @@
-from backend.app.asr_corrections import PhraseCorrectionRule, correct_transcript
+from backend.app.asr_corrections import PhraseCorrectionRule, correct_transcript, load_phrase_corrections
+from backend.app.config import ASR_CORRECTION_DICTIONARY_PATH
 from backend.app.providers import TranscriptAnimationPlanningProvider
 from backend.app.schemas import Transcript
 from backend.app.subtitles import build_dynamic_subtitle_cues
@@ -42,5 +43,17 @@ def test_book_title_correction_updates_subtitles_and_animation_plan() -> None:
     assert corrected.full_text == "最近看了心理学与生活这本书"
     assert plan.animations[0].trigger_text == "心理学与生活"
     assert plan.animations[0].parameters.title == "心理学与生活"
-    assert plan.animations[0].parameters.search_query == "Psychology and Life book"
+    assert plan.animations[0].parameters.search_query == "book: Psychology and Life Richard J. Gerrig Philip G. Zimbardo"
     assert "".join(word["text"] for cue in cues for word in cue["words"]) == corrected.full_text
+
+
+def test_configured_context_corrections_clean_observed_animation_copy_errors() -> None:
+    raw = transcript_for("介绍了三种对抑提高创新性的方法", [
+        ("介绍了", 0, 500), ("三种", 500, 900), ("对抑", 900, 1200),
+        ("提高", 1200, 1600), ("创新性", 1600, 2200), ("的方法", 2200, 2800),
+    ])
+
+    corrected = correct_transcript(raw, load_phrase_corrections(ASR_CORRECTION_DICTIONARY_PATH))
+
+    assert corrected.full_text == "介绍了三种可以提高创新性的方法"
+    assert corrected.raw_asr.full_text == raw.full_text

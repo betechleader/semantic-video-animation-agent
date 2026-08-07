@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, STORAGE_ROOT
-from .asr_corrections import normalize_review_transcript
+from .asr_corrections import correct_transcript, load_phrase_corrections, normalize_review_transcript
 from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, start_review_render, update_transcript
 from .errors import AppError
 from .logging_config import configure_logging
@@ -72,8 +72,8 @@ async def upload_video(
 ) -> dict:
     if processing_profile not in {"configured", "real", "mock"}:
         raise HTTPException(status_code=422, detail="processing_profile must be configured, real, or mock")
-    if media_provider not in {"mock", "manual", "wikimedia_commons", "pexels"}:
-        raise HTTPException(status_code=422, detail="media_provider must be mock, manual, wikimedia_commons, or pexels")
+    if media_provider not in {"mock", "manual", "knowledge", "wikimedia_commons", "pexels"}:
+        raise HTTPException(status_code=422, detail="media_provider must be mock, manual, knowledge, wikimedia_commons, or pexels")
     if not file.filename or Path(file.filename).suffix.lower() != ".mp4":
         raise HTTPException(status_code=400, detail="Only .mp4 uploads are accepted")
     task_id = str(uuid4())
@@ -175,7 +175,7 @@ def add_manual_video_media_candidate(task_id: str, request: ManualMediaCandidate
 
 
 @app.get("/api/videos/{task_id}/download")
-def download_video(task_id: str) -> FileResponse:
+def download_video(task_id: str, preview: bool = False) -> FileResponse:
     task = get_task(task_id)
     try:
         result = StorageService(STORAGE_ROOT).task_directory(task_id) / "result.mp4"
@@ -183,6 +183,12 @@ def download_video(task_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Result video not found") from None
     if task is None or task["status"] != "completed" or not result.is_file():
         raise HTTPException(status_code=404, detail="Result video not found")
+    if preview:
+        return FileResponse(
+            result,
+            media_type="video/mp4",
+            headers={"Content-Disposition": "inline", "Accept-Ranges": "bytes", "Cache-Control": "no-store"},
+        )
     return FileResponse(result, media_type="video/mp4", filename="result.mp4")
 
 
@@ -230,6 +236,13 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
     try:
         stored_transcript = Transcript.model_validate(task["transcript"])
         transcript, transcript_changed = normalize_review_transcript(review.transcript, stored_transcript)
+        corrected = correct_transcript(
+            transcript,
+            load_phrase_corrections(SETTINGS.asr_correction_dictionary_path),
+        )
+        if corrected.full_text != transcript.full_text or corrected.segments != transcript.segments:
+            transcript_changed = True
+        transcript = corrected
         if transcript_changed:
             plan = TranscriptAnimationPlanningProvider().plan(transcript).model_copy(update={
                 "media_provider": review.plan.media_provider,

@@ -87,7 +87,8 @@ class TranscriptAnimationPlanningProvider:
                 next_compact = re.sub(r"\s+", "", following.text)
                 incomplete = (
                     compact.endswith(("介绍了", "对比了", "而不是说", "比如说", "然后"))
-                    or next_compact.startswith(("而不是", "提高"))
+                    or compact.endswith(("设想这个事情", "考虑这个事情"))
+                    or next_compact.startswith(("而不是", "提高", "是如果"))
                     or ("三种" in compact and len(compact) <= 12)
                 )
                 if 0 <= gap <= 1_200 and incomplete:
@@ -109,6 +110,35 @@ class TranscriptAnimationPlanningProvider:
         compact = re.sub(r"^对于[^，。]{0,24}?来说", "", compact)
         compact = re.sub(r"^(?:(?:然后|就比如说|比如说|而不是说|而不是|就是|去)[，,]?)+", "", compact)
         return compact[:maximum]
+
+    @classmethod
+    def _display_summary(cls, text: str, fallback: str = "", maximum: int = 18) -> str:
+        """Create concise on-screen copy while keeping raw speech as the trigger."""
+        compact = cls._clean_clause(text, 64)
+        if "灰姑娘" in compact and any(token in compact for token in ("改写", "复述", "故事")):
+            return "改写《灰姑娘》故事"
+        if "接触各种各样的文化" in compact or "接触两种不同文化" in compact:
+            return "接触多元文化"
+        if "设想未来" in compact and any(token in compact for token in ("近期", "进展")):
+            return "着眼长远未来"
+        if "一年之后" in compact or "一年后" in compact:
+            return "设想一年后"
+        if "明天" in compact and any(token in compact for token in ("想", "怎么样", "如何")):
+            return "只想明天"
+        if any(token in compact for token in ("你怎么做了会怎么样", "你这么做了会怎么样", "做了会怎么样")):
+            return "思考行动带来的结果"
+        if "会对这个事有什么影响" in compact or "会对这件事有什么影响" in compact:
+            return "思考行动的影响"
+        if "当时" in compact and any(token in compact for token in ("没做", "没有做", "没怎么做")):
+            return "假设当初没做"
+        if "已经发生的一件事情" in compact or "已经发生的事情" in compact:
+            return "回顾已经发生的事"
+        if "创新性" in compact and any(token in compact for token in ("重要", "更高", "更好", "更强")):
+            return "创新性更高" if any(token in compact for token in ("更高", "更好", "更强")) else "创新性很重要"
+        summarized = re.sub(r"^(?:我最近|我们|他们|你|我)", "", compact)
+        summarized = re.sub(r"(?:这个|这件)(?:事情|事)", "这件事", summarized)
+        summarized = summarized.strip("，,。 ")
+        return (summarized or fallback or compact)[:maximum]
 
     @staticmethod
     def _time_anchor(segment, phrase: str, maximum_duration_ms: int) -> tuple[int, int]:
@@ -159,6 +189,11 @@ class TranscriptAnimationPlanningProvider:
         title always remains excerpted from the spoken transcript.
         """
         normalized = text.lower()
+        if "灰姑娘" in text and any(token in text for token in ("改写", "复述", "故事")):
+            return {
+                "theme": "learning", "query": "Cinderella fairy tale illustration", "kind": "external_image",
+                "display_mode": "full_screen", "title": "改写《灰姑娘》故事",
+            }
         categories = (
             (("《", "书", "阅读", "作者", "book", "reading"), "book", "book reading", "external_image", "full_screen"),
             (("工厂", "制造", "生产", "车间", "factory", "manufacturing"), "factory", "factory manufacturing", "external_video", "full_screen"),
@@ -185,14 +220,17 @@ class TranscriptAnimationPlanningProvider:
         numbered = re.search(r"第([一二三四五六七八九十]+)个(?:方法)?(?:是|就是)?(.+)", compact)
         if numbered:
             item = TranscriptAnimationPlanningProvider._clean_clause(numbered.group(2)) or compact
-            return {"variant": "number_list", "headline": f"第{numbered.group(1)}个方法", "items": [item[:36]]}
+            return {
+                "variant": "number_list", "headline": f"第{numbered.group(1)}个方法",
+                "items": [TranscriptAnimationPlanningProvider._display_summary(item, item)],
+            }
         if "而不是" in compact:
             left, right = compact.split("而不是", 1)
             left = left or re.sub(r"\s+", "", previous_text)
             if left and right:
                 return {"variant": "comparison", "headline": "两种思考方式", "items": [
-                    TranscriptAnimationPlanningProvider._clean_clause(left[-24:], 24),
-                    TranscriptAnimationPlanningProvider._clean_clause(right, 24),
+                    TranscriptAnimationPlanningProvider._display_summary(left[-32:], left[-24:]),
+                    TranscriptAnimationPlanningProvider._display_summary(right, right[:24]),
                 ]}
         culture_match = re.search(r"只接触(.+?)和接触(.+?)两组", compact)
         if culture_match:
@@ -222,7 +260,10 @@ class TranscriptAnimationPlanningProvider:
             book_title = self._book_title(segment.text)
             visual = self._visual_spec(segment.text)
             if book_title:
-                query = "Psychology and Life book" if book_title == "心理学与生活" else "book reading"
+                query = (
+                    "book: Psychology and Life Richard J. Gerrig Philip G. Zimbardo"
+                    if book_title == "心理学与生活" else "book reading"
+                )
                 visual = {"theme": "book", "query": query, "kind": "external_image", "display_mode": "full_screen", "title": book_title}
             infographic = None if book_title else self._infographic_spec(segment.text, previous_text)
             if infographic:
@@ -246,6 +287,7 @@ class TranscriptAnimationPlanningProvider:
             keyword = self._meaningful_phrase(segment.text)
             if not keyword:
                 continue
+            display_text = self._display_summary(segment.text, keyword)
             anchor_phrase = keyword
             if book_title:
                 anchor_phrase = "心理学有生活" if "心理学有生活" in segment.text else "心理学与生活" if "心理学与生活" in segment.text else "书"
@@ -256,7 +298,7 @@ class TranscriptAnimationPlanningProvider:
             if book_title or visual:
                 spec = visual or {"theme": "book", "query": "book reading", "kind": "external_image", "display_mode": "side_card", "title": book_title}
                 if not book_title:
-                    spec = {**spec, "title": self._clean_clause(str(spec["title"]), 42) or keyword}
+                    spec = {**spec, "title": self._display_summary(str(spec["title"]), display_text, 42)}
                 animations.append({
                     "id": f"animation_{identifier}", "type": "media_visual", "template_id": "media_visual_v1",
                     "start_ms": start_ms, "end_ms": end_ms, "trigger_text": anchor_phrase,
@@ -272,11 +314,11 @@ class TranscriptAnimationPlanningProvider:
                 animations.append({
                     "id": f"animation_{identifier}", "type": "keyword_pop", "template_id": "keyword_pop_v1",
                     "start_ms": start_ms, "end_ms": end_ms, "trigger_text": keyword,
-                    "parameters": {"text": keyword, "color": "#FFD400", "position": "top-right"},
+                    "parameters": {"text": display_text, "color": "#FFD400", "position": "top-right"},
                 })
             semantic_segments.append({
                 "id": f"semantic_{identifier}", "text": segment.text[:240], "start_ms": start_ms,
-                "end_ms": end_ms, "intent": "emphasis", "keywords": [keyword],
+                "end_ms": end_ms, "intent": "emphasis", "keywords": [display_text],
             })
             last_start_ms = start_ms
         if not animations:
@@ -310,6 +352,7 @@ Return at least one animation. Each animation must be fully contained in one sup
 For a quote_card use type quote_card, template_id quote_card_v1, and parameters {"headline": "max 48 chars", "body": "max 160 chars", "accent_color": "#RRGGBB"}.
 For a topic visual use type media_visual, template_id media_visual_v1, and parameters {"asset_id": "media_<id>", "title": "transcript-grounded topic label", "theme": "book|factory|product|money|learning|people|place|concept|wellbeing|business|technology", "accent_color": "#RRGGBB", "search_query": "short search query", "desired_asset_kind": "external_image|external_video", "display_mode": "side_card|full_screen"}. Never invent facts from a visual source: external materials are B-roll only and their source is selected by the pipeline.
 For an original diagram use type info_graphic, template_id knowledge_infographic_v1, and parameters {"variant": "number_list|comparison|flow", "headline": "transcript-grounded headline", "items": ["two to four transcript-grounded labels"], "accent_color": "#RRGGBB"}.
+Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only visible parameter text into concise, context-aware Chinese labels; remove filler words and repair an obvious local ASR wording only when the surrounding transcript makes the intended meaning unambiguous.
 Transcript JSON:
 """ + transcript.model_dump_json()
 

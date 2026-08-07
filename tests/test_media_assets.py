@@ -31,7 +31,7 @@ def test_rule_based_book_mention_uses_designed_original_fallback_when_mock_is_of
     audit = plan.media_assets[0]
     assert audit.asset_kind == "generated_infographic"
     assert audit.provider == "original_infographic"
-    assert audit.search_query == "Psychology and Life book"
+    assert audit.search_query == "book: Psychology and Life Richard J. Gerrig Philip G. Zimbardo"
     assert audit.usage_start_ms == 1000
     assert audit.usage_end_ms == 3000
     assert (tmp_path / audit.local_path).is_file()
@@ -72,7 +72,7 @@ def test_rule_based_planner_normalizes_unquoted_book_title_and_anchors_phrase_wo
     })
     visual = TranscriptAnimationPlanningProvider().plan(transcript).animations[0]
     assert visual.parameters.title == "心理学与生活"
-    assert visual.parameters.search_query == "Psychology and Life book"
+    assert visual.parameters.search_query == "book: Psychology and Life Richard J. Gerrig Philip G. Zimbardo"
     assert (visual.start_ms, visual.end_ms) == (2600, 3900)
 
 

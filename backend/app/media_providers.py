@@ -122,6 +122,90 @@ class WikimediaCommonsProvider:
         return candidates
 
 
+class OpenLibraryBooksProvider:
+    """Resolve exact book entities through Open Library's no-key APIs."""
+
+    name = "open_library"
+    endpoint = "https://openlibrary.org/search.json"
+    cover_endpoint = "https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+
+    def __init__(self, timeout_seconds: int = 20, session: requests.Session | None = None) -> None:
+        self.timeout_seconds = timeout_seconds
+        self.session = session or requests.Session()
+
+    @staticmethod
+    def _search_fields(query: str) -> tuple[str, str | None]:
+        compact = re.sub(r"\s+", " ", query).strip()
+        if "psychology and life" in compact.lower():
+            return "Psychology and Life", "Richard J. Gerrig"
+        match = re.match(r"(.+?)\s+(?:by|作者[:：]?)\s*(.+)$", compact, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip(), match.group(2).strip()
+        return compact, None
+
+    def search(self, query: str, asset_kind: MediaKind) -> list[MediaCandidate]:
+        if asset_kind != "external_image":
+            return []
+        title, author = self._search_fields(query)
+        params = {"title": title, "fields": "key,title,author_name,cover_i", "limit": 12}
+        if author:
+            params["author"] = author
+        try:
+            response = self.session.get(
+                self.endpoint,
+                params=params,
+                headers={"User-Agent": "semantic-video-animation-agent/0.1 prototype contact"},
+                timeout=self.timeout_seconds,
+            )
+            response.raise_for_status()
+            documents = response.json().get("docs", [])
+        except (requests.RequestException, ValueError, AttributeError) as exc:
+            raise MediaProviderError(f"Open Library book search failed: {exc}") from exc
+
+        candidates: list[MediaCandidate] = []
+        for document in documents if isinstance(documents, list) else []:
+            if not isinstance(document, dict) or not isinstance(document.get("cover_i"), int):
+                continue
+            work_key = document.get("key")
+            if not isinstance(work_key, str) or not work_key.startswith("/"):
+                continue
+            book_title = str(document.get("title") or title).strip()
+            authors = document.get("author_name")
+            author_text = ", ".join(str(value) for value in authors) if isinstance(authors, list) else "Open Library"
+            cover_url = self.cover_endpoint.format(cover_id=document["cover_i"])
+            display_title = f"{book_title} — {author_text}"[:240]
+            candidates.append(MediaCandidate(
+                id=_candidate_id(self.name, query, cover_url), provider=self.name, query=query,
+                asset_kind="external_image", source_url=cover_url,
+                source_page_url=f"https://openlibrary.org{work_key}", title=display_title,
+                author_or_provider=author_text[:160],
+                license="Open Library cover source; image rights require human review",
+                mime_type="image/jpeg",
+            ))
+        return candidates
+
+
+class KnowledgeMediaProvider:
+    """Use exact book lookup for marked entities and Commons for other B-roll."""
+
+    name = "knowledge"
+
+    def __init__(
+        self,
+        timeout_seconds: int = 20,
+        *,
+        book_provider: ExternalMediaProvider | None = None,
+        commons_provider: ExternalMediaProvider | None = None,
+    ) -> None:
+        self.book_provider = book_provider or OpenLibraryBooksProvider(timeout_seconds)
+        self.commons_provider = commons_provider or WikimediaCommonsProvider(timeout_seconds)
+
+    def search(self, query: str, asset_kind: MediaKind) -> list[MediaCandidate]:
+        if query.lower().startswith("book:"):
+            return self.book_provider.search(query.split(":", 1)[1].strip(), asset_kind)
+        return self.commons_provider.search(query, asset_kind)
+
+
 class PexelsProvider:
     """Optional keyed photo/video provider.  It is never contacted without a key."""
 
@@ -179,9 +263,11 @@ def get_media_provider_by_name(name: str, settings: Settings) -> ExternalMediaPr
         return ManualMediaProvider()
     if name == "wikimedia_commons":
         return WikimediaCommonsProvider(settings.media_search_timeout_seconds)
+    if name == "knowledge":
+        return KnowledgeMediaProvider(settings.media_search_timeout_seconds)
     if name == "pexels":
         return PexelsProvider(settings.pexels_api_key, settings.media_search_timeout_seconds)
-    raise MediaProviderError("MEDIA_PROVIDER must be mock, manual, wikimedia_commons, or pexels")
+    raise MediaProviderError("MEDIA_PROVIDER must be mock, manual, knowledge, wikimedia_commons, or pexels")
 
 
 def get_media_provider(settings: Settings) -> ExternalMediaProvider:
