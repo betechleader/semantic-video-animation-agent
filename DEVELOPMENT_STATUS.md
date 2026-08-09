@@ -1,8 +1,31 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `37d1aab 修复转写纠错与审核重渲染`
-- Current stage: Stage 10F, deterministic exact-entity visual fallback - completed, pending user-approved commit.
+- Current commit before this stage: `3b53059 优化字幕预览与语义素材匹配`
+- Current stage: Stage 10G, local AI creation platform UI - completed, pending user-approved commit.
+
+## Stage 10G delivered
+
+- Replaced the upload-form landing page with a restrained local AI creation App Shell: persistent desktop sidebar, mobile drawer, global page header, real local-runtime/privacy status, and `#/home`, `#/tools/semantic-video`, `#/tasks`, and `#/settings` routes.
+- Added a data-driven tool catalog. Semantic video animation is the only enabled production module; two future extension positions are visibly disabled and marked planned rather than presented as working features.
+- Added a creation home with a focused value statement, primary entry into semantic video, real browser-local recent-task continuation, and accurate local-processing/privacy explanations without accounts, paid plans, cloud sync, or fabricated statistics.
+- Reorganized semantic video into progressive upload, processing, and review stages. Upload settings remain unchanged at the API boundary; processing now has a consistent progress/status system, event timeline, and cancel action; completed output prioritizes the responsive video and download action before advanced review.
+- Moved transcript JSON, animation-plan JSON, B-roll search/manual candidate/enable-disable controls, and review re-render into accessible review tabs. Existing API paths and payload semantics remain unchanged.
+- Preserved stable preview behavior by assigning `src` only when the task/render source key changes. Browser local storage remembers the language, current task ID, and recent real task IDs; refresh and history navigation restore the same task without rebuilding the view or reassigning the preview source.
+- Split the build-free frontend into `index.html`, `styles.css`, and `app.js`. The design system defines shared colour, spacing, radius, shadow, focus, state, and motion tokens, includes keyboard tab navigation and reduced-motion support, and uses only system fonts and inline SVG icons.
+
+## Stage 10G verification
+
+- Full Python suite: `95 passed in 53.06s`. Frontend coverage now checks split static assets, complete Chinese/English keys, data-driven routes and tools, mobile drawer rules, responsive preview sizing, stable video source assignment, refresh/history persistence, and accessible review tabs while retaining all existing API/E2E coverage.
+- In-app browser checks used 1440×900, 1024×768, and 390×844 viewports. The original 390 px page overflowed to 459 px; the redesigned Chinese and English screens had no over-wide controls or document overflow. Desktop used the fixed platform sidebar, 1024 px retained a two-column result layout, and mobile used a 306 px drawer plus naturally stacked forms, preview, summary, and review controls.
+- Browser navigation covered the creation home → semantic-video workspace path, task recovery for the real completed 94.36 s / 540×960 task `fc606fb1-59b5-47ee-a6ad-bc9dd5d95b91`, transcript/plan/material review tabs, and browser back/forward with the same result and preview source key.
+- A browser-uploaded 4.00 s / 360×640 local MP4 completed the actual Mock + local-original-media pipeline as task `01360a61-2d49-4f4e-b3a2-91b420ce15ab`. The browser showed live rendering at 76%, then loaded the completed preview, transcript, plan, and media review with a new completion-event source key.
+- Standard `npm.cmd run build` reached the known locked `animation-renderer/build` directory and failed with `EPERM`; that directory was not removed or cleaned. `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260807_platform_ui` completed successfully.
+
+## Stage 10G known limitations
+
+- Recent-task indexing is intentionally browser-local because the backend does not expose a task-list endpoint. Existing tasks can be reopened by entering their task ID; authoritative status and content are still fetched from FastAPI/SQLite.
+- Transcript and animation-plan editing remains JSON-based inside the advanced review tabs. A future module can add structured segment/word editing without changing the current API semantics.
 
 ## Stage 10F delivered
 

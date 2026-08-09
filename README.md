@@ -1,6 +1,6 @@
-# Chinese Talking-head Semantic Video Animation
+# Local AI Video & Content Creation Studio
 
-本地 Windows 口播视频管线：上传 MP4、抽取语音、生成时间对齐语义计划、渲染动态字幕与知识口播包装、再用 FFmpeg 输出成片。输出是单一完整成片，不会保留参考视频中的“原片/成片”对照或剪辑台。
+面向本地 Windows 的 AI 视频与内容创作平台。当前正式模块是“语义视频动画”：上传 MP4、抽取语音、生成时间对齐语义计划、渲染动态字幕与知识口播包装，再用 FFmpeg 输出成片。输出是单一完整成片，不会保留参考视频中的“原片/成片”对照或剪辑台。平台外壳、功能目录和 hash 路由已经独立于该模块，后续工具可以复用同一导航、任务和设置结构。
 
 ## Start
 
@@ -13,9 +13,20 @@ cd ..
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.app.main:app --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000), upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The web form defaults to **real local `faster_whisper` + rule-based semantic planning** and a knowledge-media profile: confirmed exact entities use audited local assets first, marked unknown books use Open Library, and other B-roll uses Wikimedia Commons. Choose Mock explicitly only for a fast engineering smoke test. Use the page-header language selector to switch the complete upload/review workflow between Chinese and English; the browser remembers the selection after refresh.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The site opens on a local creation home rather than an upload form. Enter **Semantic Video Animation** from the tool catalog, upload an MP4 (up to 100 MB), then review the generated video, transcript, plan, and B-roll choices. The workspace defaults to **real local `faster_whisper` + rule-based semantic planning** and a knowledge-media profile: confirmed exact entities use audited local assets first, marked unknown books use Open Library, and other B-roll uses Wikimedia Commons. Choose Mock explicitly only for a fast engineering smoke test. Use the global language selector to switch the complete platform and workflow between Chinese and English; the browser remembers the selection after refresh.
 
 The generated-video preview is display-only and responsive: portrait output is centred with `max-width: 100%`, a viewport-relative `max-height`, and `object-fit: contain`. Preview requests are served inline with byte-range support, and the page changes the video source only once per completed render. This does not resize or recompress the downloadable result.
+
+## Local creation platform UI
+
+The frontend remains a build-free same-origin static app, split into `frontend/index.html`, `frontend/styles.css`, and `frontend/app.js`:
+
+- `#/home` provides the creation home, real recent-task continuation, the data-driven tool catalog, and local/privacy explanations.
+- `#/tools/semantic-video` contains the complete upload, processing, result, transcript/plan, media-review, cancel, and review re-render workflow.
+- `#/tasks` lists only task IDs created or explicitly restored in this browser. A task can be recovered by its local ID; no sample tasks or fake statistics are generated.
+- `#/settings` exposes the real interface-language and local-storage behavior without accounts, cloud sync, subscriptions, or other unavailable features.
+
+The current task ID and recent-task index are stored in browser local storage, while authoritative task content remains in the FastAPI/SQLite backend. Refresh, hash navigation, and browser back/forward restore the same task without repeatedly assigning the video preview source. The responsive shell uses a persistent desktop sidebar and a mobile drawer, accessible review tabs, visible focus states, and reduced-motion support.
 
 ## Post-ASR correction
 
@@ -64,7 +75,7 @@ Automatic Wikimedia search/download timeouts or rate limits fall back to the aut
 
 ## Review workflow and API
 
-The browser preview keeps the transcript and plan JSON editor. Its B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save review edits and re-render** to download a selected candidate into the task and render the new result. If transcript segment text changed, the backend automatically rebuilds the animation plan from the edited transcript. Media audit metadata, face regions, and placements are renderer-derived: the review endpoint discards stale client copies, materializes enabled visuals, repeats local placement analysis, and then performs strict final validation. An explicitly selected missing or failed candidate remains an error.
+After a result is ready, the advanced review tabs expose the transcript and plan JSON editors, material review, and task events without putting large editors in the initial upload view. The B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save edits and re-render** to download a selected candidate into the task and render the new result. If transcript segment text changed, the backend automatically rebuilds the animation plan from the edited transcript. Media audit metadata, face regions, and placements are renderer-derived: the review endpoint discards stale client copies, materializes enabled visuals, repeats local placement analysis, and then performs strict final validation. An explicitly selected missing or failed candidate remains an error.
 
 - `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart fields `processing_profile=configured|real|mock` and `media_provider=mock|manual|knowledge|wikimedia_commons|pexels` select the task-local providers.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
@@ -85,6 +96,8 @@ Every adopted asset is downloaded into `media-assets/`; the plan and `media_asse
 Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` records only a SHA-256 trace fingerprint, stage durations (including media acquisition and local safety analysis), terminal category, and technical output facts—never transcript text, media bytes, absolute paths, identity data, face coordinates, or exception messages.
 
 ## Verification
+
+Current platform redesign verification: `95 passed`. The standard renderer build can still hit the known Windows lock on `animation-renderer/build`; the equivalent isolated command succeeded at `storage/renderer_build_validation_20260807_platform_ui`.
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv

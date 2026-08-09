@@ -3,315 +3,222 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>语义视频动画</title>
-  <style>
-    :root { color-scheme: dark; font-family: "Microsoft YaHei", sans-serif; background: #10131c; color: #f5f7ff; }
-    main { max-width: 1000px; margin: 5vh auto; padding: 28px; background: #1d2331; border-radius: 16px; }
-    button, input, textarea, select { font: inherit; } button { margin: 8px 8px 8px 0; padding: 10px 16px; cursor: pointer; background: #ffd400; border: 0; border-radius: 8px; color: #111; font-weight: 700; } button:disabled { opacity: .5; cursor: default; }
-    .upload-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; } .upload-options label { display: grid; gap: 6px; color: #cbd5e1; } .upload-options select { border-radius: 8px; border: 1px solid #475569; padding: 10px; color: #e2e8f0; background: #0f172a; }
-    .page-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; } .language-control { display: grid; gap: 6px; min-width: 150px; color: #cbd5e1; } .language-control select { border-radius: 8px; border: 1px solid #475569; padding: 9px; color: #e2e8f0; background: #0f172a; }
-    .file-picker { display: flex; align-items: center; gap: 12px; margin: 14px 0; } .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); } .file-button { padding: 10px 16px; border-radius: 8px; background: #334155; color: #f8fafc; cursor: pointer; font-weight: 700; } .file-button:focus-within, .file-button:hover { background: #475569; } #file-name { color: #cbd5e1; overflow-wrap: anywhere; }
-    #status { white-space: pre-wrap; color: #cbd5e1; min-height: 1.5em; } a { color: #ffd400; } .review { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; } textarea { width: 100%; min-height: 320px; box-sizing: border-box; background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 8px; padding: 12px; font: 13px ui-monospace, monospace; } .preview-shell { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 12px; overflow: hidden; } #preview { display: block; width: auto; height: auto; max-width: 100%; max-height: min(72vh, 760px); object-fit: contain; border-radius: 10px; background: #000; } .hidden { display: none; } .media-review { margin-top: 24px; padding: 18px; background: #121a2a; border: 1px solid #334155; border-radius: 12px; } .media-controls { display: grid; grid-template-columns: 1fr auto auto 1fr; gap: 8px; } .media-controls input, .media-controls select { min-width: 0; border-radius: 8px; border: 1px solid #475569; padding: 10px; color: #e2e8f0; background: #0f172a; } .media-list, .candidate-list { display: grid; gap: 10px; margin-top: 14px; } .media-card { padding: 12px; border-radius: 9px; background: #0f172a; border-left: 4px solid #ffd400; } .media-card small { display: block; color: #94a3b8; margin-top: 4px; overflow-wrap: anywhere; } .media-card button { padding: 6px 10px; margin: 10px 6px 0 0; } .review-note { color: #fbbf24; } @media (max-width: 700px) { .page-header { flex-direction: column; } .language-control { width: 100%; } .upload-options, .review { grid-template-columns: 1fr; } .media-controls { grid-template-columns: 1fr; } #preview { max-height: 64vh; } }
-  </style>
+  <meta name="color-scheme" content="dark" />
+  <title>本地 AI 创作工作台</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="/app.js" defer></script>
 </head>
 <body>
-  <main>
-    <header class="page-header">
-      <div>
-        <h1 data-i18n="pageTitle">语义视频动画</h1>
-        <p data-i18n="pageDescription">上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。</p>
-      </div>
-      <label class="language-control"><span data-i18n="languageLabel">界面语言</span>
-        <select id="language-select" aria-label="界面语言" data-i18n-aria-label="languageLabel">
-          <option value="zh-CN">中文</option>
-          <option value="en">English</option>
-        </select>
-      </label>
-    </header>
-    <form id="upload-form">
-      <div class="file-picker">
-        <label class="file-button" for="video-file" data-i18n="chooseVideo">选择视频</label>
-        <span id="file-name">未选择文件</span>
-        <input id="video-file" class="file-input" type="file" accept="video/mp4,.mp4" required />
-      </div>
-      <div class="upload-options">
-        <label><span data-i18n="processingMode">处理模式</span>
-          <select id="processing-profile">
-            <option value="real" selected data-i18n="profileReal">真实转写 + 语义规划（推荐）</option>
-            <option value="mock" data-i18n="profileMock">Mock 测试文案</option>
-            <option value="configured" data-i18n="profileConfigured">使用服务端环境变量</option>
-          </select>
-        </label>
-        <label><span data-i18n="externalMedia">外部素材</span>
-          <select id="upload-media-provider">
-            <option value="knowledge" selected data-i18n="providerKnowledge">Open Library 图书 + Wikimedia B-roll（无需 Key）</option>
-            <option value="wikimedia_commons" data-i18n="providerWikimedia">仅 Wikimedia Commons（无需 Key）</option>
-            <option value="pexels" data-i18n="providerPexels">Pexels（需要 PEXELS_API_KEY）</option>
-            <option value="mock" data-i18n="providerMock">本地原创信息图</option>
-            <option value="manual" data-i18n="providerManual">仅人工候选 URL</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" data-i18n="uploadButton">上传并生成成片</button>
-    </form>
-    <p id="status">请选择一个 MP4 视频开始处理。</p>
-    <section id="result" class="hidden">
-      <div class="preview-shell"><video id="preview" controls></video></div>
-      <p><a id="download" data-i18n="downloadResult">下载生成的视频</a></p>
-      <div class="review">
-        <label><span data-i18n="transcriptJson">转写文本 JSON</span><textarea id="transcript"></textarea></label>
-        <label><span data-i18n="planJson">动画计划 JSON</span><textarea id="plan"></textarea></label>
-      </div>
-      <p class="review-note" data-i18n="replanNote">修改转写后保存时，后端会根据修改后的文本自动重新生成动画计划，并清理旧素材派生数据。</p>
-      <section class="media-review">
-        <h2 data-i18n="reviewTitle">外部 B-roll 素材审核</h2>
-        <p class="review-note" data-i18n="reviewNote">外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。</p>
-        <div id="media-list" class="media-list"></div>
-        <div class="media-controls">
-          <input id="media-query" placeholder="搜索 B-roll，例如：supermarket product" data-i18n-placeholder="searchPlaceholder" />
-          <select id="media-kind"><option value="external_image" data-i18n="imageKind">图片</option><option value="external_video" data-i18n="videoKind">视频</option></select>
-          <button id="search-media" type="button" data-i18n="searchButton">搜索</button>
-          <input id="manual-media-url" placeholder="或添加图片/视频 URL" data-i18n-placeholder="manualUrlPlaceholder" />
-        </div>
-        <div id="candidate-list" class="candidate-list"></div>
-      </section>
-      <button id="save-review" type="button" data-i18n="saveReview">保存审核修改并重新渲染</button>
-    </section>
-  </main>
-  <script>
-    const form = document.querySelector('#upload-form');
-    const input = document.querySelector('#video-file');
-    const fileName = document.querySelector('#file-name');
-    const processingProfile = document.querySelector('#processing-profile');
-    const uploadMediaProvider = document.querySelector('#upload-media-provider');
-    const status = document.querySelector('#status');
-    const result = document.querySelector('#result');
-    const preview = document.querySelector('#preview');
-    const download = document.querySelector('#download');
-    const transcript = document.querySelector('#transcript');
-    const plan = document.querySelector('#plan');
-    const saveReview = document.querySelector('#save-review');
-    const mediaList = document.querySelector('#media-list');
-    const mediaQuery = document.querySelector('#media-query');
-    const mediaKind = document.querySelector('#media-kind');
-    const searchMedia = document.querySelector('#search-media');
-    const manualMediaUrl = document.querySelector('#manual-media-url');
-    const candidateList = document.querySelector('#candidate-list');
-    const languageSelect = document.querySelector('#language-select');
-    const translations = {
-      'zh-CN': {
-        documentTitle: '语义视频动画', pageTitle: '语义视频动画',
-        pageDescription: '上传原片后生成知识口播成片。默认使用真实语音转写和语义规划；Mock 仅用于快速工程测试。',
-        languageLabel: '界面语言', chooseVideo: '选择视频', noFileChosen: '未选择文件', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）',
-        profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '外部素材',
-        providerKnowledge: 'Open Library 图书 + Wikimedia B-roll（无需 Key）', providerWikimedia: '仅 Wikimedia Commons（无需 Key）', providerPexels: 'Pexels（需要 PEXELS_API_KEY）',
-        providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', uploadButton: '上传并生成成片',
-        downloadResult: '下载生成的视频', transcriptJson: '转写文本 JSON', planJson: '动画计划 JSON',
-        reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。', replanNote: '修改转写后保存时，后端会根据修改后的文本自动重新生成动画计划，并清理旧素材派生数据。',
-        searchPlaceholder: '搜索 B-roll，例如：supermarket product', imageKind: '图片', videoKind: '视频',
-        searchButton: '搜索', manualUrlPlaceholder: '或添加图片/视频 URL', saveReview: '保存审核修改并重新渲染',
-        ready: '请选择一个 MP4 视频开始处理。', chooseTarget: '替换 B-roll 前，请先选择要应用的语义画面。',
-        selectedCandidate: '已选择“{title}”。请保存审核修改，以下载并渲染任务内素材副本。',
-        brollDisabled: '已禁用该 B-roll。请保存审核修改并重新渲染。', generatedOriginal: '本地原创信息图',
-        pendingSelection: '等待选择或渲染', disabled: '已禁用', disable: '禁用', enable: '启用',
-        useFor: '用于：{title}', useThis: '使用此素材', imageAsset: '外部图片', videoAsset: '外部视频',
-        taskLoadFailed: '无法加载任务。', completed: '处理完成：{seconds} 秒，{width} × {height}。',
-        downloadFallback: '{message}\n视频已可下载，但无法加载转写文本和动画计划：{error}',
-        event_created: '任务已创建。', event_processing: '正在提取音频并进行语音转写…', event_rendering: '正在生成动画并合成视频…',
-        event_review_rendering: '正在根据审核修改重新渲染…', event_cancel_requested: '已请求取消任务。',
-        event_failed: '任务失败：{message}', event_cancelled: '任务已取消。', uploading: '正在上传视频…',
-        uploadFailed: '上传失败：{message}', validatingReview: '正在校验审核修改并重新渲染…',
-        reviewFailed: '审核重渲染失败：{message}', replanned: '已根据修改后的转写重新生成动画计划，正在渲染…', searching: '正在搜索外部 B-roll 候选…',
-        searchFailed: '素材搜索失败：{message}', foundCandidates: '找到 {count} 个候选。请选择素材，然后保存审核修改。',
-        manualFailed: '添加人工候选失败：{message}', manualVisual: '人工素材', unknownError: '未知错误',
-      },
-      en: {
-        documentTitle: 'Semantic Video Animation', pageTitle: 'Semantic Video Animation',
-        pageDescription: 'Upload source footage to generate a polished knowledge-talk video. Real speech recognition and semantic planning are recommended; Mock is for engineering tests only.',
-        languageLabel: 'Language', chooseVideo: 'Choose video', noFileChosen: 'No file selected', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)',
-        profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'External media',
-        providerKnowledge: 'Open Library books + Wikimedia B-roll (No key required)', providerWikimedia: 'Wikimedia Commons only (No key required)', providerPexels: 'Pexels (Requires PEXELS_API_KEY)',
-        providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', uploadButton: 'Upload and generate',
-        downloadResult: 'Download result video', transcriptJson: 'Transcript JSON', planJson: 'Animation plan JSON',
-        reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.', replanNote: 'When transcript text changes, saving automatically rebuilds the animation plan from the edited transcript and clears stale media-derived data.',
-        searchPlaceholder: 'Search B-roll, e.g. supermarket product', imageKind: 'Image', videoKind: 'Video',
-        searchButton: 'Search', manualUrlPlaceholder: 'Or add an image/video URL', saveReview: 'Save review edits and re-render',
-        ready: 'Choose an MP4 file to begin.', chooseTarget: 'Choose a target visual before replacing its B-roll.',
-        selectedCandidate: 'Selected “{title}”. Save review edits to download and render the task-local copy.',
-        brollDisabled: 'B-roll disabled. Save review edits to re-render.', generatedOriginal: 'Generated original',
-        pendingSelection: 'Pending selection/render', disabled: 'Disabled', disable: 'Disable', enable: 'Enable',
-        useFor: 'Use for: {title}', useThis: 'Use this', imageAsset: 'external image', videoAsset: 'external video',
-        taskLoadFailed: 'Could not load the task.', completed: 'Completed: {seconds} seconds, {width} × {height}.',
-        downloadFallback: '{message}\nDownload is ready, but the transcript and plan could not be loaded: {error}',
-        event_created: 'Task created.', event_processing: 'Extracting audio and transcribing speech…', event_rendering: 'Rendering animation and compositing video…',
-        event_review_rendering: 'Re-rendering the reviewed changes…', event_cancel_requested: 'Task cancellation requested.',
-        event_failed: 'Task failed: {message}', event_cancelled: 'Task cancelled.', uploading: 'Uploading video…',
-        uploadFailed: 'Upload failed: {message}', validatingReview: 'Validating review edits and re-rendering…',
-        reviewFailed: 'Review re-render failed: {message}', replanned: 'Animation plan rebuilt from the edited transcript; rendering…', searching: 'Searching external B-roll candidates…',
-        searchFailed: 'Media search failed: {message}', foundCandidates: 'Found {count} candidates. Choose one, then save review edits.',
-        manualFailed: 'Could not add manual candidate: {message}', manualVisual: 'manual visual', unknownError: 'Unknown error',
-      },
-    };
-    let currentLanguage = localStorage.getItem('semantic-video-language') || 'zh-CN';
-    let taskId = null;
-    let lastEventId = 0;
-    let lastCandidates = [];
-    let statusState = {key: 'ready', params: {}};
+  <a class="skip-link" href="#main-content" data-i18n="skipToContent">跳到主要内容</a>
 
-    const pretty = (value) => JSON.stringify(value, null, 2);
-    const t = (key, params = {}) => {
-      const template = translations[currentLanguage][key] || translations['zh-CN'][key] || key;
-      return Object.entries(params).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), template);
-    };
-    const setStatusKey = (key, params = {}) => { statusState = {key, params}; status.textContent = t(key, params); };
-    const updateFileName = () => { fileName.textContent = input.files[0]?.name || t('noFileChosen'); };
-    function applyLanguage(language) {
-      currentLanguage = translations[language] ? language : 'zh-CN';
-      localStorage.setItem('semantic-video-language', currentLanguage);
-      languageSelect.value = currentLanguage;
-      document.documentElement.lang = currentLanguage;
-      document.title = t('documentTitle');
-      document.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(element => { element.placeholder = t(element.dataset.i18nPlaceholder); });
-      document.querySelectorAll('[data-i18n-aria-label]').forEach(element => { element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel)); });
-      updateFileName();
-      status.textContent = t(statusState.key, statusState.params);
-      if (plan.value.trim()) renderMediaReview(currentPlan(), lastCandidates);
-    }
-    const currentPlan = () => JSON.parse(plan.value);
-    function writePlan(value) { plan.value = pretty(value); }
-    function useCandidate(candidate) {
-      const editable = currentPlan();
-      const animation = editable.animations.find(item => item.type === 'media_visual' && item.parameters.asset_id === candidate.targetAssetId);
-      if (!animation) { setStatusKey('chooseTarget'); return; }
-      animation.parameters.selected_candidate_id = candidate.id;
-      animation.parameters.enabled = true;
-      editable.media_assets = (editable.media_assets || []).filter(asset => asset.asset_id !== animation.parameters.asset_id);
-      editable.media_placements = (editable.media_placements || []).filter(item => item.animation_id !== animation.id);
-      writePlan(editable); renderMediaReview(editable, []);
-      setStatusKey('selectedCandidate', {title: candidate.title});
-    }
-    function disableMedia(assetId) {
-      const editable = currentPlan();
-      const animation = editable.animations.find(item => item.type === 'media_visual' && item.parameters.asset_id === assetId);
-      if (!animation) return;
-      animation.parameters.enabled = false;
-      editable.media_assets = (editable.media_assets || []).filter(asset => asset.asset_id !== assetId);
-      editable.media_placements = (editable.media_placements || []).filter(item => item.animation_id !== animation.id);
-      writePlan(editable); renderMediaReview(editable, []);
-      setStatusKey('brollDisabled');
-    }
-    function renderMediaReview(editablePlan, candidates) {
-      lastCandidates = candidates;
-      const visuals = editablePlan.animations.filter(item => item.type === 'media_visual');
-      const audits = new Map((editablePlan.media_assets || []).map(asset => [asset.asset_id, asset]));
-      mediaList.replaceChildren();
-      visuals.forEach(animation => {
-        const audit = audits.get(animation.parameters.asset_id);
-        const card = document.createElement('article'); card.className = 'media-card';
-        const title = document.createElement('strong'); title.textContent = `${animation.parameters.title} · ${animation.start_ms}-${animation.end_ms} ms`;
-        const source = document.createElement('small'); source.textContent = audit ? `${audit.provider} · ${audit.search_query} · ${audit.source_url || t('generatedOriginal')} · ${audit.license}` : (animation.parameters.enabled ? t('pendingSelection') : t('disabled'));
-        const disable = document.createElement('button'); disable.type = 'button'; disable.textContent = animation.parameters.enabled ? t('disable') : t('enable');
-        disable.addEventListener('click', () => { if (animation.parameters.enabled) disableMedia(animation.parameters.asset_id); else { const next = currentPlan(); next.animations.find(item => item.id === animation.id).parameters.enabled = true; writePlan(next); renderMediaReview(next, []); } });
-        card.append(title, source, disable); mediaList.append(card);
-      });
-      candidateList.replaceChildren();
-      candidates.forEach(candidate => {
-        const card = document.createElement('article'); card.className = 'media-card';
-        const kindLabel = candidate.asset_kind === 'external_video' ? t('videoAsset') : t('imageAsset');
-        const title = document.createElement('strong'); title.textContent = `${candidate.title} (${kindLabel})`;
-        const source = document.createElement('small'); source.textContent = `${candidate.provider} · ${candidate.author_or_provider} · ${candidate.license} · ${candidate.source_url}`;
-        const target = document.createElement('select'); visuals.filter(item => item.parameters.enabled).forEach(item => { const option = document.createElement('option'); option.value = item.parameters.asset_id; option.textContent = t('useFor', {title: item.parameters.title}); target.append(option); });
-        const use = document.createElement('button'); use.type = 'button'; use.textContent = t('useThis'); use.addEventListener('click', () => useCandidate({...candidate, targetAssetId: target.value}));
-        card.append(title, source, target, use); candidateList.append(card);
-      });
-    }
-    async function loadMediaReview(id) {
-      const response = await fetch(`/api/videos/${id}/media`); if (!response.ok) return;
-      const payload = await response.json(); renderMediaReview(currentPlan(), payload.candidates || []);
-    }
-    function showResult(id) {
-      const sourceKey = `${id}:${lastEventId}`;
-      if (preview.dataset.sourceKey !== sourceKey) {
-        preview.src = `/api/videos/${id}/download?preview=true&version=${lastEventId}`;
-        preview.dataset.sourceKey = sourceKey;
-      }
-      download.href = `/api/videos/${id}/download`;
-      result.classList.remove('hidden');
-    }
-    async function loadTask(id) {
-      const response = await fetch(`/api/videos/${id}`);
-      if (!response.ok) throw new Error(t('taskLoadFailed'));
-      const task = await response.json();
-      if (task.status === 'completed') {
-        transcript.value = pretty(task.transcript);
-        plan.value = pretty(task.plan);
-        showResult(id);
-        loadMediaReview(id);
-        setStatusKey('completed', {seconds: task.metadata.duration_seconds.toFixed(2), width: task.metadata.width, height: task.metadata.height});
-      }
-      return task;
-    }
-    function watchTask(id) {
-      const events = new EventSource(`/api/videos/${id}/events?after_event_id=${lastEventId}`);
-      const readEvent = event => { const detail = JSON.parse(event.data); lastEventId = Math.max(lastEventId, detail.id); return detail; };
-      ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => events.addEventListener(name, event => { readEvent(event); setStatusKey(`event_${name}`); }));
-      events.addEventListener('completed', async event => {
-        const detail = readEvent(event);
-        events.close();
-        setStatusKey('event_rendering');
-        try { await loadTask(id); }
-        catch (error) { setStatusKey('downloadFallback', {message: detail.message, error: error.message}); }
-      });
-      ['failed', 'cancelled'].forEach((name) => events.addEventListener(name, event => { const detail = readEvent(event); events.close(); setStatusKey(`event_${name}`, {message: detail.message || t('unknownError')}); }));
-    }
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      if (!input.files[0]) return;
-      result.classList.add('hidden'); setStatusKey('uploading');
-      const data = new FormData();
-      data.append('file', input.files[0]);
-      data.append('processing_profile', processingProfile.value);
-      data.append('media_provider', uploadMediaProvider.value);
-      try {
-        const response = await fetch('/api/videos', { method: 'POST', body: data });
-        const body = await response.json(); if (!response.ok) throw new Error(body.detail || t('unknownError'));
-        taskId = body.task_id; watchTask(taskId);
-      } catch (error) { setStatusKey('uploadFailed', {message: error.message}); }
-    });
-    saveReview.addEventListener('click', async () => {
-      if (!taskId) return;
-      try {
-        const body = { transcript: JSON.parse(transcript.value), plan: JSON.parse(plan.value) };
-        saveReview.disabled = true; setStatusKey('validatingReview');
-        const response = await fetch(`/api/videos/${taskId}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
-        if (payload.replanned) setStatusKey('replanned');
-        watchTask(taskId);
-      } catch (error) { setStatusKey('reviewFailed', {message: error.message}); }
-      finally { saveReview.disabled = false; }
-    });
-    searchMedia.addEventListener('click', async () => {
-      if (!taskId || !mediaQuery.value.trim()) return;
-      try {
-        searchMedia.disabled = true; setStatusKey('searching');
-        const response = await fetch(`/api/videos/${taskId}/media/search`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: mediaQuery.value.trim(), asset_kind: mediaKind.value})});
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
-        renderMediaReview(currentPlan(), payload.candidates); setStatusKey('foundCandidates', {count: payload.candidates.length});
-      } catch (error) { setStatusKey('searchFailed', {message: error.message}); } finally { searchMedia.disabled = false; }
-    });
-    manualMediaUrl.addEventListener('change', async () => {
-      if (!taskId || !manualMediaUrl.value.trim()) return;
-      try {
-        const query = mediaQuery.value.trim() || t('manualVisual');
-        const response = await fetch(`/api/videos/${taskId}/media/candidates`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, source_url: manualMediaUrl.value.trim(), title: query, asset_kind: mediaKind.value, mime_type: mediaKind.value === 'external_video' ? 'video/mp4' : 'image/jpeg'})});
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || t('unknownError'));
-        renderMediaReview(currentPlan(), [payload.candidate]); manualMediaUrl.value = '';
-      } catch (error) { setStatusKey('manualFailed', {message: error.message}); }
-    });
-    input.addEventListener('change', updateFileName);
-    languageSelect.addEventListener('change', () => applyLanguage(languageSelect.value));
-    applyLanguage(currentLanguage);
-  </script>
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="icon-grid" viewBox="0 0 24 24"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" /></symbol>
+    <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 2 1.4 5.1L18 9l-4.6 1.9L12 16l-1.4-5.1L6 9l4.6-1.9L12 2Zm6 12 .9 3.1L22 18l-3.1.9L18 22l-.9-3.1L14 18l3.1-.9L18 14ZM5 13l1.1 3.9L10 18l-3.9 1.1L5 23l-1.1-3.9L0 18l3.9-1.1L5 13Z" /></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Zm1 4v4.6l3.2 1.9-1 1.7-4.2-2.5V7h2Z" /></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="m20.4 13.5-1.7 1 .1 2-2.4 2.4-2-.1-1 1.7h-3l-1-1.7-2 .1L5 16.5l.1-2-1.7-1v-3l1.7-1L5 7.4 7.4 5l2 .1 1-1.7h3l1 1.7 2-.1 2.4 2.4-.1 2 1.7 1v3.1ZM12 8.5a3.5 3.5 0 1 0 3.5 3.5A3.5 3.5 0 0 0 12 8.5Z" /></symbol>
+    <symbol id="icon-video" viewBox="0 0 24 24"><path d="M4 5h11a2 2 0 0 1 2 2v2.1l3-1.8v9.4l-3-1.8V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm3 4v6l5-3-5-3Z" /></symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" /></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="m13.2 5.6 6.4 6.4-6.4 6.4-1.4-1.4 4-4H4v-2h11.8l-4-4 1.4-1.4Z" /></symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M11 16V7.8L8.4 10.4 7 9l5-5 5 5-1.4 1.4L13 7.8V16h-2Zm-6 4v-6h2v4h10v-4h2v6H5Z" /></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.1 3.4 9.7 8 11 4.6-1.3 8-5.9 8-11V5l-8-3Zm-1 14-3-3 1.4-1.4 1.6 1.6 3.6-3.6L16 11l-5 5Z" /></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m9.2 16.2-4.4-4.4-1.4 1.4L9.2 19 21 7.2l-1.4-1.4-10.4 10.4Z" /></symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6V2Zm7 2H8v16h9V8h-4V4Zm-3 8h5v2h-5v-2Zm0 4h5v2h-5v-2Z" /></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5Z" /></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="主导航" data-i18n-aria-label="primaryNavigation">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg><use href="#icon-spark" /></svg></span>
+        <span><strong data-i18n="brandName">帧语工坊</strong><small data-i18n="brandTagline">LOCAL AI STUDIO</small></span>
+      </div>
+      <nav id="primary-nav" class="primary-nav"></nav>
+      <div class="sidebar-footer">
+        <div class="local-note">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span><strong data-i18n="localRunning">本地运行</strong><small data-i18n="localData">数据保存在本机</small></span>
+        </div>
+        <p class="build-label" data-i18n="platformLabel">AI 视频与内容创作平台</p>
+      </div>
+    </aside>
+    <button id="nav-scrim" class="nav-scrim" type="button" aria-label="关闭导航" data-i18n-aria-label="closeNavigation" tabindex="-1"></button>
+
+    <div class="workspace-shell">
+      <header class="topbar">
+        <div class="topbar-leading">
+          <button id="menu-button" class="icon-button menu-button" type="button" aria-label="打开导航" data-i18n-aria-label="openNavigation" aria-controls="sidebar" aria-expanded="false">
+            <svg aria-hidden="true"><use href="#icon-menu" /></svg>
+          </button>
+          <div class="page-heading">
+            <h1 id="page-title">创作工作台</h1>
+            <p id="page-description">在本机完成从素材到成片的 AI 创作流程。</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="runtime-badge"><span class="status-dot" aria-hidden="true"></span><span data-i18n="localRunning">本地运行</span></span>
+          <label class="language-control">
+            <span class="sr-only" data-i18n="languageLabel">界面语言</span>
+            <select id="language-select" aria-label="界面语言" data-i18n-aria-label="languageLabel">
+              <option value="zh-CN">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+      <main id="main-content" class="main-content" tabindex="-1">
+        <section id="view-home" class="route-view home-view" data-route-view="home">
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <p class="eyebrow" data-i18n="homeEyebrow">本地优先 · 创作工具箱</p>
+              <h2 data-i18n="homeTitle">让内容生产更专注，<br />把繁琐流程交给本地 AI。</h2>
+              <p data-i18n="homeDescription">从口播视频的语义包装开始，在统一工作台中组织素材、处理任务和审核成片。</p>
+              <div class="hero-actions">
+                <a class="button button-primary" href="#/tools/semantic-video"><span data-i18n="startCreating">开始创作</span><svg aria-hidden="true"><use href="#icon-arrow" /></svg></a>
+                <a class="button button-secondary" href="#/tasks" data-i18n="viewTasks">查看最近任务</a>
+              </div>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+              <div class="visual-frame">
+                <span class="visual-line visual-line-short"></span><span class="visual-line"></span>
+                <div class="visual-timeline"><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="visual-caption">AI</div>
+              </div>
+              <span class="visual-chip visual-chip-top"><svg><use href="#icon-video" /></svg></span>
+              <span class="visual-chip visual-chip-bottom"><svg><use href="#icon-spark" /></svg></span>
+            </div>
+          </div>
+
+          <section class="content-section" aria-labelledby="tools-heading">
+            <div class="section-heading">
+              <div><p class="eyebrow" data-i18n="toolboxEyebrow">创作工具</p><h2 id="tools-heading" data-i18n="toolboxTitle">从一个成熟模块开始</h2></div>
+              <p data-i18n="toolboxDescription">功能目录由配置驱动，后续模块可在同一平台外壳中扩展。</p>
+            </div>
+            <div id="tool-grid" class="tool-grid"></div>
+          </section>
+
+          <div class="home-lower-grid">
+            <section class="content-section compact-section" aria-labelledby="continue-heading">
+              <div class="section-heading inline-heading"><div><p class="eyebrow" data-i18n="continueEyebrow">快速继续</p><h2 id="continue-heading" data-i18n="continueTitle">最近任务</h2></div><a href="#/tasks" class="text-link" data-i18n="viewAll">查看全部</a></div>
+              <div id="home-recent" class="recent-slot"></div>
+            </section>
+            <aside class="privacy-panel">
+              <span class="feature-icon"><svg aria-hidden="true"><use href="#icon-shield" /></svg></span>
+              <div><p class="eyebrow" data-i18n="privacyEyebrow">本地优先</p><h2 data-i18n="privacyTitle">创作素材留在你的电脑上</h2><p data-i18n="privacyDescription">任务文件、转写和成片保存在本机存储目录。只有在你选择外部素材源时，相关搜索才会访问对应服务。</p></div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="view-semantic-video" class="route-view tool-view" data-route-view="semantic-video" hidden>
+          <div class="tool-banner">
+            <div class="tool-heading"><span class="feature-icon feature-icon-accent"><svg aria-hidden="true"><use href="#icon-video" /></svg></span><div><p class="eyebrow" data-i18n="availableNow">已可使用</p><h2 data-i18n="semanticTitle">语义视频动画</h2><p data-i18n="semanticDescription">识别口播内容，生成动态字幕、语义画面和知识型视觉包装。</p></div></div>
+            <button id="new-task-button" class="button button-secondary button-small" type="button"><span data-i18n="newCreation">新建创作</span></button>
+          </div>
+
+          <ol class="workflow-steps" aria-label="创作步骤" data-i18n-aria-label="workflowSteps">
+            <li data-step="upload" class="is-current"><span>1</span><div><strong data-i18n="stepUpload">上传素材</strong><small data-i18n="stepUploadHint">选择视频与处理方式</small></div></li>
+            <li data-step="processing"><span>2</span><div><strong data-i18n="stepProcess">本地处理</strong><small data-i18n="stepProcessHint">转写、规划与渲染</small></div></li>
+            <li data-step="review"><span>3</span><div><strong data-i18n="stepReview">预览审核</strong><small data-i18n="stepReviewHint">检查成片与高级内容</small></div></li>
+          </ol>
+
+          <div id="status-banner" class="status-banner" data-tone="neutral" role="status" aria-live="polite">
+            <span class="status-symbol" aria-hidden="true"></span>
+            <div><strong id="status-title" data-i18n="readyTitle">准备开始</strong><p id="status">请选择一个 MP4 视频开始处理。</p></div>
+          </div>
+
+          <section id="upload-panel" class="panel upload-panel" aria-labelledby="upload-heading">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="sourceEyebrow">第一步</p><h2 id="upload-heading" data-i18n="uploadTitle">添加口播原片</h2><p data-i18n="uploadDescription">支持最大 100 MB 的 MP4 文件。素材将保存在本地任务目录。</p></div></div>
+            <form id="upload-form" class="upload-layout">
+              <label id="drop-zone" class="drop-zone" for="video-file">
+                <input id="video-file" class="file-input" type="file" accept="video/mp4,.mp4" required />
+                <span class="upload-icon"><svg aria-hidden="true"><use href="#icon-upload" /></svg></span>
+                <strong data-i18n="dropTitle">拖放视频到这里，或点击选择</strong>
+                <span id="file-name" data-i18n="noFileChosen">尚未选择文件</span>
+                <small data-i18n="dropHint">MP4 · 最大 100 MB</small>
+              </label>
+              <div class="setup-panel">
+                <div class="setup-heading"><span class="setup-number">01</span><div><strong data-i18n="generationSettings">生成设置</strong><small data-i18n="settingsHint">推荐配置适合正式本地处理</small></div></div>
+                <label class="field"><span data-i18n="processingMode">处理模式</span><select id="processing-profile"><option value="real" selected data-i18n="profileReal">真实转写 + 语义规划（推荐）</option><option value="mock" data-i18n="profileMock">Mock 测试文案</option><option value="configured" data-i18n="profileConfigured">使用服务端环境变量</option></select></label>
+                <label class="field"><span data-i18n="externalMedia">素材来源</span><select id="upload-media-provider"><option value="knowledge" selected data-i18n="providerKnowledge">知识素材组合（推荐）</option><option value="wikimedia_commons" data-i18n="providerWikimedia">仅 Wikimedia Commons</option><option value="pexels" data-i18n="providerPexels">Pexels（需要 API Key）</option><option value="mock" data-i18n="providerMock">本地原创信息图</option><option value="manual" data-i18n="providerManual">仅人工候选 URL</option></select></label>
+                <div class="inline-note"><svg aria-hidden="true"><use href="#icon-shield" /></svg><span data-i18n="settingPrivacyNote">语音识别与渲染在本机完成；外部素材模式可能访问所选素材服务。</span></div>
+                <button id="upload-button" class="button button-primary button-wide" type="submit"><span data-i18n="uploadButton">上传并开始生成</span><svg aria-hidden="true"><use href="#icon-arrow" /></svg></button>
+              </div>
+            </form>
+          </section>
+
+          <section id="processing-panel" class="panel processing-panel" aria-labelledby="processing-heading" hidden>
+            <div class="processing-header"><div><p class="eyebrow" data-i18n="processingEyebrow">任务进行中</p><h2 id="processing-heading" data-i18n="processingTitle">正在本地生成视频</h2></div><span id="progress-percent" class="progress-percent">0%</span></div>
+            <div class="progress-track" role="progressbar" aria-label="任务进度" data-i18n-aria-label="taskProgress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-bar"></span></div>
+            <div id="processing-stages" class="processing-stages">
+              <div data-process-step="created"><span><svg aria-hidden="true"><use href="#icon-check" /></svg></span><strong data-i18n="processCreated">任务已创建</strong></div>
+              <div data-process-step="processing"><span><svg aria-hidden="true"><use href="#icon-spark" /></svg></span><strong data-i18n="processTranscribe">转写与语义规划</strong></div>
+              <div data-process-step="rendering"><span><svg aria-hidden="true"><use href="#icon-video" /></svg></span><strong data-i18n="processRender">动画渲染与合成</strong></div>
+              <div data-process-step="completed"><span><svg aria-hidden="true"><use href="#icon-check" /></svg></span><strong data-i18n="processComplete">质量检查完成</strong></div>
+            </div>
+            <div class="processing-actions"><span id="active-task-id" class="task-id"></span><button id="cancel-task" class="button button-ghost button-small" type="button" data-i18n="cancelTask">取消任务</button></div>
+          </section>
+
+          <section id="result" class="result-section" aria-labelledby="result-heading" hidden>
+            <div class="result-heading"><div><p class="eyebrow" data-i18n="resultEyebrow">生成完成</p><h2 id="result-heading" data-i18n="resultTitle">成片已准备好</h2><p data-i18n="resultDescription">先检查播放效果，再进入下方高级审核区调整转写、动画或素材。</p></div><a id="download" class="button button-primary" download><span data-i18n="downloadResult">下载成片</span><svg aria-hidden="true"><use href="#icon-arrow" /></svg></a></div>
+            <div class="result-grid">
+              <div class="preview-card"><div class="preview-shell"><video id="preview" controls preload="metadata"></video></div></div>
+              <aside class="result-summary">
+                <span class="success-mark"><svg aria-hidden="true"><use href="#icon-check" /></svg></span>
+                <h3 data-i18n="summaryTitle">本地生成完成</h3>
+                <p data-i18n="summaryDescription">成片已通过技术质量检查，可下载或继续审核。</p>
+                <dl><div><dt data-i18n="durationLabel">时长</dt><dd id="result-duration">—</dd></div><div><dt data-i18n="resolutionLabel">分辨率</dt><dd id="result-resolution">—</dd></div><div><dt data-i18n="taskLabel">任务编号</dt><dd id="result-task-id">—</dd></div></dl>
+              </aside>
+            </div>
+
+            <section class="review-workspace" aria-labelledby="review-workspace-heading">
+              <div class="review-heading"><div><p class="eyebrow" data-i18n="advancedEyebrow">高级审核</p><h2 id="review-workspace-heading" data-i18n="advancedTitle">检查并微调生成内容</h2><p data-i18n="advancedDescription">这些内容不会占据初始创作界面，仅在成片完成后按需展开。</p></div></div>
+              <div class="tabs" role="tablist" aria-label="审核内容" data-i18n-aria-label="reviewTabs">
+                <button id="tab-transcript" role="tab" type="button" aria-selected="true" aria-controls="panel-transcript" data-tab="transcript" data-i18n="transcriptTab">转写文本</button>
+                <button id="tab-plan" role="tab" type="button" aria-selected="false" aria-controls="panel-plan" data-tab="plan" data-i18n="planTab">动画计划</button>
+                <button id="tab-media" role="tab" type="button" aria-selected="false" aria-controls="panel-media" data-tab="media" data-i18n="mediaTab">素材审核</button>
+                <button id="tab-activity" role="tab" type="button" aria-selected="false" aria-controls="panel-activity" data-tab="activity" data-i18n="activityTab">任务记录</button>
+              </div>
+              <div id="panel-transcript" class="tab-panel" role="tabpanel" aria-labelledby="tab-transcript" data-tab-panel="transcript">
+                <div class="editor-heading"><div><h3 data-i18n="transcriptTitle">转写文本 JSON</h3><p data-i18n="transcriptHelp">修改分段文本后保存，后端会沿用原时间区间并重新规划动画。</p></div><span class="code-label">JSON</span></div>
+                <label class="sr-only" for="transcript" data-i18n="transcriptTitle">转写文本 JSON</label><textarea id="transcript" spellcheck="false"></textarea>
+              </div>
+              <div id="panel-plan" class="tab-panel" role="tabpanel" aria-labelledby="tab-plan" data-tab-panel="plan" hidden>
+                <div class="editor-heading"><div><h3 data-i18n="planTitle">动画计划 JSON</h3><p data-i18n="planHelp">可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。</p></div><span class="code-label">JSON</span></div>
+                <label class="sr-only" for="plan" data-i18n="planTitle">动画计划 JSON</label><textarea id="plan" spellcheck="false"></textarea>
+              </div>
+              <div id="panel-media" class="tab-panel" role="tabpanel" aria-labelledby="tab-media" data-tab-panel="media" hidden>
+                <div class="editor-heading"><div><h3 data-i18n="reviewTitle">外部 B-roll 素材审核</h3><p class="warning-copy" data-i18n="reviewNote">外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。</p></div></div>
+                <div id="media-list" class="media-list"></div>
+                <div class="media-search-panel">
+                  <div class="media-search-row"><label class="field field-grow"><span data-i18n="searchQueryLabel">搜索词</span><input id="media-query" placeholder="例如：supermarket product" data-i18n-placeholder="searchPlaceholder" /></label><label class="field"><span data-i18n="mediaTypeLabel">类型</span><select id="media-kind"><option value="external_image" data-i18n="imageKind">图片</option><option value="external_video" data-i18n="videoKind">视频</option></select></label><button id="search-media" class="button button-secondary align-end" type="button" data-i18n="searchButton">搜索素材</button></div>
+                  <div class="manual-row"><label class="field field-grow"><span data-i18n="manualUrlLabel">人工候选 URL</span><input id="manual-media-url" inputmode="url" placeholder="https://..." data-i18n-placeholder="manualUrlPlaceholder" /></label><button id="add-manual-media" class="button button-secondary align-end" type="button" data-i18n="addManualButton">添加候选</button></div>
+                </div>
+                <div id="candidate-list" class="candidate-list"></div>
+              </div>
+              <div id="panel-activity" class="tab-panel" role="tabpanel" aria-labelledby="tab-activity" data-tab-panel="activity" hidden>
+                <div class="editor-heading"><div><h3 data-i18n="activityTitle">任务事件</h3><p data-i18n="activityHelp">记录当前浏览器会话中收到的创建、处理、渲染和审核状态。</p></div></div>
+                <ol id="event-list" class="event-list"></ol>
+              </div>
+              <div class="review-footer"><p data-i18n="replanNote">修改转写后保存时，后端会根据修改后的文本自动重建动画计划，并清理旧素材派生数据。</p><button id="save-review" class="button button-primary" type="button" data-i18n="saveReview">保存修改并重新渲染</button></div>
+            </section>
+          </section>
+        </section>
+
+        <section id="view-tasks" class="route-view" data-route-view="tasks" hidden>
+          <div class="section-heading page-section-heading"><div><p class="eyebrow" data-i18n="tasksEyebrow">本机任务</p><h2 data-i18n="tasksTitle">最近任务</h2><p data-i18n="tasksDescription">这里仅显示此浏览器在本机创建或恢复过的真实任务，不生成示例数据。</p></div></div>
+          <section class="panel restore-panel" aria-labelledby="restore-heading"><div><h3 id="restore-heading" data-i18n="restoreTitle">恢复已有任务</h3><p data-i18n="restoreDescription">输入本机任务编号，可重新打开仍保存在 storage 目录中的任务。</p></div><form id="restore-form" class="restore-form"><label class="field field-grow"><span class="sr-only" data-i18n="taskIdPlaceholder">任务编号</span><input id="restore-task-id" placeholder="任务编号" data-i18n-placeholder="taskIdPlaceholder" autocomplete="off" /></label><button class="button button-secondary" type="submit" data-i18n="restoreButton">恢复任务</button></form><p id="restore-error" class="form-error" role="alert"></p></section>
+          <div id="tasks-list" class="tasks-list"></div>
+        </section>
+
+        <section id="view-settings" class="route-view" data-route-view="settings" hidden>
+          <div class="section-heading page-section-heading"><div><p class="eyebrow" data-i18n="settingsEyebrow">平台设置</p><h2 data-i18n="settingsTitle">设置</h2><p data-i18n="settingsDescription">当前仅提供与本地工作台真实能力相关的偏好。</p></div></div>
+          <div class="settings-grid">
+            <section class="panel settings-card"><span class="feature-icon"><svg aria-hidden="true"><use href="#icon-settings" /></svg></span><div><h3 data-i18n="interfaceLanguage">界面语言</h3><p data-i18n="interfaceLanguageDescription">语言偏好会保存在浏览器中，刷新后继续生效。</p><label class="field settings-field"><span data-i18n="languageLabel">界面语言</span><select id="settings-language"><option value="zh-CN">中文</option><option value="en">English</option></select></label></div></section>
+            <section class="panel settings-card"><span class="feature-icon"><svg aria-hidden="true"><use href="#icon-shield" /></svg></span><div><h3 data-i18n="storageTitle">本地数据</h3><p data-i18n="storageDescription">上传素材、任务数据库、转写、计划与成片由 FastAPI 服务保存在本机 storage 目录。本页面不提供云同步或账户功能。</p><span class="runtime-badge runtime-badge-large"><span class="status-dot" aria-hidden="true"></span><span data-i18n="localStorageActive">本地存储已启用</span></span></div></section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
 </body>
 </html>
