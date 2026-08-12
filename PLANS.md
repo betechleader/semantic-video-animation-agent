@@ -28,3 +28,19 @@
 ## Current execution plan
 
 Stages 10, 10A, 10B, 10C, 10D, 10E, 10F, and 10G are complete. The site now opens as a local AI creation platform with a data-driven tool catalog; semantic video animation is its first production-ready module. Mock remains the offline server/test default, while the semantic-video workspace recommends real local ASR/rule planning and the `knowledge` media profile. The confirmed book and Cinderella entities use audited local exact assets before attempting no-key web search, so blocked providers cannot replace them with unrelated or generic visuals. Corrected transcript text is the sole input to subtitles and semantic planning; visible animation copy is separately summarized without changing grounded trigger timing. Review renders rebuild renderer-derived media state. External-source mode is explicitly a non-commercial effect-validation prototype. Stage 11 is optional and remains deferred while the core chain stabilizes.
+
+## Portfolio Agent Upgrade Roadmap
+
+| Phase | Status |
+|---|---|
+| P1 Recoverable Agent workflow foundation | COMPLETED |
+| P2 Director instruction, typed tools, and plan auto-repair | NOT_STARTED |
+| P3 Human-in-the-loop approval and resume | NOT_STARTED |
+| P4 Agent mode in the existing page | NOT_STARTED |
+| P5 Agent eval harness and observability | NOT_STARTED |
+| P6 Local knowledge base and hybrid retrieval | NOT_STARTED |
+| P7 Citation-grounded RAG semantic planning | NOT_STARTED |
+| P8 Natural-language edits and visual timeline | NOT_STARTED |
+| P9 MCP tool service | NOT_STARTED |
+| P10 Production task execution and deployment | NOT_STARTED |
+| P11 Evidence-based multi-Agent experiment | NOT_STARTED |

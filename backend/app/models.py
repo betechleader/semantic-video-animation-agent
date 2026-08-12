@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -18,11 +18,21 @@ class TaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class WorkflowMode(StrEnum):
+    STANDARD = "standard"
+    AGENT = "agent"
+
+
 class VideoTask(Base):
     __tablename__ = "video_tasks"
 
     task_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, native_enum=False), nullable=False)
+    workflow_mode: Mapped[WorkflowMode] = mapped_column(
+        Enum(WorkflowMode, native_enum=False), default=WorkflowMode.STANDARD, server_default="STANDARD", nullable=False
+    )
+    processing_profile: Mapped[str] = mapped_column(String(32), default="configured", server_default="configured", nullable=False)
+    media_provider: Mapped[str] = mapped_column(String(64), default="mock", server_default="mock", nullable=False)
     metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     transcript_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     plan_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -36,11 +46,13 @@ class VideoTask(Base):
 
 class TaskEvent(Base):
     __tablename__ = "task_events"
+    __table_args__ = (UniqueConstraint("task_id", "dedupe_key", name="uq_task_events_task_id_dedupe_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     task_id: Mapped[str] = mapped_column(ForeignKey("video_tasks.task_id", ondelete="CASCADE"), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(48), nullable=False)
     message: Mapped[str] = mapped_column(String(256), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    dedupe_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     task: Mapped[VideoTask] = relationship(back_populates="events")

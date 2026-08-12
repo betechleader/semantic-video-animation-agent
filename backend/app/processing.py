@@ -81,6 +81,38 @@ def render_and_composite(
     task_id: str | None = None,
     stage_runner: StageRunner | None = None,
 ) -> tuple[dict, dict, dict]:
+    transcript_data, plan_data = render_and_composite_video(
+        task_dir,
+        metadata,
+        transcript,
+        plan,
+        task_id=task_id,
+        stage_runner=stage_runner,
+    )
+    quality_data = verify_and_write_output_quality(
+        task_dir,
+        metadata,
+        stage_runner=stage_runner,
+    )
+    return transcript_data, plan_data, quality_data
+
+
+def render_and_composite_video(
+    task_dir: Path,
+    metadata: VideoMetadata,
+    transcript: Transcript,
+    plan: AnimationPlan,
+    task_id: str | None = None,
+    stage_runner: StageRunner | None = None,
+) -> tuple[dict, dict]:
+    """Prepare media, render the overlay, and composite the result video.
+
+    Output quality verification is deliberately a separate service so a
+    persistent workflow can checkpoint the completed render before running
+    its quality node. ``render_and_composite`` remains the stable combined
+    entry point used by the standard and review workflows.
+    """
+
     def run_stage(stage: str, action: Callable[[], T]) -> T:
         return stage_runner(stage, action) if stage_runner else action()
 
@@ -90,6 +122,7 @@ def render_and_composite(
     props_file = safe_dir / "remotion_props.json"
     subtitles = safe_dir / "subtitles.ass"
     result = safe_dir / "result.mp4"
+
     def acquire_media() -> AnimationPlan:
         try:
             return prepare_media_assets(safe_dir, plan)
@@ -152,6 +185,21 @@ def render_and_composite(
             raise ProcessingError("Rendering completed without producing result.mp4")
 
     run_stage("compositing", composite)
+    return transcript.model_dump(), plan.model_dump()
+
+
+def verify_and_write_output_quality(
+    task_dir: Path,
+    metadata: VideoMetadata,
+    stage_runner: StageRunner | None = None,
+) -> dict:
+    """Verify ``result.mp4`` and persist the task-local quality report."""
+
+    def run_stage(stage: str, action: Callable[[], T]) -> T:
+        return stage_runner(stage, action) if stage_runner else action()
+
+    safe_dir = ensure_storage_path(task_dir)
+    result = safe_dir / "result.mp4"
 
     def check_quality() -> dict:
         try:
@@ -161,5 +209,4 @@ def render_and_composite(
         except QualityValidationError as exc:
             raise ProcessingError(f"Output quality validation failed: {exc}") from exc
 
-    quality_data = run_stage("quality_check", check_quality)
-    return transcript.model_dump(), plan.model_dump(), quality_data
+    return run_stage("quality_check", check_quality)

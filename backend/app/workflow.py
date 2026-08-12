@@ -3,8 +3,6 @@ import threading
 from pathlib import Path
 
 from .audio import AudioExtractionError, AudioService
-from .asr_corrections import correct_transcript, load_phrase_corrections
-from .config import MODEL_ROOT, SETTINGS
 from .database import get_task, transition_task
 from .metrics import TaskMetrics, initialize_initial_metrics
 from .models import TaskStatus
@@ -12,6 +10,7 @@ from .processing import ProcessingCancelled, ProcessingError, render_and_composi
 from .providers import FasterWhisperProvider, LocalLlmAnimationPlanningProvider, MockAnimationPlanningProvider, MockSpeechRecognitionProvider, TranscriptAnimationPlanningProvider
 from .planning_rules import PlanningRuleError, validate_animation_plan
 from .schemas import AnimationPlan, Transcript, VideoMetadata
+from .workflow_services import build_animation_plan, correct_asr_transcript, extract_audio, transcribe_audio, validate_plan
 
 logger = logging.getLogger("semantic_video")
 
@@ -31,37 +30,25 @@ def process_task(
     try:
         if not transition_task(task_id, TaskStatus.PROCESSING, "Extracting audio and transcribing speech"):
             return
-        if not metadata.has_audio:
-            def missing_audio() -> None:
-                raise ProcessingError("Video has no audio track for speech recognition")
-
-            metrics.record_stage(attempt, "audio_extraction", missing_audio)
-        audio_path = metrics.record_stage(attempt, "audio_extraction", lambda: AudioService().extract_wav(task_dir / "source.mp4", task_dir / "audio.wav"))
-        asr_name = "faster_whisper" if processing_profile == "real" else "mock" if processing_profile == "mock" else SETTINGS.asr_provider
-        provider = MockSpeechRecognitionProvider() if asr_name == "mock" else FasterWhisperProvider(SETTINGS.asr_model, MODEL_ROOT, SETTINGS.asr_local_files_only)
-        transcript = metrics.record_stage(attempt, "asr", lambda: provider.transcribe(audio_path))
+        audio_path = metrics.record_stage(
+            attempt,
+            "audio_extraction",
+            lambda: extract_audio(task_dir, metadata),
+        )
+        transcript = metrics.record_stage(
+            attempt,
+            "asr",
+            lambda: transcribe_audio(audio_path, processing_profile),
+        )
         transcript = metrics.record_stage(
             attempt,
             "asr_correction",
-            lambda: correct_transcript(transcript, load_phrase_corrections(SETTINGS.asr_correction_dictionary_path)),
+            lambda: correct_asr_transcript(transcript),
         )
 
         def build_plan() -> AnimationPlan:
-            planner_name = "rule_based" if processing_profile == "real" else "mock" if processing_profile == "mock" else SETTINGS.planner_provider
-            if planner_name == "mock":
-                planner = MockAnimationPlanningProvider()
-            elif planner_name == "rule_based":
-                planner = TranscriptAnimationPlanningProvider()
-            elif planner_name == "local_llm":
-                planner = LocalLlmAnimationPlanningProvider(
-                    SETTINGS.planner_model, SETTINGS.planner_base_url, SETTINGS.planner_timeout_seconds,
-                )
-            else:
-                raise ProcessingError("PLANNER_PROVIDER must be mock, rule_based, or local_llm")
-            planned = planner.plan(transcript)
-            selected_media_provider = media_provider or SETTINGS.media_provider
-            planned = planned.model_copy(update={"media_provider": selected_media_provider})
-            return validate_animation_plan(planned, transcript)
+            planned = build_animation_plan(transcript, processing_profile, media_provider)
+            return validate_plan(planned, transcript)
 
         # Providers validate their normal outputs, and the workflow validates again
         # at the trust boundary before an untrusted plan can reach the renderer.

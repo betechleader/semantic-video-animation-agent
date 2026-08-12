@@ -23,11 +23,13 @@ from .schemas import ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
+from .agent_workflow import recover_agent_tasks, start_agent_task
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_logging()
     initialize_database()
+    recover_agent_tasks(storage_root=STORAGE_ROOT)
     yield
 
 
@@ -69,7 +71,10 @@ async def upload_video(
     file: UploadFile = File(...),
     processing_profile: str = Form("configured"),
     media_provider: str = Form("mock"),
+    workflow_mode: str = Form("standard"),
 ) -> dict:
+    if workflow_mode not in {"standard", "agent"}:
+        raise HTTPException(status_code=422, detail="workflow_mode must be standard or agent")
     if processing_profile not in {"configured", "real", "mock"}:
         raise HTTPException(status_code=422, detail="processing_profile must be configured, real, or mock")
     if media_provider not in {"mock", "manual", "knowledge", "wikimedia_commons", "pexels"}:
@@ -84,16 +89,39 @@ async def upload_video(
     try:
         await save_mp4(file, source)
         metadata = probe_video(source)
-        create_task(task_id, metadata.model_dump(), request.state.trace_id)
+        create_task(
+            task_id,
+            metadata.model_dump(),
+            request.state.trace_id,
+            workflow_mode=workflow_mode,
+            processing_profile=processing_profile,
+            media_provider=media_provider,
+        )
         initialize_initial_metrics(task_dir, task_id, request.state.trace_id, round((time.perf_counter() - upload_probe_started_at) * 1000))
-        start_task(task_id, task_dir, metadata, request.state.trace_id, processing_profile, media_provider)
+        if workflow_mode == "agent":
+            start_agent_task(
+                task_id,
+                task_dir,
+                metadata,
+                request.state.trace_id,
+                processing_profile,
+                media_provider,
+            )
+        else:
+            start_task(task_id, task_dir, metadata, request.state.trace_id, processing_profile, media_provider)
     except HTTPException:
         storage.remove_task_directory(task_id)
         raise
     except VideoProbeError as exc:
         storage.remove_task_directory(task_id)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"task_id": task_id, "status": "pending", "metadata": metadata, "trace_id": request.state.trace_id}
+    return {
+        "task_id": task_id,
+        "status": "pending",
+        "workflow_mode": workflow_mode,
+        "metadata": metadata,
+        "trace_id": request.state.trace_id,
+    }
 
 
 @app.get("/api/videos/{task_id}")

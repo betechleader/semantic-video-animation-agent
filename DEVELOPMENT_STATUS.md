@@ -1,8 +1,45 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `3b53059 优化字幕预览与语义素材匹配`
-- Current stage: Stage 10G, local AI creation platform UI - completed, pending user-approved commit.
+- Current commit before this stage: `916d8dd 重构本地AI创作平台前端`
+- Current stage: P1, recoverable Agent workflow foundation - completed after user acceptance.
+
+## P1 delivered
+
+- Added an additive upload field `workflow_mode=standard|agent`, defaulting to `standard`. The stable standard dispatcher, `processing_profile=configured|real|mock`, `media_provider`, public task API, Mock providers, review API, and render/download chain remain compatible.
+- Added an explicit persistent state graph with the real nodes `upload_probe → audio_asr → correction → planning → validation → render → quality → complete`. It reuses the existing ASR, correction, planning-rule, media, face-safety, Remotion, FFmpeg, and quality services rather than cloning the standard pipeline.
+- Uses `task_id` as the Agent thread/run ID and stores JSON state after every successful node in the separate `storage/agent_checkpoints.sqlite3` SQLite database. Checkpoint writes use transactions and compare-and-swap versions; state contains task-relative data and validated schemas rather than absolute artifact paths.
+- FastAPI lifespan recovery scans only non-terminal Agent graph executions. Cancelled work converges to `cancelled`; completed nodes are skipped after restart; tasks currently in the existing manual review-render flow are not mistaken for an unfinished Agent graph.
+- Added true `agent_node` events with `started`, `completed`, `failed`, and `resumed` payload states. Events contain node/thread/checkpoint metadata and error categories, with no fabricated percentage or internal reasoning.
+- Added Alembic migration `0002_agent_workflow_persistence` for `workflow_mode`, `processing_profile`, `media_provider`, and task-local event deduplication. Existing 0001 rows are migrated to `standard/configured/mock`.
+- Split reusable processing services so Agent render and quality are separately checkpointable while the original standard `render_and_composite` signature and metrics stages remain intact.
+
+## P1 verification
+
+- Targeted Agent/API/persistence regression: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_workflow.py tests\test_task_database.py tests\test_workflow_mode_api.py` → `14 passed in 6.21s`.
+- Real Agent Mock render: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_end_to_end.py::test_agent_mock_video_processing_pipeline` → `1 passed in 28.57s`.
+- Full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `108 passed in 73.81s`.
+- Standard renderer command `cd animation-renderer; npm.cmd run build` failed at the pre-existing locked `animation-renderer/build` directory with `EPERM`; that directory was not removed or overwritten.
+- Equivalent isolated renderer validation `cd animation-renderer; npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260812_p1` succeeded.
+- `git diff --check` passed. The user-owned untracked file `how 提交哈希` remains untouched.
+
+## P1 known limitations
+
+- Recovery is designed for the current single-process local runtime. The in-memory active-task registry prevents duplicate runners within one process; distributed leases, persistent workers, heartbeats, and cross-process exactly-once execution remain P10 work.
+- Checkpoints guarantee that successful nodes are not replayed. If a process dies while a node is executing but before its checkpoint commits, that current node can run again with at-least-once semantics; fixed task-local artifacts make the operation retry-safe, but an orphaned external process cannot be reclaimed after a hard OS crash.
+- If a process dies after the terminal checkpoint and public task completion are durable but before `metrics.json` is finalized, the result remains safe and expensive nodes are not replayed, but that metrics attempt can temporarily remain `running`.
+- Automatic plan repair/retry, director instructions, approval interrupts, Agent UI controls, and eval harness deliberately remain out of scope for P1. The existing manual review worker itself is not restart-recoverable; startup excludes it so an Agent terminal checkpoint cannot overwrite an interrupted review.
+- No real local LLM, faster-whisper model, or external media provider was exercised in this phase. Automated Agent coverage is fully offline through Mock/Fake providers.
+
+## Recommended P1 manual acceptance
+
+1. Start FastAPI with the documented `.conda` interpreter and upload a short MP4 using multipart fields `workflow_mode=standard`, `processing_profile=mock`, and `media_provider=mock`; verify the existing result, review, events, and download behavior.
+2. Upload the same MP4 with `workflow_mode=agent`, `processing_profile=mock`, and `media_provider=mock`; poll `GET /api/videos/{task_id}` until `completed`, then download and play `result.mp4`.
+3. Open `GET /api/videos/{task_id}/events` during the Agent run; verify ordered real `agent_node` events for all eight nodes and no synthetic percentage in their payloads.
+4. For a recovery check, stop the API after a completed node but before task completion, restart it, and verify the same task resumes from the next checkpoint rather than repeating earlier ASR/planning events.
+5. Restart once more after completion and verify the completed task remains completed and downloadable without creating duplicate completed-node events.
+
+P1 was explicitly accepted for commit. P2 has not been started.
 
 ## Stage 10G delivered
 

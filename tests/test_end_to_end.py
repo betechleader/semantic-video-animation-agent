@@ -6,6 +6,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from backend.app import main
+from backend.app.agent_workflow import AGENT_NODES, AgentCheckpointStore
+from backend.app.database import get_task_events
 from backend.app.video import probe_video
 
 
@@ -24,7 +26,11 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
 
     with TestClient(main.app) as client:
         assert client.get("/").status_code == 200
-        response = client.post("/api/videos", files={"file": ("speech.mp4", source.read_bytes(), "video/mp4")})
+        response = client.post(
+            "/api/videos",
+            files={"file": ("speech.mp4", source.read_bytes(), "video/mp4")},
+            data={"workflow_mode": "standard"},
+        )
         assert response.status_code == 202, response.text
         task_id = response.json()["task_id"]
         deadline = time.monotonic() + 120
@@ -94,3 +100,71 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert "event: rendering" in events.text
         assert "event: review_rendering" in events.text
         assert "event: completed" in events.text
+
+
+def test_agent_mock_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
+    storage = tmp_path / "storage"
+    monkeypatch.setattr(main, "STORAGE_ROOT", storage)
+    monkeypatch.setattr("backend.app.video.STORAGE_ROOT", storage)
+    monkeypatch.setattr("backend.app.database.STORAGE_ROOT", storage)
+    monkeypatch.setattr("backend.app.database.DATABASE_PATH", storage / "tasks.sqlite3")
+    source = tmp_path / "agent-source.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:s=320x568:d=5:r=30",
+            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest",
+            "-c:v", "libx264", "-c:a", "aac", str(source),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/videos",
+            files={"file": ("agent-speech.mp4", source.read_bytes(), "video/mp4")},
+            data={
+                "workflow_mode": "agent",
+                "processing_profile": "mock",
+                "media_provider": "mock",
+            },
+        )
+        assert response.status_code == 202, response.text
+        task_id = response.json()["task_id"]
+        deadline = time.monotonic() + 120
+        while True:
+            task = client.get(f"/api/videos/{task_id}").json()
+            if task["status"] in {"completed", "failed", "cancelled"} or time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
+
+        assert task["status"] == "completed", task.get("error")
+        assert task["workflow_mode"] == "agent"
+        assert task["processing_profile"] == "mock"
+        assert task["media_provider"] == "mock"
+        assert probe_video(storage / task_id / "result.mp4").has_video is True
+        assert json.loads((storage / task_id / "quality.json").read_text(encoding="utf-8"))["has_audio"] is True
+
+        checkpoint = AgentCheckpointStore.for_storage_root(storage).load(task_id)
+        assert checkpoint is not None
+        assert checkpoint["task_id"] == task_id
+        assert checkpoint["next_node"] is None
+        assert checkpoint["run_status"] == "completed"
+        assert checkpoint["state"]["thread_id"] == task_id
+        assert checkpoint["state"]["completed_nodes"] == list(AGENT_NODES)
+
+        node_events = [
+            event
+            for event in get_task_events(task_id)
+            if event["type"] == "agent_node"
+        ]
+        assert [
+            (event["payload"]["node"], event["payload"]["status"])
+            for event in node_events
+        ] == [item for node in AGENT_NODES for item in ((node, "started"), (node, "completed"))]
+        assert all("progress" not in event["payload"] for event in node_events)
+
+        download = client.get(f"/api/videos/{task_id}/download")
+        assert download.status_code == 200
+        assert download.headers["content-type"].startswith("video/mp4")

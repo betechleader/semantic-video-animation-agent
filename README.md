@@ -77,7 +77,7 @@ Automatic Wikimedia search/download timeouts or rate limits fall back to the aut
 
 After a result is ready, the advanced review tabs expose the transcript and plan JSON editors, material review, and task events without putting large editors in the initial upload view. The B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save edits and re-render** to download a selected candidate into the task and render the new result. If transcript segment text changed, the backend automatically rebuilds the animation plan from the edited transcript. Media audit metadata, face regions, and placements are renderer-derived: the review endpoint discards stale client copies, materializes enabled visuals, repeats local placement analysis, and then performs strict final validation. An explicitly selected missing or failed candidate remains an error.
 
-- `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart fields `processing_profile=configured|real|mock` and `media_provider=mock|manual|knowledge|wikimedia_commons|pexels` select the task-local providers.
+- `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart field `workflow_mode=standard|agent` defaults to `standard`; `processing_profile=configured|real|mock` and `media_provider=mock|manual|knowledge|wikimedia_commons|pexels` keep their existing task-local meanings.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
 - `GET /api/videos/{task_id}/media` returns adopted assets, use intervals, and stored candidates.
 - `POST /api/videos/{task_id}/media/search` searches the configured provider with `{query, asset_kind}`.
@@ -89,6 +89,8 @@ After a result is ready, the advanced review tabs expose the transcript and plan
 
 Runtime files live under `storage/{task_id}/`: source/audio, `remotion_props.json`, `animation.mov`, ASS fallback subtitles, `result.mp4`, `quality.json`, `face_safe_areas.json`, `media_candidates.json`, `media_assets.json`, and `metrics.json`. Props stay in the task-local file, so no complete plan or base64 media is placed on the Windows command line.
 
+`workflow_mode=agent` is the API-only recoverable path introduced in P1; the existing page continues to use the stable `standard` path. The Agent executes `upload_probe → audio_asr → correction → planning → validation → render → quality → complete`, emits real `agent_node` SSE events, and uses the task ID as its thread/run ID. JSON checkpoints are transactionally stored in the separate `storage/agent_checkpoints.sqlite3` database after each successful node. On a single-process FastAPI restart, unfinished Agent tasks resume at their next checkpointed node; already completed nodes are not replayed. A node interrupted before its checkpoint is committed can run again with at-least-once semantics.
+
 ## Provenance, safety, and quality
 
 Every adopted asset is downloaded into `media-assets/`; the plan and `media_assets.json` record the provider, search query, download/source-page URLs, acquisition time, SHA-256 digest, MIME type, and exact use interval. Remotion receives only a hash-verified task-local data URI. When no candidate is available, it uses a designed original concept graphic rather than a simple book SVG placeholder.
@@ -97,7 +99,7 @@ Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` re
 
 ## Verification
 
-Current platform redesign verification: `95 passed`. The standard renderer build can still hit the known Windows lock on `animation-renderer/build`; the equivalent isolated command succeeded at `storage/renderer_build_validation_20260807_platform_ui`.
+Current P1 verification: `108 passed`, including real local standard and `agent+mock` FFmpeg/Remotion pipelines plus checkpoint restart coverage. The standard renderer build still hits the known Windows lock on `animation-renderer/build`; the equivalent isolated command succeeded at `storage/renderer_build_validation_20260812_p1`.
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv
