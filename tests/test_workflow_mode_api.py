@@ -38,7 +38,13 @@ def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     standard_calls: list[tuple] = []
     agent_calls: list[tuple] = []
     monkeypatch.setattr(main, "start_task", lambda *args: standard_calls.append(args))
-    monkeypatch.setattr(main, "start_agent_task", lambda *args: agent_calls.append(args))
+    monkeypatch.setattr(
+        main,
+        "start_agent_task",
+        lambda *args, **kwargs: agent_calls.append(
+            args + ((kwargs["director_instruction"],) if "director_instruction" in kwargs else ())
+        ),
+    )
     database.initialize_database()
     yield TestClient(main.app), storage, standard_calls, agent_calls
 
@@ -122,3 +128,34 @@ def test_invalid_workflow_mode_returns_422_without_task_directory_or_row(workflo
     with next(database.get_session()) as session:
         after_rows = session.scalar(select(func.count()).select_from(VideoTask))
     assert after_rows == before_rows
+
+
+def test_director_instruction_is_agent_only_bounded_and_persisted(workflow_client) -> None:
+    client, storage, standard_calls, agent_calls = workflow_client
+
+    agent = upload(
+        client,
+        {"workflow_mode": "agent", "director_instruction": "  前三秒更抓人  "},
+    )
+    assert agent.status_code == 202
+    agent_task = database.get_task(agent.json()["task_id"])
+    assert agent_task["director_instruction"] == "前三秒更抓人"
+    assert agent_calls[0][-1] == "前三秒更抓人"
+
+    standard = upload(
+        client,
+        {"workflow_mode": "standard", "director_instruction": "不得进入标准模式"},
+    )
+    assert standard.status_code == 202
+    standard_task = database.get_task(standard.json()["task_id"])
+    assert standard_task["director_instruction"] is None
+    assert len(standard_calls[-1]) == 6
+
+    before = {path.name for path in storage.iterdir() if path.is_dir()}
+    too_long = upload(
+        client,
+        {"workflow_mode": "agent", "director_instruction": "导" * 2001},
+    )
+    assert too_long.status_code == 422
+    assert "at most 2000" in too_long.json()["detail"]
+    assert {path.name for path in storage.iterdir() if path.is_dir()} == before

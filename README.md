@@ -78,16 +78,20 @@ Automatic Wikimedia search/download timeouts or rate limits fall back to the aut
 After a result is ready, the advanced review tabs expose the transcript and plan JSON editors, material review, and task events without putting large editors in the initial upload view. The B-roll panel shows automatic selections, provider, source URL, query, and timing; it searches images or videos, allows a manual URL, selects a replacement for a visual, or disables it. Click **Save edits and re-render** to download a selected candidate into the task and render the new result. If transcript segment text changed, the backend automatically rebuilds the animation plan from the edited transcript. Media audit metadata, face regions, and placements are renderer-derived: the review endpoint discards stale client copies, materializes enabled visuals, repeats local placement analysis, and then performs strict final validation. An explicitly selected missing or failed candidate remains an error.
 
 - `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart field `workflow_mode=standard|agent` defaults to `standard`; `processing_profile=configured|real|mock` and `media_provider=mock|manual|knowledge|wikimedia_commons|pexels` keep their existing task-local meanings.
+- Agent uploads may also include `director_instruction` (maximum 2,000 characters). Standard uploads discard this Agent-only field and keep their original behavior.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
 - `GET /api/videos/{task_id}/media` returns adopted assets, use intervals, and stored candidates.
 - `POST /api/videos/{task_id}/media/search` searches the configured provider with `{query, asset_kind}`.
 - `POST /api/videos/{task_id}/media/candidates` adds a manual candidate URL.
 - `GET /api/videos/{task_id}/metrics` returns the privacy-safe metrics report.
+- `GET /api/videos/{task_id}/agent-trace` returns the Agent-only, privacy-safe planning/validation audit with planner identifiers, retry count, structured violations, and call durations.
 - `GET /api/videos/{task_id}/download` downloads completed `result.mp4`.
 - `GET /api/videos/{task_id}/events` streams status events; `POST /api/videos/{task_id}/cancel` cancels an active task.
 - `PUT /api/videos/{task_id}/transcript` edits the transcript; `POST /api/videos/{task_id}/review` validates and re-renders the transcript/plan.
 
 Runtime files live under `storage/{task_id}/`: source/audio, `remotion_props.json`, `animation.mov`, ASS fallback subtitles, `result.mp4`, `quality.json`, `face_safe_areas.json`, `media_candidates.json`, `media_assets.json`, and `metrics.json`. Props stay in the task-local file, so no complete plan or base64 media is placed on the Windows command line.
+
+In Agent mode, planning and validation run behind Pydantic typed tool envelopes. Every candidate is validated first as `AnimationPlan` and then with the transcript-grounded `planning_rules`. Structured violations are returned to a repair-capable planner for at most two repair calls. Exhaustion produces a terminal, auditable failure; there is no unbounded retry loop. The task-local `agent_trace.json` records only call metadata and bounded summaries—it excludes transcript/director text, plan bodies, absolute paths, media content, and exception messages. Deterministic Mock/rule planners remain offline; only the configured loopback local-LLM planner interprets free-form director instructions.
 
 `workflow_mode=agent` is the API-only recoverable path introduced in P1; the existing page continues to use the stable `standard` path. The Agent executes `upload_probe → audio_asr → correction → planning → validation → render → quality → complete`, emits real `agent_node` SSE events, and uses the task ID as its thread/run ID. JSON checkpoints are transactionally stored in the separate `storage/agent_checkpoints.sqlite3` database after each successful node. On a single-process FastAPI restart, unfinished Agent tasks resume at their next checkpointed node; already completed nodes are not replayed. A node interrupted before its checkpoint is committed can run again with at-least-once semantics.
 
@@ -99,7 +103,7 @@ Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` re
 
 ## Verification
 
-Current P1 verification: `108 passed`, including real local standard and `agent+mock` FFmpeg/Remotion pipelines plus checkpoint restart coverage. The standard renderer build still hits the known Windows lock on `animation-renderer/build`; the equivalent isolated command succeeded at `storage/renderer_build_validation_20260812_p1`.
+Current P2 verification: `114 passed`, including standard and `agent+mock` FFmpeg/Remotion pipelines, checkpoint restart coverage, typed planning/validation tools, bounded repair, director-instruction isolation, and privacy-safe Agent Trace coverage. P2 did not change TypeScript, Remotion source, the renderer contract, or the `AnimationPlan` schema, so no new renderer build was required.
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv

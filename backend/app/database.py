@@ -76,6 +76,7 @@ def create_task(
     workflow_mode: WorkflowMode | str = WorkflowMode.STANDARD,
     processing_profile: str = "configured",
     media_provider: str = "mock",
+    director_instruction: str | None = None,
 ) -> None:
     initialize_database()
     normalized_workflow_mode = WorkflowMode(workflow_mode)
@@ -87,6 +88,7 @@ def create_task(
                 workflow_mode=normalized_workflow_mode,
                 processing_profile=processing_profile,
                 media_provider=media_provider,
+                director_instruction=director_instruction if normalized_workflow_mode == WorkflowMode.AGENT else None,
                 metadata_json=metadata,
                 trace_id=trace_id,
             )
@@ -186,6 +188,7 @@ def _serialize_task(task: VideoTask) -> dict:
         "workflow_mode": task.workflow_mode.value,
         "processing_profile": task.processing_profile,
         "media_provider": task.media_provider,
+        "director_instruction": task.director_instruction if task.workflow_mode == WorkflowMode.AGENT else None,
     }
 
 

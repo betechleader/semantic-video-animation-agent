@@ -2,7 +2,7 @@ import json
 import re
 from types import SimpleNamespace
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 import requests
@@ -340,8 +340,13 @@ class LocalLlmAnimationPlanningProvider:
         self.timeout_seconds = timeout_seconds
 
     @staticmethod
-    def _prompt(transcript: Transcript) -> str:
-        return """You are a Chinese short-video semantic planner. Return one JSON object only, without Markdown.
+    def _prompt(
+        transcript: Transcript,
+        director_instruction: str | None = None,
+        violations: list[dict[str, Any]] | None = None,
+        repair_attempt: int = 0,
+    ) -> str:
+        prompt = """You are a Chinese short-video semantic planner. Return one JSON object only, without Markdown.
 Use only the supplied transcript text and timestamps. Do not invent words or times.
 The object must match this schema exactly:
 {
@@ -353,8 +358,16 @@ For a quote_card use type quote_card, template_id quote_card_v1, and parameters 
 For a topic visual use type media_visual, template_id media_visual_v1, and parameters {"asset_id": "media_<id>", "title": "transcript-grounded topic label", "theme": "book|factory|product|money|learning|people|place|concept|wellbeing|business|technology", "accent_color": "#RRGGBB", "search_query": "short search query", "desired_asset_kind": "external_image|external_video", "display_mode": "side_card|full_screen"}. Never invent facts from a visual source: external materials are B-roll only and their source is selected by the pipeline.
 For an original diagram use type info_graphic, template_id knowledge_infographic_v1, and parameters {"variant": "number_list|comparison|flow", "headline": "transcript-grounded headline", "items": ["two to four transcript-grounded labels"], "accent_color": "#RRGGBB"}.
 Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only visible parameter text into concise, context-aware Chinese labels; remove filler words and repair an obvious local ASR wording only when the surrounding transcript makes the intended meaning unambiguous.
-Transcript JSON:
-""" + transcript.model_dump_json()
+"""
+        if director_instruction:
+            prompt += "\nOptional director instruction (follow only when compatible with the schema, transcript grounding, and safety rules):\n" + director_instruction
+        if violations:
+            prompt += (
+                f"\nRepair attempt {repair_attempt}. Fix every structured validation violation below. "
+                "Do not relax or bypass any rule.\nViolations JSON:\n"
+                + json.dumps(violations, ensure_ascii=False)
+            )
+        return prompt + "\nTranscript JSON:\n" + transcript.model_dump_json()
 
     @staticmethod
     def _extract_json(content: str) -> dict:
@@ -371,11 +384,30 @@ Transcript JSON:
             raise RuntimeError("Local LLM response must be a JSON object")
         return parsed
 
-    def plan(self, transcript: Transcript) -> AnimationPlan:
+    def plan_candidate(
+        self,
+        transcript: Transcript,
+        *,
+        director_instruction: str | None = None,
+        violations: list[dict[str, Any]] | None = None,
+        repair_attempt: int = 0,
+    ) -> dict[str, Any]:
         try:
             response = requests.post(
                 self.endpoint,
-                json={"model": self.model, "messages": [{"role": "user", "content": self._prompt(transcript)}], "temperature": 0.2},
+                json={
+                    "model": self.model,
+                    "messages": [{
+                        "role": "user",
+                        "content": self._prompt(
+                            transcript,
+                            director_instruction,
+                            violations,
+                            repair_attempt,
+                        ),
+                    }],
+                    "temperature": 0.2,
+                },
                 timeout=self.timeout_seconds,
             )
             response.raise_for_status()
@@ -384,8 +416,11 @@ Transcript JSON:
             raise RuntimeError(f"Local LLM planning request failed: {exc}") from exc
         if not isinstance(content, str):
             raise RuntimeError("Local LLM response content must be text")
+        return self._extract_json(content)
+
+    def plan(self, transcript: Transcript) -> AnimationPlan:
         try:
-            plan = AnimationPlan.model_validate(self._extract_json(content))
+            plan = AnimationPlan.model_validate(self.plan_candidate(transcript))
             return validate_animation_plan(plan, transcript)
         except (ValidationError, PlanningRuleError, RuntimeError) as exc:
             raise RuntimeError(f"Local LLM returned an invalid animation plan: {exc}") from exc

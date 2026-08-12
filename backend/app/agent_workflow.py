@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,6 +29,17 @@ from .database import (
 )
 from .metrics import TaskMetrics, initialize_initial_metrics
 from .models import TaskStatus
+from .agent_tools import (
+    DIRECTOR_INSTRUCTION_MAX_LENGTH,
+    MAX_PLAN_REPAIR_ATTEMPTS,
+    PlanViolation,
+    PlanningToolInput,
+    PlanningToolOutput,
+    ValidationToolInput,
+    invoke_planning_tool,
+    invoke_validation_tool,
+)
+from .agent_trace import AgentTrace
 from .processing import (
     ProcessingCancelled,
     render_and_composite_video,
@@ -38,12 +50,13 @@ from .workflow_services import (
     build_animation_plan,
     correct_asr_transcript,
     extract_audio,
+    plan_agent_candidate,
     transcribe_audio,
     validate_plan,
 )
 
 CHECKPOINT_FILENAME = "agent_checkpoints.sqlite3"
-CHECKPOINT_SCHEMA_VERSION = 1
+CHECKPOINT_SCHEMA_VERSION = 2
 AGENT_NODES = (
     "upload_probe",
     "audio_asr",
@@ -64,6 +77,22 @@ class AgentCheckpointConflict(AgentWorkflowError):
     """Raised when another writer advanced the same checkpoint."""
 
 
+class PlanRepairExhausted(AgentWorkflowError):
+    """Raised after the bounded repair budget cannot produce a valid plan."""
+
+    def __init__(self, attempts: int, violation_codes: list[str]) -> None:
+        self.attempts = attempts
+        self.violation_codes = violation_codes
+        super().__init__(
+            f"Agent plan repair exhausted after {attempts} retries; "
+            f"violation codes: {', '.join(violation_codes)}"
+        )
+
+
+class AgentPlannerCallError(AgentWorkflowError):
+    """Raised when a planner call fails rather than returning an invalid plan."""
+
+
 @dataclass(frozen=True)
 class AgentWorkflowServices:
     """Injectable node services; tests can replace every expensive operation."""
@@ -72,6 +101,9 @@ class AgentWorkflowServices:
     transcribe_audio: Callable[[Path, str], Transcript] = transcribe_audio
     correct_asr_transcript: Callable[[Transcript], Transcript] = correct_asr_transcript
     build_animation_plan: Callable[[Transcript, str, str | None], AnimationPlan] = build_animation_plan
+    plan_agent_candidate: Callable[
+        [PlanningToolInput, str, str | None], PlanningToolOutput
+    ] | None = None
     validate_plan: Callable[[AnimationPlan, Transcript], AnimationPlan] = validate_plan
     render_and_composite_video: Callable[
         [Path, VideoMetadata, Transcript, AnimationPlan, str | None, Any | None],
@@ -82,7 +114,7 @@ class AgentWorkflowServices:
     ] = verify_and_write_output_quality
 
 
-DEFAULT_AGENT_SERVICES = AgentWorkflowServices()
+DEFAULT_AGENT_SERVICES = AgentWorkflowServices(plan_agent_candidate=plan_agent_candidate)
 
 
 class AgentCheckpointStore:
@@ -231,6 +263,7 @@ class _RunContext:
     services: AgentWorkflowServices
     metrics: TaskMetrics
     attempt: int
+    agent_trace: AgentTrace
 
 
 _active_lock = threading.Lock()
@@ -258,7 +291,7 @@ def _resolve_task_directory(storage_root: Path, task_id: str) -> Path:
     return candidate
 
 
-def _new_state(context: _RunContext) -> dict:
+def _new_state(context: _RunContext, director_instruction: str | None) -> dict:
     return {
         "schema_version": CHECKPOINT_SCHEMA_VERSION,
         "thread_id": context.task_id,
@@ -266,23 +299,45 @@ def _new_state(context: _RunContext) -> dict:
         "trace_id": context.trace_id,
         "processing_profile": context.processing_profile,
         "media_provider": context.media_provider,
+        "director_instruction": director_instruction,
         "completed_nodes": [],
         "node_versions": {},
         "transcript": None,
+        "plan_candidate": None,
         "plan": None,
+        "repair_attempts": 0,
+        "validation_violations": [],
         "quality": None,
     }
 
 
 def _validated_state(checkpoint: dict, task_id: str) -> dict:
     state = checkpoint["state"]
-    if state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION:
+    schema_version = state.get("schema_version")
+    if schema_version not in {1, CHECKPOINT_SCHEMA_VERSION}:
         raise AgentWorkflowError("Unsupported Agent checkpoint schema version")
     if state.get("thread_id") != task_id:
         raise AgentWorkflowError("Agent checkpoint thread ID does not match task ID")
     completed = state.get("completed_nodes")
     if not isinstance(completed, list) or any(node not in AGENT_NODES for node in completed):
         raise AgentWorkflowError("Agent checkpoint has invalid completed nodes")
+    if schema_version == 1:
+        # P1 checkpoints remain resumable. A previously schema-valid plan is
+        # also a valid candidate for the new explicit validation boundary.
+        state = {
+            **state,
+            "schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "director_instruction": None,
+            "plan_candidate": state.get("plan"),
+            "repair_attempts": 0,
+            "validation_violations": [],
+        }
+    instruction = state.get("director_instruction")
+    if instruction is not None and (
+        not isinstance(instruction, str)
+        or len(instruction) > DIRECTOR_INSTRUCTION_MAX_LENGTH
+    ):
+        raise AgentWorkflowError("Agent checkpoint has an invalid director instruction")
     return state
 
 
@@ -346,6 +401,146 @@ def _transition(context: _RunContext, status: TaskStatus, message: str, **values
         raise AgentWorkflowError(f"Agent task cannot transition to {status.value}")
 
 
+def _planning_tool_call(
+    context: _RunContext,
+    state: dict,
+    *,
+    repair_attempt: int,
+    violations: list[PlanViolation],
+) -> PlanningToolOutput:
+    tool_input = PlanningToolInput(
+        transcript=Transcript.model_validate(state["transcript"]),
+        director_instruction=state.get("director_instruction"),
+        repair_attempt=repair_attempt,
+        violations=violations,
+    )
+    started_at = time.perf_counter()
+    if context.services.plan_agent_candidate is not None:
+        output = context.services.plan_agent_candidate(
+            tool_input,
+            context.processing_profile,
+            context.media_provider,
+        )
+        output = PlanningToolOutput.model_validate(output)
+    else:
+        # Compatibility adapter for P1 service bundles and deterministic tests.
+        output = invoke_planning_tool(
+            tool_input,
+            lambda value: context.services.build_animation_plan(
+                value.transcript,
+                context.processing_profile,
+                context.media_provider,
+            ),
+            planner_id="injected",
+            model_id=None,
+        )
+    duration_ms = round((time.perf_counter() - started_at) * 1_000)
+    planner = {
+        "planner_id": output.planner_id,
+        "model_id": output.model_id,
+        "prompt_version": output.prompt_version,
+        "schema_version": output.schema_version,
+    }
+    input_summary = {
+        "transcript_segment_count": len(tool_input.transcript.segments),
+        "transcript_character_count": len(tool_input.transcript.full_text),
+        "director_instruction_present": bool(tool_input.director_instruction),
+        "director_instruction_length": len(tool_input.director_instruction or ""),
+        "repair_attempt": repair_attempt,
+        "violation_count": len(violations),
+    }
+    output_summary = {
+        "candidate_present": output.candidate is not None,
+        "animation_count": len(output.candidate.get("animations", []))
+        if isinstance(output.candidate, dict) and isinstance(output.candidate.get("animations"), list)
+        else None,
+        "violation_count": len(output.violations),
+    }
+    if output.planner_id == "local_llm":
+        context.agent_trace.append(
+            "model_call",
+            node="planning",
+            status="completed" if output.candidate is not None else "failed",
+            duration_ms=duration_ms,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            error_category="planner_error" if output.violations else None,
+            planner=planner,
+            retry_count=repair_attempt,
+        )
+    context.agent_trace.append(
+        "tool_call",
+        node="planning",
+        status="completed" if output.candidate is not None else "failed",
+        duration_ms=duration_ms,
+        input_summary=input_summary,
+        output_summary=output_summary,
+        error_category="planner_error" if output.violations else None,
+        violations=[item.model_dump() for item in output.violations],
+        planner=planner,
+        retry_count=repair_attempt,
+    )
+    return output
+
+
+def _validation_tool_call(
+    context: _RunContext,
+    state: dict,
+    candidate: dict[str, Any] | None,
+    *,
+    repair_attempt: int,
+) -> tuple[AnimationPlan | None, list[PlanViolation]]:
+    started_at = time.perf_counter()
+    result = invoke_validation_tool(
+        ValidationToolInput(
+            transcript=Transcript.model_validate(state["transcript"]),
+            candidate=candidate,
+        ),
+        context.services.validate_plan,
+    )
+    duration_ms = round((time.perf_counter() - started_at) * 1_000)
+    violations = [item.model_dump() for item in result.violations]
+    context.agent_trace.append(
+        "tool_call",
+        node="validation",
+        status="completed" if result.valid else "failed",
+        duration_ms=duration_ms,
+        input_summary={
+            "candidate_present": candidate is not None,
+            "repair_attempt": repair_attempt,
+        },
+        output_summary={
+            "valid": result.valid,
+            "violation_count": len(result.violations),
+        },
+        error_category="plan_validation_failed" if not result.valid else None,
+        violations=violations,
+        retry_count=repair_attempt,
+    )
+    if not result.valid:
+        context.agent_trace.append(
+            "validation_error",
+            node="validation",
+            status="failed",
+            error_category="plan_validation_failed",
+            violations=violations,
+            retry_count=repair_attempt,
+        )
+    return result.plan, result.violations
+
+
+def _merge_violations(*groups: list[PlanViolation]) -> list[PlanViolation]:
+    merged: list[PlanViolation] = []
+    seen: set[tuple[str, tuple[str | int, ...], str]] = set()
+    for group in groups:
+        for item in group:
+            key = (item.code, tuple(item.path), item.message)
+            if key not in seen:
+                seen.add(key)
+                merged.append(item)
+    return merged[:50]
+
+
 def _run_node(node: str, context: _RunContext, state: dict) -> dict:
     transcript = lambda: Transcript.model_validate(state["transcript"])
     plan = lambda: AnimationPlan.model_validate(state["plan"])
@@ -381,16 +576,77 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
         planned = context.metrics.record_stage(
             context.attempt,
             "planning",
-            lambda: context.services.build_animation_plan(
-                transcript(),
-                context.processing_profile,
-                context.media_provider,
-            ),
+            lambda: _planning_tool_call(context, state, repair_attempt=0, violations=[]),
         )
-        return {**state, "plan": AnimationPlan.model_validate(planned).model_dump()}
+        if planned.candidate is None:
+            codes = sorted({item.code for item in planned.violations})
+            raise AgentPlannerCallError(
+                f"Agent planner failed before returning a candidate; violation codes: {', '.join(codes)}"
+            )
+        return {
+            **state,
+            "plan_candidate": planned.candidate,
+            "validation_violations": [item.model_dump() for item in planned.violations],
+        }
     if node == "validation":
-        validated = context.services.validate_plan(plan(), transcript())
-        return {**state, "plan": AnimationPlan.model_validate(validated).model_dump()}
+        candidate = state.get("plan_candidate") or state.get("plan")
+        repair_attempt = int(state.get("repair_attempts", 0))
+        validated, violations = _validation_tool_call(
+            context,
+            state,
+            candidate,
+            repair_attempt=repair_attempt,
+        )
+        recorded_violations = [
+            PlanViolation.model_validate(item)
+            for item in state.get("validation_violations", [])
+        ]
+        violations = _merge_violations(recorded_violations, violations)
+        while validated is None and repair_attempt < MAX_PLAN_REPAIR_ATTEMPTS:
+            repair_attempt += 1
+            context.agent_trace.append(
+                "retry",
+                node="planning",
+                status="started",
+                input_summary={"repair_attempt": repair_attempt, "violation_count": len(violations)},
+                retry_count=repair_attempt,
+            )
+            planned = _planning_tool_call(
+                context,
+                state,
+                repair_attempt=repair_attempt,
+                violations=violations,
+            )
+            if planned.candidate is None and planned.violations:
+                codes = sorted({item.code for item in planned.violations})
+                raise AgentPlannerCallError(
+                    f"Agent planner failed during repair attempt {repair_attempt}; "
+                    f"violation codes: {', '.join(codes)}"
+                )
+            candidate = planned.candidate
+            planner_violations = planned.violations
+            validated, violations = _validation_tool_call(
+                context,
+                state,
+                candidate,
+                repair_attempt=repair_attempt,
+            )
+            violations = _merge_violations(planner_violations, violations)
+        if validated is None:
+            codes = sorted({item.code for item in violations})
+            context.agent_trace.finalize(
+                "failed",
+                retry_count=repair_attempt,
+                failure_category="plan_repair_exhausted",
+            )
+            raise PlanRepairExhausted(repair_attempt, codes)
+        return {
+            **state,
+            "plan_candidate": candidate,
+            "plan": AnimationPlan.model_validate(validated).model_dump(),
+            "repair_attempts": repair_attempt,
+            "validation_violations": [],
+        }
     if node == "render":
         _transition(context, TaskStatus.RENDERING, "Agent is rendering animation and compositing video")
         transcript_data, plan_data = context.services.render_and_composite_video(
@@ -462,6 +718,10 @@ def _reconcile_terminal_checkpoint(
             TaskStatus.COMPLETED.value,
             output_quality=state.get("quality"),
         )
+        context.agent_trace.finalize(
+            "completed",
+            retry_count=int(state.get("repair_attempts", 0)),
+        )
     elif run_status == "cancelled":
         node = checkpoint.get("next_node")
         if node in AGENT_NODES:
@@ -479,6 +739,11 @@ def _reconcile_terminal_checkpoint(
             TaskStatus.CANCELLED.value,
             failure_category="cancelled",
             output_quality=state.get("quality"),
+        )
+        context.agent_trace.finalize(
+            "cancelled",
+            retry_count=int(state.get("repair_attempts", 0)),
+            failure_category="cancelled",
         )
     elif run_status == "failed":
         failure = state.get("failure") if isinstance(state.get("failure"), dict) else {}
@@ -504,6 +769,11 @@ def _reconcile_terminal_checkpoint(
             TaskStatus.FAILED.value,
             failure_category=str(node or "workflow"),
             output_quality=state.get("quality"),
+        )
+        context.agent_trace.finalize(
+            "failed",
+            retry_count=int(state.get("repair_attempts", 0)),
+            failure_category=str(error_category),
         )
 
 
@@ -540,6 +810,7 @@ def run_agent_task(
     trace_id: str,
     processing_profile: str = "configured",
     media_provider: str | None = None,
+    director_instruction: str | None = None,
     *,
     services: AgentWorkflowServices | None = None,
     checkpoint_store: AgentCheckpointStore | None = None,
@@ -572,10 +843,15 @@ def run_agent_task(
         services=services or DEFAULT_AGENT_SERVICES,
         metrics=metrics,
         attempt=attempt,
+        agent_trace=AgentTrace(safe_task_dir, task_id),
     )
     store = checkpoint_store or AgentCheckpointStore.for_storage_root(storage_root)
     existing = store.load(task_id)
-    checkpoint = store.create(task_id, _new_state(context)) if existing is None else existing
+    checkpoint = (
+        store.create(task_id, _new_state(context, director_instruction))
+        if existing is None
+        else existing
+    )
     state = _validated_state(checkpoint, task_id)
     _reconcile_completed_events(context, state)
 
@@ -637,11 +913,19 @@ def run_agent_task(
             _reconcile_terminal_checkpoint(context, checkpoint)
             return checkpoint
         except Exception as exc:
+            error_category = (
+                "plan_repair_exhausted"
+                if isinstance(exc, PlanRepairExhausted)
+                else exc.__class__.__name__
+            )
             failed_state = {
                 **state,
+                "repair_attempts": (
+                    exc.attempts if isinstance(exc, PlanRepairExhausted) else state.get("repair_attempts", 0)
+                ),
                 "failure": {
                     "node": node,
-                    "error_category": exc.__class__.__name__,
+                    "error_category": error_category,
                 },
             }
             checkpoint = store.save(
@@ -679,6 +963,7 @@ def start_agent_task(
     trace_id: str,
     processing_profile: str = "configured",
     media_provider: str | None = None,
+    director_instruction: str | None = None,
     *,
     services: AgentWorkflowServices | None = None,
     checkpoint_store: AgentCheckpointStore | None = None,
@@ -700,6 +985,7 @@ def start_agent_task(
                     trace_id,
                     processing_profile,
                     media_provider,
+                    director_instruction,
                     services=services,
                     checkpoint_store=checkpoint_store,
                     interrupt_after=interrupt_after,
@@ -752,6 +1038,7 @@ def resume_agent_task(
         task["trace_id"],
         task.get("processing_profile", "configured"),
         task.get("media_provider"),
+        task.get("director_instruction"),
         services=services,
         checkpoint_store=checkpoint_store or AgentCheckpointStore.for_storage_root(root),
         interrupt_after=interrupt_after,

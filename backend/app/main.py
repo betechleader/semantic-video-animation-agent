@@ -24,6 +24,8 @@ from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
 from .agent_workflow import recover_agent_tasks, start_agent_task
+from .agent_tools import DIRECTOR_INSTRUCTION_MAX_LENGTH
+from .agent_trace import AgentTraceError, read_agent_trace
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -72,6 +74,7 @@ async def upload_video(
     processing_profile: str = Form("configured"),
     media_provider: str = Form("mock"),
     workflow_mode: str = Form("standard"),
+    director_instruction: str | None = Form(None),
 ) -> dict:
     if workflow_mode not in {"standard", "agent"}:
         raise HTTPException(status_code=422, detail="workflow_mode must be standard or agent")
@@ -79,6 +82,18 @@ async def upload_video(
         raise HTTPException(status_code=422, detail="processing_profile must be configured, real, or mock")
     if media_provider not in {"mock", "manual", "knowledge", "wikimedia_commons", "pexels"}:
         raise HTTPException(status_code=422, detail="media_provider must be mock, manual, knowledge, wikimedia_commons, or pexels")
+    normalized_instruction = director_instruction.strip() if director_instruction else None
+    if (
+        workflow_mode == "agent"
+        and normalized_instruction
+        and len(normalized_instruction) > DIRECTOR_INSTRUCTION_MAX_LENGTH
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=f"director_instruction must be at most {DIRECTOR_INSTRUCTION_MAX_LENGTH} characters",
+        )
+    if workflow_mode == "standard":
+        normalized_instruction = None
     if not file.filename or Path(file.filename).suffix.lower() != ".mp4":
         raise HTTPException(status_code=400, detail="Only .mp4 uploads are accepted")
     task_id = str(uuid4())
@@ -96,10 +111,11 @@ async def upload_video(
             workflow_mode=workflow_mode,
             processing_profile=processing_profile,
             media_provider=media_provider,
+            director_instruction=normalized_instruction,
         )
         initialize_initial_metrics(task_dir, task_id, request.state.trace_id, round((time.perf_counter() - upload_probe_started_at) * 1000))
         if workflow_mode == "agent":
-            start_agent_task(
+            agent_args = (
                 task_id,
                 task_dir,
                 metadata,
@@ -107,6 +123,10 @@ async def upload_video(
                 processing_profile,
                 media_provider,
             )
+            if normalized_instruction:
+                start_agent_task(*agent_args, director_instruction=normalized_instruction)
+            else:
+                start_agent_task(*agent_args)
         else:
             start_task(task_id, task_dir, metadata, request.state.trace_id, processing_profile, media_provider)
     except HTTPException:
@@ -144,6 +164,23 @@ def get_video_metrics(task_id: str) -> dict:
     if metrics is None:
         raise HTTPException(status_code=404, detail="Task metrics not found")
     return metrics
+
+
+@app.get("/api/videos/{task_id}/agent-trace")
+def get_video_agent_trace(task_id: str) -> dict:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["workflow_mode"] != "agent":
+        raise HTTPException(status_code=409, detail="Agent trace is only available for Agent tasks")
+    try:
+        task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
+        trace = read_agent_trace(task_dir, task_id)
+    except (ValueError, AgentTraceError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Agent trace not found")
+    return trace
 
 
 @app.get("/api/videos/{task_id}/media")

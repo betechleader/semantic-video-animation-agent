@@ -17,6 +17,7 @@ from .providers import (
 )
 from .planning_rules import validate_animation_plan
 from .schemas import AnimationPlan, Transcript, VideoMetadata
+from .agent_tools import PlanningToolInput, PlanningToolOutput, invoke_planning_tool
 
 
 def resolve_asr_provider(processing_profile: str = "configured") -> SpeechRecognitionProvider:
@@ -93,6 +94,46 @@ def build_animation_plan(
     plan = planner.plan(transcript)
     selected_media_provider = media_provider or SETTINGS.media_provider
     return plan.model_copy(update={"media_provider": selected_media_provider})
+
+
+def plan_agent_candidate(
+    tool_input: PlanningToolInput,
+    processing_profile: str = "configured",
+    media_provider: str | None = None,
+) -> PlanningToolOutput:
+    """Invoke the configured planner through the Agent's typed tool boundary."""
+
+    planner = resolve_planning_provider(processing_profile)
+    selected_media_provider = media_provider or SETTINGS.media_provider
+    planner_id = (
+        "mock"
+        if isinstance(planner, MockAnimationPlanningProvider)
+        else "rule_based"
+        if isinstance(planner, TranscriptAnimationPlanningProvider)
+        else "local_llm"
+    )
+    model_id = SETTINGS.planner_model if isinstance(planner, LocalLlmAnimationPlanningProvider) else None
+
+    def generate(value: PlanningToolInput):
+        if isinstance(planner, LocalLlmAnimationPlanningProvider):
+            candidate = planner.plan_candidate(
+                value.transcript,
+                director_instruction=value.director_instruction,
+                violations=[item.model_dump() for item in value.violations],
+                repair_attempt=value.repair_attempt,
+            )
+        else:
+            candidate = planner.plan(value.transcript)
+        if isinstance(candidate, AnimationPlan):
+            candidate = candidate.model_dump()
+        return {**candidate, "media_provider": selected_media_provider}
+
+    return invoke_planning_tool(
+        tool_input,
+        generate,
+        planner_id=planner_id,
+        model_id=model_id,
+    )
 
 
 def validate_plan(plan: AnimationPlan, transcript: Transcript) -> AnimationPlan:

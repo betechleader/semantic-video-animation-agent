@@ -55,6 +55,26 @@ def test_existing_0001_task_gets_workflow_defaults_when_upgraded_to_head(tmp_pat
     assert task["workflow_mode"] == "standard"
     assert task["processing_profile"] == "configured"
     assert task["media_provider"] == "mock"
+    assert task["director_instruction"] is None
+
+
+def test_agent_director_instruction_survives_migration_and_standard_discards_it(tmp_path: Path, monkeypatch) -> None:
+    configure_test_database(tmp_path, monkeypatch)
+    database.create_task(
+        "agent-directed",
+        {},
+        workflow_mode="agent",
+        director_instruction="突出开场",
+    )
+    database.create_task(
+        "standard-undirected",
+        {},
+        workflow_mode="standard",
+        director_instruction="不应保存",
+    )
+
+    assert database.get_task("agent-directed")["director_instruction"] == "突出开场"
+    assert database.get_task("standard-undirected")["director_instruction"] is None
 
 
 def test_migration_persists_task_state_and_events(tmp_path: Path, monkeypatch) -> None:

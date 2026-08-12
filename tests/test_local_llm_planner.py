@@ -53,3 +53,27 @@ def test_local_llm_planner_applies_transcript_grounding_rules(monkeypatch) -> No
     monkeypatch.setattr("backend.app.providers.requests.post", lambda *args, **kwargs: FakeResponse(json.dumps(invalid)))
     with pytest.raises(RuntimeError, match="fully contained"):
         LocalLlmAnimationPlanningProvider("qwen", "http://localhost:11434/v1").plan(create_mock_transcript())
+
+
+def test_local_llm_repair_prompt_includes_director_instruction_and_structured_violations(monkeypatch) -> None:
+    captured = {}
+
+    def fake_post(url, *, json, timeout):
+        captured.update(url=url, payload=json, timeout=timeout)
+        return FakeResponse(valid_plan())
+
+    monkeypatch.setattr("backend.app.providers.requests.post", fake_post)
+    provider = LocalLlmAnimationPlanningProvider("qwen", "http://localhost:11434/v1", 12)
+
+    candidate = provider.plan_candidate(
+        create_mock_transcript(),
+        director_instruction="前三秒更抓人",
+        violations=[{"code": "planning_rule", "path": [], "message": "duration is invalid"}],
+        repair_attempt=1,
+    )
+
+    prompt = captured["payload"]["messages"][0]["content"]
+    assert candidate["animations"][0]["id"] == "animation_keyword"
+    assert "前三秒更抓人" in prompt
+    assert '"code": "planning_rule"' in prompt
+    assert "Repair attempt 1" in prompt

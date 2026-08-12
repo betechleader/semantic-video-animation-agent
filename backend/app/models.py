@@ -33,6 +33,7 @@ class VideoTask(Base):
     )
     processing_profile: Mapped[str] = mapped_column(String(32), default="configured", server_default="configured", nullable=False)
     media_provider: Mapped[str] = mapped_column(String(64), default="mock", server_default="mock", nullable=False)
+    director_instruction: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     transcript_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     plan_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

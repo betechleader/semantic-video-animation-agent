@@ -1,8 +1,42 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `916d8dd 重构本地AI创作平台前端`
-- Current stage: P1, recoverable Agent workflow foundation - completed after user acceptance.
+- Current commit before this stage: `c0108ba 实现可恢复 Agent 工作流基础`
+- Current stage: P2, director instruction, typed tools, and plan auto-repair - completed after user acceptance.
+
+## P2 delivered
+
+- Added the optional Agent-only multipart field `director_instruction`, trimmed and bounded to 2,000 characters. It is persisted in SQLite and the recoverable Agent checkpoint; standard uploads discard it and retain the original dispatcher signature and behavior.
+- Added Pydantic typed planning and validation tool envelopes. Planner candidates must first pass `AnimationPlan` schema validation and then the existing transcript-grounded `planning_rules` before render.
+- Added bounded automatic repair: structured schema/rule violations are returned to the planner for at most two repair calls. A valid repair continues to render; exhaustion stops with `plan_repair_exhausted`, retry count, and violation codes rather than looping.
+- Extended the loopback local-LLM prompt with optional director instructions and structured repair violations while preserving the original `plan()` API for standard workflows. Offline Mock/rule planners remain deterministic; they carry the instruction in Agent state but do not claim to interpret free-form direction.
+- Added task-local atomic `agent_trace.json` plus `GET /api/videos/{task_id}/agent-trace`. The trace records tool/model call type, node, status, durations, structured violations, retries, `prompt_version`, plan schema version, planner ID, and model ID. It stores only counts/lengths for transcript and director input and excludes their text, plan bodies, absolute paths, media data, and raw exception messages.
+- Added Alembic migration `0003_agent_director_instruction`; P1 checkpoint schema version 1 remains readable and is upgraded in memory when resumed.
+
+## P2 verification
+
+- Baseline before implementation: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `108 passed in 74.01s`.
+- Final targeted P2/Agent/API/migration/provider tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_workflow_mode_api.py tests\test_local_llm_planner.py tests\test_task_database.py` → `24 passed in 8.34s`.
+- Final full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `114 passed in 75.97s`, including the standard and Agent Mock FFmpeg/Remotion end-to-end pipelines.
+- Alembic reports the single head `0003_agent_director_instruction`.
+- Renderer build was not required: P2 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema.
+- `git diff --check` is part of the final verification. The user-owned untracked file `how 提交哈希` remains untouched.
+
+## P2 known limitations
+
+- The deterministic Mock and rule-based planners cannot semantically interpret arbitrary natural-language director instructions. The instruction remains persisted/auditable Agent input, while actual free-form interpretation requires the supported loopback local-LLM provider or a scripted test planner.
+- No real local LLM, faster-whisper model, or external media service is exercised by P2 automated tests. Repair behavior is covered fully offline with Scripted/Fake planners.
+- Agent Trace is task-local JSON with atomic replacement for the current single-process runtime. Cross-process trace append coordination and distributed execution remain P10 concerns.
+
+## Recommended P2 manual acceptance
+
+1. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=standard`, Mock processing/media, plus an intentionally supplied `director_instruction`; verify the standard task completes and `director_instruction` is `null` in `GET /api/videos/{task_id}`.
+2. Upload the same file with `workflow_mode=agent`, Mock processing/media, and a short `director_instruction`; verify the task completes, the instruction is returned only for this Agent task, and the existing result downloads/plays.
+3. Open `GET /api/videos/{task_id}/agent-trace`; verify `prompt_version`, `plan_schema_version`, planner identity, tool-call entries, and retry count are present, while the instruction text, transcript text, plan body, and absolute paths are absent.
+4. Submit an Agent upload with more than 2,000 instruction characters; verify HTTP 422 and that no task directory/row is created. Submit the same oversized field in standard mode; verify it is ignored and the stable standard flow still starts.
+5. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py`; inspect the two scripted cases: invalid-first/valid-second completes with one retry, while persistent rule violations stop after exactly two repairs without rendering.
+
+P2 was explicitly accepted for commit. P3 has not been started.
 
 ## P1 delivered
 
@@ -39,7 +73,7 @@
 4. For a recovery check, stop the API after a completed node but before task completion, restart it, and verify the same task resumes from the next checkpoint rather than repeating earlier ASR/planning events.
 5. Restart once more after completion and verify the completed task remains completed and downloadable without creating duplicate completed-node events.
 
-P1 was explicitly accepted for commit. P2 has not been started.
+P1 was explicitly accepted and committed before P2 began.
 
 ## Stage 10G delivered
 

@@ -34,7 +34,7 @@ Stages 10, 10A, 10B, 10C, 10D, 10E, 10F, and 10G are complete. The site now open
 | Phase | Status |
 |---|---|
 | P1 Recoverable Agent workflow foundation | COMPLETED |
-| P2 Director instruction, typed tools, and plan auto-repair | NOT_STARTED |
+| P2 Director instruction, typed tools, and plan auto-repair | COMPLETED |
 | P3 Human-in-the-loop approval and resume | NOT_STARTED |
 | P4 Agent mode in the existing page | NOT_STARTED |
 | P5 Agent eval harness and observability | NOT_STARTED |
