@@ -56,6 +56,7 @@ def test_existing_0001_task_gets_workflow_defaults_when_upgraded_to_head(tmp_pat
     assert task["processing_profile"] == "configured"
     assert task["media_provider"] == "mock"
     assert task["director_instruction"] is None
+    assert task["approval_policy"] is None
 
 
 def test_agent_director_instruction_survives_migration_and_standard_discards_it(tmp_path: Path, monkeypatch) -> None:

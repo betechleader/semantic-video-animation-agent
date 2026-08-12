@@ -129,6 +129,17 @@ class AgentTrace:
             }
             self._write(payload)
 
+    def set_status(
+        self, status: str, *, retry_count: int, failure_category: str | None = None
+    ) -> None:
+        """Persist a non-terminal audit status such as awaiting approval."""
+
+        self.finalize(
+            status,
+            retry_count=retry_count,
+            failure_category=failure_category,
+        )
+
 
 def read_agent_trace(task_dir: Path, task_id: str) -> dict[str, Any] | None:
     trace = AgentTrace(task_dir, task_id)

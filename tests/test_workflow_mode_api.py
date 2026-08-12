@@ -79,6 +79,7 @@ def test_upload_defaults_to_standard_and_preserves_start_task_signature(workflow
     assert task["workflow_mode"] == "standard"
     assert task["processing_profile"] == "configured"
     assert task["media_provider"] == "mock"
+    assert task["approval_policy"] is None
 
 
 def test_upload_dispatches_agent_and_forwards_existing_processing_choices(workflow_client) -> None:
@@ -90,6 +91,7 @@ def test_upload_dispatches_agent_and_forwards_existing_processing_choices(workfl
             "workflow_mode": "agent",
             "processing_profile": "real",
             "media_provider": "knowledge",
+            "approval_policy": "on_risk",
         },
     )
 
@@ -110,6 +112,22 @@ def test_upload_dispatches_agent_and_forwards_existing_processing_choices(workfl
     assert task["workflow_mode"] == "agent"
     assert task["processing_profile"] == "real"
     assert task["media_provider"] == "knowledge"
+    assert task["approval_policy"] == "on_risk"
+
+
+def test_approval_policy_is_agent_only_and_validated_before_creating_task(workflow_client) -> None:
+    client, storage, standard_calls, agent_calls = workflow_client
+
+    standard = upload(client, {"workflow_mode": "standard", "approval_policy": "unknown"})
+    assert standard.status_code == 202
+    assert database.get_task(standard.json()["task_id"])["approval_policy"] is None
+    assert len(standard_calls) == 1
+
+    before = {path.name for path in storage.iterdir() if path.is_dir()}
+    invalid_agent = upload(client, {"workflow_mode": "agent", "approval_policy": "unknown"})
+    assert invalid_agent.status_code == 422
+    assert {path.name for path in storage.iterdir() if path.is_dir()} == before
+    assert agent_calls == []
 
 
 def test_invalid_workflow_mode_returns_422_without_task_directory_or_row(workflow_client) -> None:

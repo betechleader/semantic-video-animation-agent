@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,19 +12,31 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, STORAGE_ROOT
 from .asr_corrections import correct_transcript, load_phrase_corrections, normalize_review_transcript
-from .database import create_task, get_task, get_task_events, initialize_database, request_cancellation, start_review_render, update_transcript
+from .database import (
+    append_task_event,
+    create_task,
+    decide_agent_approval,
+    get_agent_approval,
+    get_task,
+    get_task_events,
+    initialize_database,
+    request_cancellation,
+    start_review_render,
+    update_transcript,
+)
 from .errors import AppError
 from .logging_config import configure_logging
 from .metrics import TaskMetrics, initialize_initial_metrics, read_metrics
 from .media_providers import MediaProviderError, get_media_provider_by_name, load_candidates, manual_candidate, save_candidates
 from .process_control import process_registry
 from .planning_rules import PlanningRuleError, validate_animation_plan
+from .quality import QualityValidationError, validate_animation_safe_areas
 from .providers import TranscriptAnimationPlanningProvider
-from .schemas import ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
+from .schemas import AgentApprovalEdit, AnimationPlan, ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
-from .agent_workflow import recover_agent_tasks, start_agent_task
+from .agent_workflow import get_active_agent_thread, recover_agent_tasks, resume_agent_task, start_agent_task
 from .agent_tools import DIRECTOR_INSTRUCTION_MAX_LENGTH
 from .agent_trace import AgentTraceError, read_agent_trace
 
@@ -75,6 +88,7 @@ async def upload_video(
     media_provider: str = Form("mock"),
     workflow_mode: str = Form("standard"),
     director_instruction: str | None = Form(None),
+    approval_policy: str = Form("never"),
 ) -> dict:
     if workflow_mode not in {"standard", "agent"}:
         raise HTTPException(status_code=422, detail="workflow_mode must be standard or agent")
@@ -82,6 +96,8 @@ async def upload_video(
         raise HTTPException(status_code=422, detail="processing_profile must be configured, real, or mock")
     if media_provider not in {"mock", "manual", "knowledge", "wikimedia_commons", "pexels"}:
         raise HTTPException(status_code=422, detail="media_provider must be mock, manual, knowledge, wikimedia_commons, or pexels")
+    if workflow_mode == "agent" and approval_policy not in {"never", "on_risk", "always"}:
+        raise HTTPException(status_code=422, detail="approval_policy must be never, on_risk, or always")
     normalized_instruction = director_instruction.strip() if director_instruction else None
     if (
         workflow_mode == "agent"
@@ -94,6 +110,7 @@ async def upload_video(
         )
     if workflow_mode == "standard":
         normalized_instruction = None
+        approval_policy = "never"
     if not file.filename or Path(file.filename).suffix.lower() != ".mp4":
         raise HTTPException(status_code=400, detail="Only .mp4 uploads are accepted")
     task_id = str(uuid4())
@@ -112,6 +129,7 @@ async def upload_video(
             processing_profile=processing_profile,
             media_provider=media_provider,
             director_instruction=normalized_instruction,
+            approval_policy=approval_policy,
         )
         initialize_initial_metrics(task_dir, task_id, request.state.trace_id, round((time.perf_counter() - upload_probe_started_at) * 1000))
         if workflow_mode == "agent":
@@ -139,6 +157,7 @@ async def upload_video(
         "task_id": task_id,
         "status": "pending",
         "workflow_mode": workflow_mode,
+        "approval_policy": approval_policy if workflow_mode == "agent" else None,
         "metadata": metadata,
         "trace_id": request.state.trace_id,
     }
@@ -181,6 +200,106 @@ def get_video_agent_trace(task_id: str) -> dict:
     if trace is None:
         raise HTTPException(status_code=404, detail="Agent trace not found")
     return trace
+
+
+def _pending_agent_approval(task_id: str) -> tuple[dict, dict]:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["workflow_mode"] != "agent":
+        raise HTTPException(status_code=409, detail="Approval is only available for Agent tasks")
+    approval = get_agent_approval(task_id)
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Agent approval not found")
+    return task, approval
+
+
+def _validate_approval_plan(task: dict, plan: AnimationPlan) -> AnimationPlan:
+    """Apply every deterministic pre-render validator before consuming approval."""
+
+    validated = validate_animation_plan(plan, Transcript.model_validate(task["transcript"]))
+    metadata = VideoMetadata.model_validate(task["metadata"])
+    validate_animation_safe_areas(validated, metadata.width, metadata.height)
+    return validated
+
+
+def _resume_after_approval(task_id: str) -> None:
+    active = get_active_agent_thread(task_id)
+    if active is None:
+        resume_agent_task(task_id, STORAGE_ROOT)
+        return
+
+    def resume_when_paused_runner_exits() -> None:
+        active.join()
+        resume_agent_task(task_id, STORAGE_ROOT)
+
+    threading.Thread(
+        target=resume_when_paused_runner_exits,
+        daemon=True,
+        name=f"agent-approval-resume-{task_id}",
+    ).start()
+
+
+@app.get("/api/videos/{task_id}/approval")
+def get_video_agent_approval(task_id: str) -> dict:
+    _task, approval = _pending_agent_approval(task_id)
+    return approval
+
+
+@app.post("/api/videos/{task_id}/approval/approve", status_code=status.HTTP_202_ACCEPTED)
+def approve_video_agent_plan(task_id: str) -> dict:
+    task, approval = _pending_agent_approval(task_id)
+    if approval["status"] != "pending" or task["status"] != "awaiting_approval":
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    if approval["candidate_plan"] is None:
+        raise HTTPException(status_code=409, detail="A valid edited plan is required before approval")
+    try:
+        plan = _validate_approval_plan(
+            task, AnimationPlan.model_validate(approval["candidate_plan"])
+        )
+    except (PlanningRuleError, QualityValidationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    decided = decide_agent_approval(task_id, "approved", plan.model_dump())
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    append_task_event(
+        task_id, "approved", "Agent plan approved", {"decision_version": decided["decision_version"]},
+        dedupe_key=f"agent:approved:{decided['decision_version']}",
+    )
+    _resume_after_approval(task_id)
+    return {"task_id": task_id, "status": "approved", "decision_version": decided["decision_version"]}
+
+
+@app.post("/api/videos/{task_id}/approval/edit", status_code=status.HTTP_202_ACCEPTED)
+def edit_video_agent_plan(task_id: str, edit: AgentApprovalEdit) -> dict:
+    task, approval = _pending_agent_approval(task_id)
+    if approval["status"] != "pending" or task["status"] != "awaiting_approval":
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    try:
+        plan = _validate_approval_plan(task, edit.plan)
+    except (PlanningRuleError, QualityValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    decided = decide_agent_approval(task_id, "edited", plan.model_dump())
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    append_task_event(
+        task_id, "edited", "Agent plan edited and approved", {"decision_version": decided["decision_version"]},
+        dedupe_key=f"agent:edited:{decided['decision_version']}",
+    )
+    _resume_after_approval(task_id)
+    return {"task_id": task_id, "status": "edited", "decision_version": decided["decision_version"]}
+
+
+@app.post("/api/videos/{task_id}/approval/reject", status_code=status.HTTP_202_ACCEPTED)
+def reject_video_agent_plan(task_id: str) -> dict:
+    task, approval = _pending_agent_approval(task_id)
+    if approval["status"] != "pending" or task["status"] != "awaiting_approval":
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    decided = decide_agent_approval(task_id, "rejected")
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Agent approval has already been decided")
+    _resume_after_approval(task_id)
+    return {"task_id": task_id, "status": "rejected", "decision_version": decided["decision_version"]}
 
 
 @app.get("/api/videos/{task_id}/media")
@@ -271,7 +390,7 @@ def stream_task_events(task_id: str, after_event_id: int = 0) -> StreamingRespon
                     last_event_id = event["id"]
                     yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
             task = get_task(task_id)
-            if task is None or task["status"] in {"completed", "failed", "cancelled"}:
+            if task is None or task["status"] in {"completed", "failed", "cancelled", "rejected"}:
                 break
             time.sleep(0.25)
 

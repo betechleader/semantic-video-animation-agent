@@ -4,13 +4,15 @@ from threading import Lock
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, select
+from datetime import datetime, timezone
+
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import DATABASE_PATH, PROJECT_ROOT, STORAGE_ROOT
-from .models import TaskEvent, TaskStatus, VideoTask, WorkflowMode
+from .models import AgentApproval, ApprovalPolicy, TaskEvent, TaskStatus, VideoTask, WorkflowMode
 
 _engine: Engine | None = None
 _engine_path: Path | None = None
@@ -77,9 +79,15 @@ def create_task(
     processing_profile: str = "configured",
     media_provider: str = "mock",
     director_instruction: str | None = None,
+    approval_policy: ApprovalPolicy | str = ApprovalPolicy.NEVER,
 ) -> None:
     initialize_database()
     normalized_workflow_mode = WorkflowMode(workflow_mode)
+    normalized_approval_policy = (
+        ApprovalPolicy(approval_policy)
+        if normalized_workflow_mode == WorkflowMode.AGENT
+        else ApprovalPolicy.NEVER
+    )
     with next(get_session()) as session:
         session.add(
             VideoTask(
@@ -89,6 +97,7 @@ def create_task(
                 processing_profile=processing_profile,
                 media_provider=media_provider,
                 director_instruction=director_instruction if normalized_workflow_mode == WorkflowMode.AGENT else None,
+                approval_policy=normalized_approval_policy,
                 metadata_json=metadata,
                 trace_id=trace_id,
             )
@@ -130,7 +139,9 @@ def append_task_event(
 def transition_task(task_id: str, status: TaskStatus, message: str, *, transcript: dict | None = None, plan: dict | None = None, error: str | None = None) -> bool:
     with next(get_session()) as session:
         task = session.get(VideoTask, task_id)
-        if task is None or task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
+        if task is None or task.status in {
+            TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.REJECTED
+        }:
             return False
         if task.cancel_requested and status not in {TaskStatus.CANCELLED, TaskStatus.FAILED}:
             task.status = TaskStatus.CANCELLED
@@ -151,7 +162,9 @@ def transition_task(task_id: str, status: TaskStatus, message: str, *, transcrip
 def request_cancellation(task_id: str) -> bool:
     with next(get_session()) as session:
         task = session.get(VideoTask, task_id)
-        if task is None or task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
+        if task is None or task.status in {
+            TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.REJECTED
+        }:
             return False
         task.cancel_requested = True
         session.add(_event(task_id, "cancel_requested", "Cancellation requested", {}))
@@ -167,7 +180,10 @@ def is_cancellation_requested(task_id: str) -> bool:
 
 def is_terminal(task_id: str) -> bool:
     task = get_task(task_id)
-    return task is None or task["status"] in {TaskStatus.COMPLETED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}
+    return task is None or task["status"] in {
+        TaskStatus.COMPLETED.value, TaskStatus.FAILED.value,
+        TaskStatus.CANCELLED.value, TaskStatus.REJECTED.value,
+    }
 
 
 def update_task(task_id: str, status: str, transcript: dict | None = None, plan: dict | None = None, error: str | None = None) -> None:
@@ -189,6 +205,9 @@ def _serialize_task(task: VideoTask) -> dict:
         "processing_profile": task.processing_profile,
         "media_provider": task.media_provider,
         "director_instruction": task.director_instruction if task.workflow_mode == WorkflowMode.AGENT else None,
+        "approval_policy": (
+            task.approval_policy.value if task.workflow_mode == WorkflowMode.AGENT else None
+        ),
     }
 
 
@@ -201,7 +220,9 @@ def get_task(task_id: str) -> dict | None:
 
 def list_recoverable_agent_tasks() -> list[dict]:
     initialize_database()
-    terminal_statuses = (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)
+    terminal_statuses = (
+        TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.REJECTED
+    )
     with next(get_session()) as session:
         # A completed Agent task may temporarily return to RENDERING through
         # the existing manual-review flow. Its graph checkpoint is already
@@ -242,7 +263,10 @@ def get_task_events(task_id: str) -> list[dict]:
 def update_transcript(task_id: str, transcript: dict) -> bool:
     with next(get_session()) as session:
         task = session.get(VideoTask, task_id)
-        if task is None or task.status in {TaskStatus.PROCESSING, TaskStatus.RENDERING}:
+        if task is None or task.status in {
+            TaskStatus.PROCESSING, TaskStatus.RENDERING, TaskStatus.AWAITING_APPROVAL,
+            TaskStatus.REJECTED,
+        }:
             return False
         task.transcript_json = transcript
         session.add(_event(task_id, "transcript_updated", "Transcript updated", {}))
@@ -264,3 +288,80 @@ def start_review_render(task_id: str, transcript: dict, plan: dict) -> bool:
         session.add(_event(task_id, "review_rendering", "Review changes saved; rendering updated result", {"status": TaskStatus.RENDERING.value}))
         session.commit()
         return True
+
+
+def create_pending_approval(
+    task_id: str,
+    policy: str,
+    reasons: list[dict],
+    candidate_plan: dict | None,
+    violations: list[dict],
+) -> dict:
+    """Persist one approval request without replacing an existing decision."""
+
+    with next(get_session()) as session:
+        approval = session.get(AgentApproval, task_id)
+        if approval is None:
+            approval = AgentApproval(
+                task_id=task_id,
+                status="pending",
+                policy=policy,
+                reasons_json=reasons,
+                candidate_plan_json=candidate_plan,
+                violations_json=violations,
+            )
+            session.add(approval)
+        session.commit()
+        return _serialize_approval(approval)
+
+
+def _serialize_approval(approval: AgentApproval) -> dict:
+    return {
+        "task_id": approval.task_id,
+        "status": approval.status,
+        "policy": approval.policy,
+        "reasons": approval.reasons_json,
+        "candidate_plan": approval.candidate_plan_json,
+        "violations": approval.violations_json,
+        "decision_version": approval.decision_version,
+        "created_at": approval.created_at.isoformat(),
+        "decided_at": approval.decided_at.isoformat() if approval.decided_at else None,
+    }
+
+
+def get_agent_approval(task_id: str) -> dict | None:
+    initialize_database()
+    with next(get_session()) as session:
+        approval = session.get(AgentApproval, task_id)
+        return None if approval is None else _serialize_approval(approval)
+
+
+def decide_agent_approval(task_id: str, decision: str, plan: dict | None = None) -> dict | None:
+    """Atomically accept exactly one decision for a pending approval."""
+
+    if decision not in {"approved", "edited", "rejected"}:
+        raise ValueError("Unsupported Agent approval decision")
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        if task is None or task.status != TaskStatus.AWAITING_APPROVAL:
+            return None
+        values: dict = {
+            "status": decision,
+            "decision_version": AgentApproval.decision_version + 1,
+            "decided_at": datetime.now(timezone.utc),
+        }
+        if plan is not None:
+            values["candidate_plan_json"] = plan
+            values["violations_json"] = []
+        result = session.execute(
+            update(AgentApproval)
+            .where(AgentApproval.task_id == task_id, AgentApproval.status == "pending")
+            .values(**values)
+        )
+        if result.rowcount != 1:
+            session.rollback()
+            return None
+        session.commit()
+        approval = session.get(AgentApproval, task_id)
+        assert approval is not None
+        return _serialize_approval(approval)

@@ -304,3 +304,11 @@ class ReviewUpdate(BaseModel):
 
     transcript: Transcript
     plan: AnimationPlan
+
+
+class AgentApprovalEdit(BaseModel):
+    """A reviewer-provided replacement plan for a paused Agent run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    plan: AnimationPlan

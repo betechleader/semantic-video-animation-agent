@@ -1,6 +1,50 @@
 # Development Status
 
 - Current branch: `master`
+- Current commit before this stage: `79e4aec 实现导演指令与计划自动修复`
+- Current stage: P3, Human-in-the-loop approval and resume - completed after user acceptance.
+
+## P3 delivered
+
+- Added Agent-only `approval_policy=never|on_risk|always`, defaulting to `never`. Standard uploads ignore the field and preserve the original dispatcher/API behavior.
+- Added durable `awaiting_approval` and `rejected` task states plus a one-row-per-task `agent_approvals` audit record through Alembic migration `0004_agent_approval`.
+- The explicit persistent graph now pauses after validation for `always`, for `on_risk` external-media relevance/source-rights review, and when bounded plan repair is exhausted. The checkpoint remains at `render`, so approval never repeats ASR, correction, planning, or validation.
+- Added `GET /api/videos/{task_id}/approval` and atomic approve/edit/reject APIs. Approval revalidates the stored plan; edit must pass the Pydantic `AnimationPlan` schema, existing transcript-grounded planning rules, and deterministic renderer safe-area validation before the decision is consumed; invalid edits leave the approval pending.
+- Approval decisions use a conditional database update, so duplicate or concurrent decisions have exactly one winner. The persisted decision is recoverable if FastAPI stops before a resume runner starts.
+- Approve/edit resumes at `render`; reject becomes an auditable terminal state; pending approval can still use the existing cancellation API. Ordinary transcript editing is blocked while approval is pending so it cannot bypass the checkpoint contract.
+- Added true SSE/task events for `awaiting_approval`, `approved`, `edited`, `rejected`, and `resumed`. Agent Trace records the structured decision and non-terminal `awaiting_approval` status without storing internal reasoning or absolute paths.
+
+## P3 verification
+
+- Baseline before implementation: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `114 passed in 77.55s`.
+- Final targeted P3/Agent/API/database/safe-area tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -q tests\test_agent_approval.py tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_workflow_mode_api.py tests\test_task_database.py tests\test_quality.py` → `30 passed in 13.86s`.
+- Final full suite after manual-acceptance hardening: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `122 passed in 82.36s`, including the existing standard and Agent Mock FFmpeg/Remotion end-to-end renders.
+- A live API acceptance task `671c5354-1e23-4176-bc88-7ef2fe6cbce9` paused under `approval_policy=always`, returned a durable pending approval, resumed after approve, completed with each graph node exactly once, and produced a verified 4.0 s, 360×640 H.264/AAC result (83,234 bytes). Repeated approve returned HTTP 409.
+- Live API checks also confirmed a planning-rule-invalid edit returns HTTP 422 and remains pending, reject becomes terminal with download HTTP 404, and standard mode completes while ignoring `approval_policy=always`.
+- Manual testing exposed an approval-boundary gap: a schema/rule-valid edit could still violate the renderer safe area and fail at render. The API now runs the existing `validate_animation_safe_areas` before consuming approve/edit; live retest task `60a94d7e-0d39-4726-beff-c409d2e76f48` returned HTTP 422, remained pending at decision version 0, and never entered render.
+- `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic heads` → single head `0004_agent_approval`.
+- Renderer build was not required: P3 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema.
+- `git diff --check` passed. The user-owned untracked file `how 提交哈希` remains untouched.
+
+## P3 known limitations
+
+- P3 remains API-only by design. The existing page does not yet expose workflow/policy controls or an approval panel; that is exclusively P4 scope.
+- `on_risk` currently treats enabled visuals under external-media profiles as requiring both relevance and source/rights review. It does not yet calculate a learned numeric relevance threshold because candidate acquisition occurs later in the render service; richer per-candidate risk scoring belongs with later retrieval/eval stages.
+- Recovery and active-run mutual exclusion retain the current single-process local-runtime guarantee. Distributed leases, workers, and cross-process exactly-once execution remain P10 scope.
+- No real local LLM, faster-whisper model, or external media service was exercised. Approval and recovery tests are fully offline with deterministic Fake/Scripted services.
+
+## Recommended P3 manual acceptance
+
+1. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=agent`, `processing_profile=mock`, `media_provider=mock`, and `approval_policy=always`.
+2. Poll `GET /api/videos/{task_id}` until `status=awaiting_approval`; open `GET /api/videos/{task_id}/approval` and confirm `policy=always`, `status=pending`, reason `policy_always`, and a candidate plan.
+3. Restart FastAPI while the task is paused. Confirm it stays `awaiting_approval`, then call `POST /api/videos/{task_id}/approval/approve`; verify the task resumes and completes, and the event stream contains `awaiting_approval`, `approved`, and `resumed` without a second ASR/planning completion event.
+4. Create another `always` task and submit an invalid plan to `POST /api/videos/{task_id}/approval/edit`; expect HTTP 422 and a still-pending approval. Submit a valid grounded plan; expect HTTP 202 and completion from render.
+5. Create a third `always` task, call `/approval/reject`, and verify terminal `status=rejected`, no result render, a `rejected` event, and HTTP 409 from a repeated approve/edit/reject decision.
+6. Upload with `workflow_mode=standard` while supplying `approval_policy=always`; verify the standard task does not pause and its public `approval_policy` remains `null`.
+
+P3 was explicitly accepted for commit. P4 has not been started.
+
+- Current branch: `master`
 - Current commit before this stage: `c0108ba 实现可恢复 Agent 工作流基础`
 - Current stage: P2, director instruction, typed tools, and plan auto-repair - completed after user acceptance.
 
@@ -36,7 +80,7 @@
 4. Submit an Agent upload with more than 2,000 instruction characters; verify HTTP 422 and that no task directory/row is created. Submit the same oversized field in standard mode; verify it is ignored and the stable standard flow still starts.
 5. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py`; inspect the two scripted cases: invalid-first/valid-second completes with one retry, while persistent rule violations stop after exactly two repairs without rendering.
 
-P2 was explicitly accepted for commit. P3 has not been started.
+P2 was explicitly accepted for commit. At that acceptance point, P3 had not been started.
 
 ## P1 delivered
 

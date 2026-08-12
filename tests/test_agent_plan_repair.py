@@ -113,7 +113,7 @@ def test_invalid_first_plan_is_repaired_once_and_trace_is_redacted(isolated_data
     assert any(entry["event_type"] == "retry" for entry in trace["entries"])
 
 
-def test_persistent_invalid_plan_stops_after_two_repairs(isolated_database: Path) -> None:
+def test_persistent_invalid_plan_stops_after_two_repairs_for_human_approval(isolated_database: Path) -> None:
     task_id = "agent-repair-exhausted"
     task_dir = _create_task(isolated_database, task_id)
     services = ScriptedPlannerServices([invalid_rule_candidate()])
@@ -130,12 +130,9 @@ def test_persistent_invalid_plan_stops_after_two_repairs(isolated_database: Path
         checkpoint_store=AgentCheckpointStore.for_storage_root(isolated_database),
     )
 
-    assert checkpoint["run_status"] == "failed"
-    assert checkpoint["next_node"] == "validation"
-    assert checkpoint["state"]["failure"] == {
-        "node": "validation",
-        "error_category": "plan_repair_exhausted",
-    }
+    assert checkpoint["run_status"] == "awaiting_approval"
+    assert checkpoint["next_node"] == "render"
+    assert checkpoint["state"]["approval_reasons"][0]["code"] == "plan_repair_exhausted"
     assert [item.repair_attempt for item in services.planning_inputs] == [0, 1, 2]
     assert all(
         item.violations[0].code == "planning_rule"
@@ -143,11 +140,14 @@ def test_persistent_invalid_plan_stops_after_two_repairs(isolated_database: Path
     )
     assert services.calls.count("render") == 0
     task = database.get_task(task_id)
-    assert task["status"] == "failed"
-    assert "after 2 retries" in task["error"]
+    assert task["status"] == "awaiting_approval"
+    approval = database.get_agent_approval(task_id)
+    assert approval["status"] == "pending"
+    assert approval["candidate_plan"] is None
+    assert approval["violations"][0]["code"] == "planning_rule"
     trace = read_agent_trace(task_dir, task_id)
     assert trace["summary"] == {
-        "status": "failed",
+        "status": "awaiting_approval",
         "retry_count": 2,
         "last_failure_category": "plan_repair_exhausted",
     }

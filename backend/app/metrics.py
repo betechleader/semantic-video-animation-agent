@@ -138,7 +138,7 @@ class TaskMetrics:
         self._save(payload)
 
     def finalize(self, attempt_number: int, status: str, *, failure_category: str | None = None, output_quality: dict | None = None) -> None:
-        if status not in {"completed", "failed", "cancelled"}:
+        if status not in {"completed", "failed", "cancelled", "rejected"}:
             raise ValueError("Metrics status must be terminal")
         payload = self._load()
         attempt = self._attempt(payload, attempt_number)

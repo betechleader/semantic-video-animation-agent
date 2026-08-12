@@ -22,6 +22,8 @@ from typing import Any
 from . import config
 from .database import (
     append_task_event,
+    create_pending_approval,
+    get_agent_approval,
     get_task,
     is_cancellation_requested,
     list_recoverable_agent_tasks,
@@ -307,6 +309,7 @@ def _new_state(context: _RunContext, director_instruction: str | None) -> dict:
         "plan": None,
         "repair_attempts": 0,
         "validation_violations": [],
+        "approval_reasons": [],
         "quality": None,
     }
 
@@ -634,18 +637,26 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
             violations = _merge_violations(planner_violations, violations)
         if validated is None:
             codes = sorted({item.code for item in violations})
-            context.agent_trace.finalize(
-                "failed",
-                retry_count=repair_attempt,
-                failure_category="plan_repair_exhausted",
-            )
-            raise PlanRepairExhausted(repair_attempt, codes)
+            return {
+                **state,
+                "plan_candidate": candidate,
+                "plan": None,
+                "repair_attempts": repair_attempt,
+                "validation_violations": [item.model_dump() for item in violations],
+                "approval_reasons": [{
+                    "code": "plan_repair_exhausted",
+                    "message": "Automatic plan repair was exhausted; a validated edit is required",
+                    "details": {"retry_count": repair_attempt, "violation_codes": codes[:20]},
+                }],
+            }
+        validated_plan = AnimationPlan.model_validate(validated)
         return {
             **state,
             "plan_candidate": candidate,
-            "plan": AnimationPlan.model_validate(validated).model_dump(),
+            "plan": validated_plan.model_dump(),
             "repair_attempts": repair_attempt,
             "validation_violations": [],
+            "approval_reasons": _approval_reasons(context, validated_plan),
         }
     if node == "render":
         _transition(context, TaskStatus.RENDERING, "Agent is rendering animation and compositing video")
@@ -679,6 +690,142 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
         plan()
         return state
     raise AgentWorkflowError(f"Unknown Agent node: {node}")
+
+
+def _approval_reasons(context: _RunContext, plan: AnimationPlan) -> list[dict]:
+    task = get_task(context.task_id) or {}
+    policy = task.get("approval_policy") or "never"
+    if policy == "always":
+        return [{
+            "code": "policy_always",
+            "message": "The configured approval policy requires review before rendering",
+            "details": {},
+        }]
+    if policy != "on_risk":
+        return []
+    external_visual_count = sum(
+        1
+        for animation in plan.animations
+        if animation.type == "media_visual"
+        and animation.parameters.enabled
+        and plan.media_provider in {"knowledge", "wikimedia_commons", "pexels", "manual"}
+    )
+    if not external_visual_count:
+        return []
+    return [
+        {
+            "code": "media_relevance_unverified",
+            "message": "External media relevance has not yet been confirmed by a reviewer",
+            "details": {"visual_count": external_visual_count},
+        },
+        {
+            "code": "external_media_rights_review",
+            "message": "External media source and rights information requires human review",
+            "details": {"visual_count": external_visual_count},
+        },
+    ]
+
+
+def _persist_approval_pause(context: _RunContext, state: dict) -> None:
+    reasons = state.get("approval_reasons", [])
+    task = get_task(context.task_id) or {}
+    create_pending_approval(
+        context.task_id,
+        task.get("approval_policy") or "never",
+        reasons,
+        state.get("plan"),
+        state.get("validation_violations", []),
+    )
+    _transition(
+        context,
+        TaskStatus.AWAITING_APPROVAL,
+        "Agent workflow is awaiting human approval",
+        transcript=Transcript.model_validate(state["transcript"]).model_dump(),
+        plan=state.get("plan"),
+    )
+    append_task_event(
+        context.task_id,
+        "awaiting_approval",
+        "Agent workflow is awaiting human approval",
+        {
+            "thread_id": context.task_id,
+            "reason_codes": [item.get("code") for item in reasons],
+            "retry_count": int(state.get("repair_attempts", 0)),
+        },
+        dedupe_key="agent:awaiting_approval",
+    )
+    reason_codes = [item.get("code") for item in reasons]
+    context.agent_trace.set_status(
+        "awaiting_approval",
+        retry_count=int(state.get("repair_attempts", 0)),
+        failure_category=(
+            "plan_repair_exhausted" if "plan_repair_exhausted" in reason_codes else None
+        ),
+    )
+
+
+def _apply_persisted_decision(
+    context: _RunContext,
+    store: AgentCheckpointStore,
+    checkpoint: dict,
+    state: dict,
+) -> tuple[dict, dict] | None:
+    approval = get_agent_approval(context.task_id)
+    if approval is None or approval["status"] == "pending":
+        return None
+    decision = approval["status"]
+    context.agent_trace.append(
+        "approval_decision",
+        node="validation",
+        status=decision,
+        input_summary={"decision_version": approval["decision_version"]},
+        output_summary={"resume_node": None if decision == "rejected" else "render"},
+        retry_count=int(state.get("repair_attempts", 0)),
+    )
+    if decision == "rejected":
+        rejected_state = {**state, "approval_decision": "rejected"}
+        rejected = store.save(
+            context.task_id,
+            rejected_state,
+            next_node=None,
+            run_status="rejected",
+            expected_version=checkpoint["checkpoint_version"],
+        )
+        _transition(context, TaskStatus.REJECTED, "Agent plan was rejected")
+        context.metrics.finalize(
+            context.attempt, TaskStatus.REJECTED.value, failure_category="human_rejected"
+        )
+        context.agent_trace.finalize(
+            "rejected",
+            retry_count=int(state.get("repair_attempts", 0)),
+            failure_category="human_rejected",
+        )
+        return rejected, rejected_state
+    approved_plan = approval.get("candidate_plan")
+    if approved_plan is None:
+        raise AgentWorkflowError("Approved Agent decision has no validated plan")
+    updated = {
+        **state,
+        "plan_candidate": approved_plan,
+        "plan": AnimationPlan.model_validate(approved_plan).model_dump(),
+        "validation_violations": [],
+        "approval_decision": decision,
+    }
+    resumed = store.save(
+        context.task_id,
+        updated,
+        next_node="render",
+        run_status="running",
+        expected_version=checkpoint["checkpoint_version"],
+    )
+    append_task_event(
+        context.task_id,
+        "resumed",
+        "Agent workflow resumed after human approval",
+        {"thread_id": context.task_id, "decision": decision, "node": "render"},
+        dedupe_key=f"agent:approval_resumed:{approval['decision_version']}",
+    )
+    return resumed, updated
 
 
 def _should_interrupt(interrupt_after: InterruptAfter, node: str, state: dict) -> bool:
@@ -785,6 +932,7 @@ def _record_unhandled_runner_failure(task_id: str, exc: Exception) -> None:
         TaskStatus.COMPLETED.value,
         TaskStatus.FAILED.value,
         TaskStatus.CANCELLED.value,
+        TaskStatus.REJECTED.value,
     }:
         return
     error_category = exc.__class__.__name__
@@ -858,6 +1006,28 @@ def run_agent_task(
     if checkpoint["run_status"] in {"completed", "cancelled", "failed"}:
         _reconcile_terminal_checkpoint(context, checkpoint)
         return checkpoint
+    if checkpoint["run_status"] == "rejected":
+        task = get_task(context.task_id)
+        if task and task["status"] != TaskStatus.REJECTED.value:
+            _transition(context, TaskStatus.REJECTED, "Agent plan was rejected")
+        return checkpoint
+    if checkpoint["run_status"] == "awaiting_approval":
+        if is_cancellation_requested(task_id):
+            checkpoint = store.save(
+                task_id,
+                state,
+                next_node=checkpoint["next_node"],
+                run_status="cancelled",
+                expected_version=checkpoint["checkpoint_version"],
+            )
+            _reconcile_terminal_checkpoint(context, checkpoint)
+            return checkpoint
+        applied = _apply_persisted_decision(context, store, checkpoint, state)
+        if applied is None:
+            return checkpoint
+        checkpoint, state = applied
+        if checkpoint["run_status"] == "rejected":
+            return checkpoint
     if existing is not None:
         _resumed_event(context, checkpoint)
 
@@ -899,6 +1069,16 @@ def run_agent_task(
             )
             state = updated
             _node_event(context, node, "completed", checkpoint["checkpoint_version"])
+            if node == "validation" and updated.get("approval_reasons"):
+                checkpoint = store.save(
+                    task_id,
+                    updated,
+                    next_node=next_node,
+                    run_status="awaiting_approval",
+                    expected_version=checkpoint["checkpoint_version"],
+                )
+                _persist_approval_pause(context, updated)
+                return checkpoint
             if interrupted:
                 return checkpoint
         except ProcessingCancelled:
@@ -1027,7 +1207,10 @@ def resume_agent_task(
     task = get_task(task_id)
     if task is None or task.get("workflow_mode") != "agent":
         return None
-    if task["status"] in {status.value for status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED)}:
+    if task["status"] in {
+        status.value
+        for status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.REJECTED)
+    }:
         return None
     root = (storage_root or config.STORAGE_ROOT).resolve()
     metadata = VideoMetadata.model_validate(task["metadata"])

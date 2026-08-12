@@ -79,12 +79,15 @@ After a result is ready, the advanced review tabs expose the transcript and plan
 
 - `POST /api/videos` uploads an MP4 and returns `202` plus a task ID. Multipart field `workflow_mode=standard|agent` defaults to `standard`; `processing_profile=configured|real|mock` and `media_provider=mock|manual|knowledge|wikimedia_commons|pexels` keep their existing task-local meanings.
 - Agent uploads may also include `director_instruction` (maximum 2,000 characters). Standard uploads discard this Agent-only field and keep their original behavior.
+- Agent uploads accept `approval_policy=never|on_risk|always` (default `never`). Standard uploads ignore this Agent-only policy.
 - `GET /api/videos/{task_id}` returns metadata, transcript, plan, and status.
 - `GET /api/videos/{task_id}/media` returns adopted assets, use intervals, and stored candidates.
 - `POST /api/videos/{task_id}/media/search` searches the configured provider with `{query, asset_kind}`.
 - `POST /api/videos/{task_id}/media/candidates` adds a manual candidate URL.
 - `GET /api/videos/{task_id}/metrics` returns the privacy-safe metrics report.
 - `GET /api/videos/{task_id}/agent-trace` returns the Agent-only, privacy-safe planning/validation audit with planner identifiers, retry count, structured violations, and call durations.
+- `GET /api/videos/{task_id}/approval` returns the durable pending or decided Agent approval record.
+- `POST /api/videos/{task_id}/approval/approve`, `/edit`, and `/reject` persist one atomic human decision. Edit accepts `{ "plan": AnimationPlan }` and repeats schema plus planning-rule validation before resume.
 - `GET /api/videos/{task_id}/download` downloads completed `result.mp4`.
 - `GET /api/videos/{task_id}/events` streams status events; `POST /api/videos/{task_id}/cancel` cancels an active task.
 - `PUT /api/videos/{task_id}/transcript` edits the transcript; `POST /api/videos/{task_id}/review` validates and re-renders the transcript/plan.
@@ -95,6 +98,8 @@ In Agent mode, planning and validation run behind Pydantic typed tool envelopes.
 
 `workflow_mode=agent` is the API-only recoverable path introduced in P1; the existing page continues to use the stable `standard` path. The Agent executes `upload_probe → audio_asr → correction → planning → validation → render → quality → complete`, emits real `agent_node` SSE events, and uses the task ID as its thread/run ID. JSON checkpoints are transactionally stored in the separate `storage/agent_checkpoints.sqlite3` database after each successful node. On a single-process FastAPI restart, unfinished Agent tasks resume at their next checkpointed node; already completed nodes are not replayed. A node interrupted before its checkpoint is committed can run again with at-least-once semantics.
 
+P3 adds a durable human approval boundary after validation. `always` pauses every valid plan; `on_risk` pauses plans using external-media profiles for relevance/source-rights review; exhausted automatic plan repair also pauses and requires a valid edited plan. Pending approvals survive FastAPI restart. Approve/edit resumes from `render` without replaying ASR or planning, reject becomes a durable terminal state, and a conditional database update ensures concurrent or repeated decisions cannot start two renders. SSE includes `awaiting_approval`, `approved`, `edited`, `rejected`, and `resumed` events without exposing internal reasoning.
+
 ## Provenance, safety, and quality
 
 Every adopted asset is downloaded into `media-assets/`; the plan and `media_assets.json` record the provider, search query, download/source-page URLs, acquisition time, SHA-256 digest, MIME type, and exact use interval. Remotion receives only a hash-verified task-local data URI. When no candidate is available, it uses a designed original concept graphic rather than a simple book SVG placeholder.
@@ -103,7 +108,7 @@ Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` re
 
 ## Verification
 
-Current P2 verification: `114 passed`, including standard and `agent+mock` FFmpeg/Remotion pipelines, checkpoint restart coverage, typed planning/validation tools, bounded repair, director-instruction isolation, and privacy-safe Agent Trace coverage. P2 did not change TypeScript, Remotion source, the renderer contract, or the `AnimationPlan` schema, so no new renderer build was required.
+Current P3 verification: `122 passed`, including standard and `agent+mock` FFmpeg/Remotion pipelines, approval pause/restart/resume, bounded repair escalation, edit validation including renderer safe areas, rejection, cancellation, concurrent decision safety, and Agent Trace/SSE coverage. P3 did not change TypeScript, Remotion source, the renderer contract, or the `AnimationPlan` schema, so no new renderer build was required.
 
 ```powershell
 D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv

@@ -161,7 +161,13 @@ def isolated_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         database._engine.dispose()
 
 
-def _create_task(storage_root: Path, task_id: str, *, workflow_mode: str = "agent") -> Path:
+def _create_task(
+    storage_root: Path,
+    task_id: str,
+    *,
+    workflow_mode: str = "agent",
+    approval_policy: str = "never",
+) -> Path:
     task_dir = storage_root / task_id
     task_dir.mkdir(parents=True)
     (task_dir / "source.mp4").write_bytes(b"offline-source")
@@ -172,6 +178,7 @@ def _create_task(storage_root: Path, task_id: str, *, workflow_mode: str = "agen
         workflow_mode=workflow_mode,
         processing_profile="mock",
         media_provider="mock",
+        approval_policy=approval_policy,
     )
     return task_dir
 
