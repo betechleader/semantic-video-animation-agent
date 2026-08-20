@@ -48,7 +48,18 @@ The rule-based planner keeps transcript-grounded trigger text for timing but sep
 
 > **External-material prototype, not suitable for direct commercial publication.**
 
-`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` remain the server/configuration defaults, so tests and the baseline work without a model service or network. The browser overrides those defaults per upload with its recommended real profile. `ASR_PROVIDER=faster_whisper` plus `PLANNER_PROVIDER=rule_based` uses local CPU ASR with real word timings; emphasized phrases are anchored to the matching word span instead of the beginning of the containing ASR segment. `PLANNER_PROVIDER=local_llm` is restricted to a loopback OpenAI-compatible endpoint.
+`ASR_PROVIDER=mock` and `PLANNER_PROVIDER=mock` remain the server/configuration defaults, so tests and the baseline work without a model service or network. The browser overrides those defaults per upload with its recommended real profile. `ASR_PROVIDER=faster_whisper` plus `PLANNER_PROVIDER=rule_based` uses local CPU ASR with real word timings; emphasized phrases are anchored to the matching word span instead of the beginning of the containing ASR segment. `PLANNER_PROVIDER=local_llm` remains restricted to a loopback OpenAI-compatible endpoint.
+
+DeepSeek is an optional configured Planner. Its endpoint is fixed in code to the official `https://api.deepseek.com/chat/completions`; `PLANNER_BASE_URL` cannot redirect it. The credential is read only from `DEEPSEEK_API_KEY` at request time and is not retained in `Settings` or Provider state. `DEEPSEEK_MODEL` is non-secret and defaults to `deepseek-v4-flash`. The Provider uses the same schema, transcript-grounding validation, and bounded Agent repair protocol as `local_llm`:
+
+```powershell
+$env:PLANNER_PROVIDER = 'deepseek'
+$env:DEEPSEEK_API_KEY = '...'
+# Optional non-secret model override:
+$env:DEEPSEEK_MODEL = 'deepseek-v4-flash'
+```
+
+Select the browser's **configured** processing profile to use this server setting. The existing `standard|agent` workflow choice, explicit `mock` profile, `real` local rule-planning profile, and `local_llm` Provider behavior are unchanged. DeepSeek is a remote semantic service: it receives the corrected transcript and, in Agent mode, the optional director instruction and structured repair violations. It never receives the source video, audio, media bytes, API key in the JSON body, or task-local Trace. Provider failures are converted to fixed safe messages before task persistence; tests use a fully mocked HTTP boundary and make no live DeepSeek request. See the [official DeepSeek API documentation](https://api-docs.deepseek.com/api/create-chat-completion).
 
 External B-roll is optional and never becomes a factual source:
 
@@ -94,7 +105,7 @@ After a result is ready, the advanced review tabs expose the transcript and plan
 
 Runtime files live under `storage/{task_id}/`: source/audio, `remotion_props.json`, `animation.mov`, ASS fallback subtitles, `result.mp4`, `quality.json`, `face_safe_areas.json`, `media_candidates.json`, `media_assets.json`, and `metrics.json`. Props stay in the task-local file, so no complete plan or base64 media is placed on the Windows command line.
 
-In Agent mode, planning and validation run behind Pydantic typed tool envelopes. Every candidate is validated first as `AnimationPlan` and then with the transcript-grounded `planning_rules`. Structured violations are returned to a repair-capable planner for at most two repair calls. Exhaustion produces a terminal, auditable failure; there is no unbounded retry loop. The task-local `agent_trace.json` records only call metadata and bounded summaries—it excludes transcript/director text, plan bodies, absolute paths, media content, and exception messages. Deterministic Mock/rule planners remain offline; only the configured loopback local-LLM planner interprets free-form director instructions.
+In Agent mode, planning and validation run behind Pydantic typed tool envelopes. Every candidate is validated first as `AnimationPlan` and then with the transcript-grounded `planning_rules`. Structured violations are returned to a repair-capable planner for at most two repair calls. Exhaustion produces a terminal, auditable failure; there is no unbounded retry loop. The task-local `agent_trace.json` records only call metadata and bounded summaries—it excludes transcript/director text, plan bodies, absolute paths, media content, credentials, and exception messages. Deterministic Mock/rule planners remain offline; configured `local_llm` and DeepSeek planners interpret free-form director instructions.
 
 `workflow_mode=agent` is the recoverable path introduced in P1. The existing semantic-video upload area now lets the user choose stable `standard` or `agent`; Agent-only fields expose the optional director instruction and approval policy without changing the home tool catalog. The Agent executes `upload_probe → audio_asr → correction → planning → validation → render → quality → complete`, emits real `agent_node` SSE events, and uses the task ID as its thread/run ID. JSON checkpoints are transactionally stored in the separate `storage/agent_checkpoints.sqlite3` database after each successful node. On a single-process FastAPI restart, unfinished Agent tasks resume at their next checkpointed node; already completed nodes are not replayed. A node interrupted before its checkpoint is committed can run again with at-least-once semantics.
 

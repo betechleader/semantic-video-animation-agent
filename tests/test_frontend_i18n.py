@@ -41,6 +41,14 @@ def test_frontend_exposes_persistent_chinese_english_switch() -> None:
     assert "refs.settingsLanguage.addEventListener('change'" in script
 
 
+def test_translation_overrides_use_existing_locale_keys() -> None:
+    script = SCRIPT.read_text(encoding="utf-8")
+
+    assert "translations['zh-CN'].settingPrivacyNote" in script
+    assert "translations.en.settingPrivacyNote" in script
+    assert "translations.zh.settingPrivacyNote" not in script
+
+
 def test_all_static_translation_keys_exist_in_both_languages() -> None:
     html = HTML.read_text(encoding="utf-8")
     static_keys = set(re.findall(r'data-i18n(?:-placeholder|-aria-label)?="([A-Za-z0-9_]+)"', html))

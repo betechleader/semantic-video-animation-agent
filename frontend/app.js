@@ -54,6 +54,9 @@
     },
   };
 
+  translations['zh-CN'].settingPrivacyNote = '默认语音识别与渲染在本机完成；外部素材模式会访问所选素材服务，配置为 DeepSeek 时会把校正后转录与可选 Agent 指令发送给 DeepSeek。';
+  translations.en.settingPrivacyNote = 'Speech recognition and rendering stay local by default; external media modes contact their provider, and configured DeepSeek planning sends the corrected transcript and optional Agent instruction to DeepSeek.';
+
   window.APP_I18N = translations;
 
   const NAV_ITEMS = [

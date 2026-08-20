@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from types import SimpleNamespace
 from pathlib import Path
@@ -424,6 +425,159 @@ Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only v
             return validate_animation_plan(plan, transcript)
         except (ValidationError, PlanningRuleError, RuntimeError) as exc:
             raise RuntimeError(f"Local LLM returned an invalid animation plan: {exc}") from exc
+
+
+DEEPSEEK_CHAT_COMPLETIONS_ENDPOINT = "https://api.deepseek.com/chat/completions"
+
+
+class DeepSeekAnimationPlanningProvider:
+    """Plan through DeepSeek's fixed official OpenAI-compatible endpoint.
+
+    The credential is deliberately read at request time from DEEPSEEK_API_KEY.
+    It is never accepted as a constructor argument or retained on the provider.
+    """
+
+    def __init__(self, model: str = "deepseek-v4-flash", timeout_seconds: int = 60) -> None:
+        if not model.strip():
+            raise ValueError("DeepSeek model must not be empty")
+        if timeout_seconds <= 0:
+            raise ValueError("planner timeout must be positive")
+        self.model = model
+        self.endpoint = DEEPSEEK_CHAT_COMPLETIONS_ENDPOINT
+        self.timeout_seconds = timeout_seconds
+
+    @staticmethod
+    def _safe_request_error(category: str) -> RuntimeError:
+        return RuntimeError(f"DeepSeek planning request failed ({category})")
+
+    def _request_content(self, payload: dict[str, Any]) -> str:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "DEEPSEEK_API_KEY is required for PLANNER_PROVIDER=deepseek"
+            )
+
+        response = None
+        request_failure: str | None = None
+        try:
+            response = requests.post(
+                self.endpoint,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=self.timeout_seconds,
+            )
+            response.raise_for_status()
+        except requests.HTTPError:
+            status_code = getattr(response, "status_code", None)
+            request_failure = (
+                f"http_{status_code}"
+                if isinstance(status_code, int) and 400 <= status_code <= 599
+                else "http_error"
+            )
+        except requests.exceptions.Timeout:
+            request_failure = "timeout"
+        except requests.exceptions.ProxyError:
+            request_failure = "proxy_error"
+        except requests.exceptions.SSLError:
+            request_failure = "tls_error"
+        except requests.exceptions.ConnectionError:
+            request_failure = "connection_error"
+        except requests.RequestException:
+            request_failure = "request_error"
+        except Exception as exc:
+            # The HTTP boundary is untrusted. Never retain or propagate an
+            # exception object that may reference the prepared auth headers.
+            request_failure = f"client_{exc.__class__.__name__.lower()}"
+        finally:
+            # Do not retain the secret in provider state or in locals used by a
+            # subsequently raised application exception.
+            api_key = None
+
+        if request_failure is not None:
+            response = None
+            raise self._safe_request_error(request_failure)
+
+        response_invalid = False
+        content: Any = None
+        try:
+            content = response.json()["choices"][0]["message"]["content"]
+        except Exception:
+            # Some response adapters retain the raw body on parse failures.
+            # Replace all such failures with a body-free application error.
+            response_invalid = True
+        if response_invalid:
+            response = None
+            raise RuntimeError("DeepSeek returned an invalid response envelope")
+        if not isinstance(content, str):
+            content = None
+            raise RuntimeError("DeepSeek response content must be text")
+        return content
+
+    @staticmethod
+    def _extract_candidate_json(content: str) -> dict[str, Any]:
+        value = content.strip()
+        if value.startswith("```"):
+            value = value.split("\n", 1)[1] if "\n" in value else ""
+            if value.rstrip().endswith("```"):
+                value = value.rstrip()[:-3]
+
+        parsed: Any = None
+        invalid_json = False
+        try:
+            parsed = json.loads(value.strip())
+        except json.JSONDecodeError:
+            invalid_json = True
+        if invalid_json or not isinstance(parsed, dict):
+            # Clear untrusted response data before raising a traceback-visible
+            # application error.
+            content = ""
+            value = ""
+            parsed = None
+            raise RuntimeError("DeepSeek returned invalid JSON")
+        return parsed
+
+    def plan_candidate(
+        self,
+        transcript: Transcript,
+        *,
+        director_instruction: str | None = None,
+        violations: list[dict[str, Any]] | None = None,
+        repair_attempt: int = 0,
+    ) -> dict[str, Any]:
+        content = self._request_content(
+            {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": LocalLlmAnimationPlanningProvider._prompt(
+                            transcript,
+                            director_instruction,
+                            violations,
+                            repair_attempt,
+                        ),
+                    }
+                ],
+                "temperature": 0.2,
+                "response_format": {"type": "json_object"},
+                "max_tokens": 8192,
+            }
+        )
+        return self._extract_candidate_json(content)
+
+    def plan(self, transcript: Transcript) -> AnimationPlan:
+        invalid_plan = False
+        try:
+            plan = AnimationPlan.model_validate(self.plan_candidate(transcript))
+            return validate_animation_plan(plan, transcript)
+        except (ValidationError, PlanningRuleError):
+            invalid_plan = True
+        if invalid_plan:
+            raise RuntimeError("DeepSeek returned an invalid animation plan")
+        raise AssertionError("unreachable")
 
 
 class FasterWhisperProvider:

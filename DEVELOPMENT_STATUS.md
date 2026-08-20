@@ -1,8 +1,33 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this stage: `068d8fb 实现 Agent 人工审批与恢复`
-- Current stage: P4, Agent mode in the existing page - completed after explicit user acceptance and approved for commit.
+- Current commit before this work: `f1fd257 接入 Agent 模式与人工审批前端`
+- Current stage: DeepSeek Planner Provider - completed after user acceptance and approved for commit.
+
+## DeepSeek Planner Provider delivered
+
+- Added `PLANNER_PROVIDER=deepseek` without changing `standard|agent` workflow selection, the `mock` and `real` processing profiles, or the existing loopback-only `local_llm` Provider. The configured profile resolves DeepSeek through the same standard and Agent planning boundaries.
+- Fixed the remote endpoint to the official `https://api.deepseek.com/chat/completions`; no environment variable, constructor parameter, upload field, or request data can override the host. `DEEPSEEK_MODEL` is a non-secret model selector and defaults to `deepseek-v4-flash`.
+- The credential is read only from `DEEPSEEK_API_KEY` immediately before a request. It is not part of the `Settings` dataclass, Provider state, request JSON, model/planner identifiers, task data, metrics, or Agent Trace.
+- Reused the existing structured planning prompt, schema, transcript grounding, and bounded repair flow. DeepSeek requests explicitly ask for a JSON object and standard planning still performs the independent trust-boundary validation before rendering.
+- Added safe failure normalization: upstream request details and untrusted response bodies are discarded before raising application errors. Planner tool violations, persisted task failures, logs, formatted tracebacks, and `agent_trace.json` receive only bounded categories or fixed messages.
+- Safe request failures retain only actionable categories such as `http_401`, `timeout`, `proxy_error`, or `client_unicodeencodeerror`; response bodies, URLs, headers, exception messages, and credentials remain excluded. This diagnosed a malformed PowerShell-session key without exposing its value.
+- Updated the bilingual upload privacy note and README to disclose that selecting a configured remote planner sends corrected transcript data and, for Agent tasks, the optional director instruction and repair violations to DeepSeek.
+- Corrected the Chinese locale override to use the existing `zh-CN` key. A regression test now prevents an invalid locale property from stopping navigation and click-handler initialization.
+
+## DeepSeek verification
+
+- Targeted provider/local-LLM/Agent regression suite: `20 passed in 7.83s`.
+- Final full Python suite: `134 passed in 82.35s`, including real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
+- Eight DeepSeek tests are fully offline: the HTTP call is mocked and they cover the fixed official endpoint, `DEEPSEEK_API_KEY` exclusivity, missing-key no-network behavior, safe HTTP/transport/client error categories, JSON request/response handling, existing profile compatibility, Agent repair metadata, and absence of a sentinel secret from Provider/Settings state, request JSON, exceptions, formatted traceback, logs, typed tool output, and Agent Trace.
+- Frontend syntax validation passed; the 12-test frontend suite includes the locale-key/navigation regression.
+- Standard `npm.cmd run build` reached the already documented Windows lock on `animation-renderer/build` (`EPERM`). The equivalent isolated bundle command completed successfully at `storage/renderer_build_validation_deepseek_commit` without deleting or overwriting the locked directory.
+- A minimal authenticated request and the complete structured Planner request both returned HTTP 200 against the fixed official endpoint. Configured DeepSeek planning then completed a real 94.36-second standard task and produced a verified 17.7 MB result; no credential was printed or persisted.
+
+## DeepSeek known limitations
+
+- DeepSeek transport and one end-to-end configured task were live-tested, but semantic quality across real ASR transcripts, latency distributions, quota behavior, and model comparisons remain unevaluated. Runtime use requires network access and a valid account key.
+- Selecting DeepSeek changes the semantic-planning privacy boundary from local to remote. Video/audio/rendering remain local, but corrected transcript and optional Agent direction are sent to DeepSeek as documented.
 
 ## P4 delivered
 

@@ -8,6 +8,7 @@ from .config import MODEL_ROOT, SETTINGS
 from .processing import ProcessingError
 from .providers import (
     AnimationPlanningProvider,
+    DeepSeekAnimationPlanningProvider,
     FasterWhisperProvider,
     LocalLlmAnimationPlanningProvider,
     MockAnimationPlanningProvider,
@@ -59,7 +60,14 @@ def resolve_planning_provider(processing_profile: str = "configured") -> Animati
             SETTINGS.planner_base_url,
             SETTINGS.planner_timeout_seconds,
         )
-    raise ProcessingError("PLANNER_PROVIDER must be mock, rule_based, or local_llm")
+    if planner_name == "deepseek":
+        return DeepSeekAnimationPlanningProvider(
+            SETTINGS.deepseek_model,
+            SETTINGS.planner_timeout_seconds,
+        )
+    raise ProcessingError(
+        "PLANNER_PROVIDER must be mock, rule_based, local_llm, or deepseek"
+    )
 
 
 def extract_audio(task_dir: Path, metadata: VideoMetadata) -> Path:
@@ -110,12 +118,24 @@ def plan_agent_candidate(
         if isinstance(planner, MockAnimationPlanningProvider)
         else "rule_based"
         if isinstance(planner, TranscriptAnimationPlanningProvider)
+        else "deepseek"
+        if isinstance(planner, DeepSeekAnimationPlanningProvider)
         else "local_llm"
     )
-    model_id = SETTINGS.planner_model if isinstance(planner, LocalLlmAnimationPlanningProvider) else None
+    model_id = (
+        planner.model
+        if isinstance(
+            planner,
+            (LocalLlmAnimationPlanningProvider, DeepSeekAnimationPlanningProvider),
+        )
+        else None
+    )
 
     def generate(value: PlanningToolInput):
-        if isinstance(planner, LocalLlmAnimationPlanningProvider):
+        if isinstance(
+            planner,
+            (LocalLlmAnimationPlanningProvider, DeepSeekAnimationPlanningProvider),
+        ):
             candidate = planner.plan_candidate(
                 value.transcript,
                 director_instruction=value.director_instruction,

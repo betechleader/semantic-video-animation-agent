@@ -23,6 +23,7 @@ class Settings:
     planner_provider: str
     planner_model: str
     planner_base_url: str
+    deepseek_model: str
     planner_timeout_seconds: int
     media_provider: str
     media_search_timeout_seconds: int
@@ -46,6 +47,7 @@ def load_settings() -> Settings:
         planner_provider=os.getenv("PLANNER_PROVIDER", "mock"),
         planner_model=os.getenv("PLANNER_MODEL", "qwen2.5:7b-instruct"),
         planner_base_url=os.getenv("PLANNER_BASE_URL", "http://127.0.0.1:11434/v1"),
+        deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         planner_timeout_seconds=int(os.getenv("PLANNER_TIMEOUT_SECONDS", "60")),
         media_provider=os.getenv("MEDIA_PROVIDER", "mock").lower(),
         media_search_timeout_seconds=int(os.getenv("MEDIA_SEARCH_TIMEOUT_SECONDS", "20")),
