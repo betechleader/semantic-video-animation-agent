@@ -1,6 +1,47 @@
 # Development Status
 
 - Current branch: `master`
+- Current commit before this stage: `068d8fb 实现 Agent 人工审批与恢复`
+- Current stage: P4, Agent mode in the existing page - completed after explicit user acceptance and approved for commit.
+
+## P4 delivered
+
+- Extended the existing semantic-video upload settings rather than adding a home card or redesigning the site. `workflow_mode` defaults to `standard`; selecting `agent` reveals the optional 2,000-character director instruction and `never|on_risk|always` approval policy. Standard submits do not send either Agent-only field.
+- Preserved the existing standard progress UI and behavior. Agent tasks hide its estimated percentage and four broad stages, then render `upload_probe → audio_asr → correction → planning → validation → render → quality → complete` from real `agent_node` SSE payloads, including started, resumed, completed, failed, checkpoint version, and safe error-category state.
+- Added a durable approval panel driven by `GET /approval`. It shows structured reason codes and the server-owned candidate plan, then calls the existing approve/edit/reject endpoints. Edit parses JSON locally for immediate feedback, while authoritative schema, transcript grounding, planning rules, and renderer safe-area validation remain on the server.
+- Added a completed-result Agent Trace tab backed by `GET /agent-trace`. It exposes privacy-safe planner identity, retry count, node/tool status, durations, and structured violation codes without rendering transcript/director content, plan bodies, absolute paths, raw exceptions, or chain of thought.
+- Added refresh/restore handling for `awaiting_approval`, `rejected`, active, and completed Agent tasks. Terminal Agent task event history is replayed through the existing SSE endpoint so a refreshed result reconstructs real node states rather than a fabricated progress snapshot.
+- Preserved bilingual translation parity, keyboard-accessible tabs and buttons, visible alert/status regions, reduced-motion behavior, and mobile stacking for node and approval controls.
+
+## P4 verification
+
+- Modification baseline: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `122 passed in 100.24s`.
+- Targeted frontend/workflow/approval/recovery tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_frontend_i18n.py tests\test_workflow_mode_api.py tests\test_agent_approval.py tests\test_agent_workflow.py` → `29 passed in 11.24s`.
+- Final full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `125 passed in 82.74s`, including both real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
+- Live local API/UI-contract task `6a441123-c948-495d-89b5-0ba057db98e2` used `agent + mock + approval_policy=always` with a director instruction. It paused durably at approval after validation, returned the candidate plan and redacted Trace, accepted one approval, emitted one `resumed` event, then executed only render/quality/complete and produced a verified 4.0 s 360×640 result (82,006 bytes). Its event history contains all eight node completions and no repeated ASR/planning after approval.
+- The result preview returned HTTP `206 Partial Content`, `Content-Disposition: inline`, and a 32-byte requested range, confirming the existing stable preview contract.
+- `node.exe --check frontend\app.js` passed. P4 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema, so the renderer build was not required by the stage verification rule.
+- The Browser skill could not start because the desktop runtime rejected its installed internal Browser service path as outside the configured trusted code path. No alternate browser automation was used; interactive viewport/click validation remains a manual acceptance item.
+
+## P4 known limitations
+
+- Browser-driven clicking and computed 390 px overflow measurement were not completed in this window because the required Browser skill failed its runtime trust-path bootstrap. Static responsive/accessibility tests pass, but desktop and mobile visual QA still needs the manual acceptance below.
+- Agent node status is deliberately event/checkpoint state, not a percentage or ETA. The Agent Trace currently has detailed tool/model calls for planning and validation; other nodes expose their real lifecycle through task SSE rather than inventing per-node internals.
+- Director instructions are interpreted only by the configured loopback local-LLM planner. Mock/rule planning remains deterministic and carries the instruction without claiming semantic interpretation.
+- The current single-process recovery and execution guarantees remain unchanged; distributed workers and cross-process leases are P10 scope.
+
+## Recommended P4 manual acceptance
+
+1. Start FastAPI with the documented `.conda` interpreter, open `#/tools/semantic-video`, and confirm `standard` is selected by default; upload a short Mock/local-original task and verify the original four-stage progress, result preview, download, and advanced review still work.
+2. Start a new task, choose `agent`, confirm the director and approval controls appear, then select Mock processing, Mock media, `always`, enter a short instruction, and upload. Verify the percentage disappears and the eight node cards advance only when SSE node events arrive.
+3. At `awaiting_approval`, refresh the page. Confirm the same task, completed node states, structured reasons, candidate plan, and approve/edit/reject buttons return. Submit invalid JSON or an invalid plan with Edit and verify the panel remains actionable with an error.
+4. Approve a valid plan. Verify the approval panel closes, `render` reports resumed/running, the task completes, and the result includes the Agent Trace tab with retry count, planner, durations, and no transcript/director text or absolute paths.
+5. Create another `always` Agent task and reject it. Verify the task shows the rejected terminal state, produces no download, and a repeated decision is not accepted.
+6. Repeat the upload/approval/result checks in Chinese and English at desktop width and around 390 px. Confirm keyboard tab navigation works, focus is visible, reduced-motion remains honored, and the page has no horizontal overflow.
+
+P4 was explicitly accepted for commit after the verification above. P5 has not been started.
+
+- Current branch: `master`
 - Current commit before this stage: `79e4aec 实现导演指令与计划自动修复`
 - Current stage: P3, Human-in-the-loop approval and resume - completed after user acceptance.
 

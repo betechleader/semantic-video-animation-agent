@@ -13,18 +13,19 @@
       continueEyebrow: '快速继续', continueTitle: '最近任务', viewAll: '查看全部', noRecentTask: '还没有本机任务。创建第一个语义视频后，可从这里快速继续。', continueTask: '继续任务', recentSemanticTask: '语义视频动画任务',
       privacyEyebrow: '本地优先', privacyTitle: '创作素材留在你的电脑上', privacyDescription: '任务文件、转写和成片保存在本机存储目录。只有在你选择外部素材源时，相关搜索才会访问对应服务。',
       semanticTitle: '语义视频动画', semanticDescription: '识别口播内容，生成动态字幕、语义画面和知识型视觉包装。', newCreation: '新建创作', workflowSteps: '创作步骤', stepUpload: '上传素材', stepUploadHint: '选择视频与处理方式', stepProcess: '本地处理', stepProcessHint: '转写、规划与渲染', stepReview: '预览审核', stepReviewHint: '检查成片与高级内容',
-      readyTitle: '准备开始', ready: '请选择一个 MP4 视频开始处理。', sourceEyebrow: '第一步', uploadTitle: '添加口播原片', uploadDescription: '支持最大 100 MB 的 MP4 文件。素材将保存在本地任务目录。', dropTitle: '拖放视频到这里，或点击选择', noFileChosen: '尚未选择文件', dropHint: 'MP4 · 最大 100 MB', generationSettings: '生成设置', settingsHint: '推荐配置适合正式本地处理', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）', profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '素材来源', providerKnowledge: '知识素材组合（推荐）', providerWikimedia: '仅 Wikimedia Commons', providerPexels: 'Pexels（需要 API Key）', providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', settingPrivacyNote: '语音识别与渲染在本机完成；外部素材模式可能访问所选素材服务。', uploadButton: '上传并开始生成', invalidFile: '请选择有效的 MP4 文件。',
-      processingEyebrow: '任务进行中', processingTitle: '正在本地生成视频', taskProgress: '任务进度', processCreated: '任务已创建', processTranscribe: '转写与语义规划', processRender: '动画渲染与合成', processComplete: '质量检查完成', cancelTask: '取消任务',
+      readyTitle: '准备开始', ready: '请选择一个 MP4 视频开始处理。', sourceEyebrow: '第一步', uploadTitle: '添加口播原片', uploadDescription: '支持最大 100 MB 的 MP4 文件。素材将保存在本地任务目录。', dropTitle: '拖放视频到这里，或点击选择', noFileChosen: '尚未选择文件', dropHint: 'MP4 · 最大 100 MB', generationSettings: '生成设置', settingsHint: '推荐配置适合正式本地处理', workflowMode: '工作流模式', workflowStandard: '标准工作流（稳定）', workflowAgent: 'Agent 工作流', directorInstruction: '导演指令（可选）', directorInstructionPlaceholder: '例如：前三秒更抓人，减少全屏素材', approvalPolicy: '审批策略', approvalNever: '无需审批', approvalOnRisk: '遇到风险时审批', approvalAlways: '始终审批', agentSettingsHelp: 'Agent 将按真实节点执行；导演指令只进入 Agent 状态，审批会在渲染前暂停。', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）', profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '素材来源', providerKnowledge: '知识素材组合（推荐）', providerWikimedia: '仅 Wikimedia Commons', providerPexels: 'Pexels（需要 API Key）', providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', settingPrivacyNote: '语音识别与渲染在本机完成；外部素材模式可能访问所选素材服务。', uploadButton: '上传并开始生成', invalidFile: '请选择有效的 MP4 文件。',
+      processingEyebrow: '任务进行中', processingTitle: '正在本地生成视频', taskProgress: '任务进度', processCreated: '任务已创建', processTranscribe: '转写与语义规划', processRender: '动画渲染与合成', processComplete: '质量检查完成', cancelTask: '取消任务', agentExecutionEyebrow: '真实执行状态', agentExecutionTitle: 'Agent 节点轨迹', agentExecutionHelp: '状态直接来自持久工作流的 SSE 节点事件，不使用估算百分比。', agentRetries: '重试 {count} 次', nodeStatusNotStarted: '未开始', nodeStatusStarted: '执行中', nodeStatusResumed: '已恢复', nodeStatusCompleted: '已完成', nodeStatusFailed: '失败', node_upload_probe: '上传与探测', node_audio_asr: '音频与转写', node_correction: '转写校正', node_planning: '语义规划', node_validation: '计划校验', node_render: '动画渲染', node_quality: '质量检查', node_complete: '完成任务',
       resultEyebrow: '生成完成', resultTitle: '成片已准备好', resultDescription: '先检查播放效果，再进入下方高级审核区调整转写、动画或素材。', downloadResult: '下载成片', summaryTitle: '本地生成完成', summaryDescription: '成片已通过技术质量检查，可下载或继续审核。', durationLabel: '时长', resolutionLabel: '分辨率', taskLabel: '任务编号', secondsUnit: '秒',
-      advancedEyebrow: '高级审核', advancedTitle: '检查并微调生成内容', advancedDescription: '这些内容不会占据初始创作界面，仅在成片完成后按需展开。', reviewTabs: '审核内容', transcriptTab: '转写文本', planTab: '动画计划', mediaTab: '素材审核', activityTab: '任务记录', transcriptTitle: '转写文本 JSON', transcriptHelp: '修改分段文本后保存，后端会沿用原时间区间并重新规划动画。', planTitle: '动画计划 JSON', planHelp: '可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。',
+      advancedEyebrow: '高级审核', advancedTitle: '检查并微调生成内容', advancedDescription: '这些内容不会占据初始创作界面，仅在成片完成后按需展开。', reviewTabs: '审核内容', transcriptTab: '转写文本', planTab: '动画计划', mediaTab: '素材审核', agentTraceTab: 'Agent 轨迹', activityTab: '任务记录', transcriptTitle: '转写文本 JSON', transcriptHelp: '修改分段文本后保存，后端会沿用原时间区间并重新规划动画。', planTitle: '动画计划 JSON', planHelp: '可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。', agentTraceTitle: 'Agent 审计摘要', agentTraceHelp: '仅展示节点、工具、重试、耗时和结构化错误，不展示内部思维链或内容正文。', traceStatus: '状态：{status}', tracePlanner: '规划器：{planner}', traceRetries: '重试：{count}', traceEntry: '{node} · {type} · {status}', traceDuration: '耗时 {duration} ms', traceViolations: '问题：{codes}', noAgentTrace: 'Agent Trace 尚未生成。',
+      approvalEyebrow: '需要人工决策', approvalTitle: '审核 Agent 动画计划', approvalHelp: '确认后从持久 Checkpoint 继续；编辑会再次经过服务端 schema、规划规则与安全区校验。', approvalPlanLabel: '待审批动画计划 JSON', approvePlan: '批准并继续', editPlan: '验证修改并继续', rejectPlan: '拒绝任务', approvalReasonFallback: '该计划需要人工确认。', approval_reason_policy_always: '当前策略要求在渲染前进行人工审核。', approval_reason_plan_repair_exhausted: '自动修复次数已耗尽，需要提交一份通过校验的编辑计划。', approval_reason_media_relevance_unverified: '外部素材与内容的相关性尚未由审核者确认。', approval_reason_external_media_rights_review: '外部素材来源与权利信息需要人工审核。', approvalSubmittingTitle: '正在提交审批', approvalSubmitting: '正在保存人工决策…', approvalResumingTitle: '正在恢复 Agent', approvalResuming: '决策已保存，Agent 将从渲染节点继续。', approvalFailedTitle: '审批失败', approvalFailed: '无法提交审批：{message}', rejectedTitle: '任务已拒绝', event_rejected: '人工已拒绝该计划，任务不会进入渲染。', awaitingApprovalTitle: '等待人工审批', event_awaiting_approval: 'Agent 已在渲染前暂停，请审核下方计划。', event_approved: '计划已批准，准备从 Checkpoint 恢复。', event_edited: '修改后的计划已通过校验，准备恢复。', event_resumed: 'Agent 已从持久 Checkpoint 恢复。',
       reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。', searchQueryLabel: '搜索词', searchPlaceholder: '例如：supermarket product', mediaTypeLabel: '类型', imageKind: '图片', videoKind: '视频', searchButton: '搜索素材', manualUrlLabel: '人工候选 URL', manualUrlPlaceholder: 'https://...', addManualButton: '添加候选', activityTitle: '任务事件', activityHelp: '记录当前浏览器会话中收到的创建、处理、渲染和审核状态。', replanNote: '修改转写后保存时，后端会根据修改后的文本自动重建动画计划，并清理旧素材派生数据。', saveReview: '保存修改并重新渲染',
       tasksEyebrow: '本机任务', tasksTitle: '最近任务', tasksDescription: '这里仅显示此浏览器在本机创建或恢复过的真实任务，不生成示例数据。', restoreTitle: '恢复已有任务', restoreDescription: '输入本机任务编号，可重新打开仍保存在 storage 目录中的任务。', taskIdPlaceholder: '任务编号', restoreButton: '恢复任务', restoringTask: '正在查找本机任务…', restoreFailed: '无法恢复该任务：{message}', noTasks: '没有可显示的最近任务。', openTask: '打开任务', unknownFile: '未记录文件名', unavailableTask: '任务已不在本机存储中',
       settingsEyebrow: '平台设置', settingsTitle: '设置', settingsDescription: '当前仅提供与本地工作台真实能力相关的偏好。', interfaceLanguage: '界面语言', interfaceLanguageDescription: '语言偏好会保存在浏览器中，刷新后继续生效。', storageTitle: '本地数据', storageDescription: '上传素材、任务数据库、转写、计划与成片由 FastAPI 服务保存在本机 storage 目录。本页面不提供云同步或账户功能。', localStorageActive: '本地存储已启用',
-      statusPending: '等待处理', statusProcessing: '正在处理', statusRendering: '正在渲染', statusCompleted: '已完成', statusFailed: '失败', statusCancelled: '已取消', statusUnavailable: '不可用',
+      statusPending: '等待处理', statusProcessing: '正在处理', statusRendering: '正在渲染', statusAwaitingApproval: '等待审批', statusRejected: '已拒绝', statusCompleted: '已完成', statusFailed: '失败', statusCancelled: '已取消', statusUnavailable: '不可用',
       uploadingTitle: '正在上传', uploading: '正在把视频保存到本机任务目录…', uploadFailedTitle: '上传失败', uploadFailed: '上传失败：{message}', taskCreatedTitle: '任务已创建', event_created: '任务已创建，正在等待本地处理。', processingStatusTitle: '正在分析内容', event_processing: '正在提取音频、转写语音并进行语义规划…', renderingStatusTitle: '正在合成成片', event_rendering: '正在生成动画并合成视频…', event_review_rendering: '正在根据审核修改重新渲染…', cancelRequestedTitle: '正在取消', event_cancel_requested: '已请求取消任务，正在等待当前安全步骤结束。', completedTitle: '处理完成', completed: '处理完成：{seconds} 秒，{width} × {height}。', failedTitle: '任务失败', event_failed: '任务失败：{message}', cancelledTitle: '任务已取消', event_cancelled: '任务已取消。你可以重新选择素材开始。', cancelFailed: '无法取消任务：{message}', taskLoadFailed: '无法加载任务。', downloadFallback: '{message}\n视频已可下载，但无法加载转写文本和动画计划：{error}',
       validatingReviewTitle: '正在保存审核', validatingReview: '正在校验修改并重新渲染…', reviewFailedTitle: '审核失败', reviewFailed: '审核重渲染失败：{message}', replanned: '已根据修改后的转写重建动画计划，正在渲染…', searchingTitle: '正在搜索素材', searching: '正在搜索外部 B-roll 候选…', searchFailedTitle: '素材搜索失败', searchFailed: '素材搜索失败：{message}', foundCandidatesTitle: '候选已更新', foundCandidates: '找到 {count} 个候选。选择素材后保存审核修改。', manualFailed: '添加人工候选失败：{message}', manualVisual: '人工素材', unknownError: '未知错误', invalidJson: 'JSON 格式无效：{message}',
       chooseTarget: '替换 B-roll 前，请先选择要应用的语义画面。', selectedCandidateTitle: '已选择候选', selectedCandidate: '已选择“{title}”。保存审核修改后会下载并渲染任务内副本。', brollDisabledTitle: '素材已更新', brollDisabled: '已禁用该 B-roll。保存审核修改后重新渲染。', generatedOriginal: '本地原创信息图', pendingSelection: '等待选择或渲染', disabled: '已禁用', disable: '禁用', enable: '启用', useFor: '用于：{title}', useThis: '使用此素材', imageAsset: '外部图片', videoAsset: '外部视频', sourceLink: '查看来源', noMediaVisuals: '当前动画计划没有 B-roll 画面。', noCandidates: '尚未搜索或添加候选素材。',
-      event_created_label: '创建任务', event_processing_label: '内容处理', event_rendering_label: '动画渲染', event_review_rendering_label: '审核重渲染', event_cancel_requested_label: '请求取消', event_completed_label: '处理完成', event_failed_label: '任务失败', event_cancelled_label: '任务取消', eventGeneric: '任务状态更新',
+      event_created_label: '创建任务', event_processing_label: '内容处理', event_rendering_label: '动画渲染', event_review_rendering_label: '审核重渲染', event_cancel_requested_label: '请求取消', event_agent_node_label: 'Agent 节点', event_awaiting_approval_label: '等待审批', event_approved_label: '计划已批准', event_edited_label: '计划已编辑', event_resumed_label: 'Agent 已恢复', event_rejected_label: '计划已拒绝', event_completed_label: '处理完成', event_failed_label: '任务失败', event_cancelled_label: '任务取消', eventGeneric: '任务状态更新',
     },
     en: {
       documentTitle: 'Frame Studio · Local AI Creation Platform', skipToContent: 'Skip to main content', primaryNavigation: 'Primary navigation', closeNavigation: 'Close navigation', openNavigation: 'Open navigation',
@@ -37,18 +38,19 @@
       continueEyebrow: 'Quick continue', continueTitle: 'Recent task', viewAll: 'View all', noRecentTask: 'No local tasks yet. Create your first semantic video to continue it here.', continueTask: 'Continue task', recentSemanticTask: 'Semantic video task',
       privacyEyebrow: 'Local first', privacyTitle: 'Your creative material stays on your computer', privacyDescription: 'Task files, transcripts, and results live in local storage. Requests leave the device only when you choose an external media provider.',
       semanticTitle: 'Semantic video animation', semanticDescription: 'Understand spoken content and generate dynamic captions, semantic visuals, and knowledge-style packaging.', newCreation: 'New creation', workflowSteps: 'Creation steps', stepUpload: 'Upload source', stepUploadHint: 'Choose video and settings', stepProcess: 'Local processing', stepProcessHint: 'Transcribe, plan, and render', stepReview: 'Preview and review', stepReviewHint: 'Inspect output and advanced data',
-      readyTitle: 'Ready to begin', ready: 'Choose an MP4 video to begin processing.', sourceEyebrow: 'Step one', uploadTitle: 'Add talking-head footage', uploadDescription: 'Supports MP4 files up to 100 MB. The source stays in the local task directory.', dropTitle: 'Drop a video here, or click to choose', noFileChosen: 'No file selected', dropHint: 'MP4 · Up to 100 MB', generationSettings: 'Generation settings', settingsHint: 'Recommended defaults suit full local processing', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)', profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'Media source', providerKnowledge: 'Knowledge media mix (Recommended)', providerWikimedia: 'Wikimedia Commons only', providerPexels: 'Pexels (API key required)', providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', settingPrivacyNote: 'Speech recognition and rendering run locally; external media modes may contact the selected provider.', uploadButton: 'Upload and generate', invalidFile: 'Choose a valid MP4 file.',
-      processingEyebrow: 'Task in progress', processingTitle: 'Generating video locally', taskProgress: 'Task progress', processCreated: 'Task created', processTranscribe: 'Transcription and planning', processRender: 'Animation and compositing', processComplete: 'Quality check complete', cancelTask: 'Cancel task',
+      readyTitle: 'Ready to begin', ready: 'Choose an MP4 video to begin processing.', sourceEyebrow: 'Step one', uploadTitle: 'Add talking-head footage', uploadDescription: 'Supports MP4 files up to 100 MB. The source stays in the local task directory.', dropTitle: 'Drop a video here, or click to choose', noFileChosen: 'No file selected', dropHint: 'MP4 · Up to 100 MB', generationSettings: 'Generation settings', settingsHint: 'Recommended defaults suit full local processing', workflowMode: 'Workflow mode', workflowStandard: 'Standard workflow (Stable)', workflowAgent: 'Agent workflow', directorInstruction: 'Director instruction (Optional)', directorInstructionPlaceholder: 'e.g. Make the first three seconds stronger and reduce full-screen media', approvalPolicy: 'Approval policy', approvalNever: 'Never require approval', approvalOnRisk: 'Require approval on risk', approvalAlways: 'Always require approval', agentSettingsHelp: 'Agent runs on real workflow nodes. Director instructions stay Agent-only, and approval pauses before rendering.', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)', profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'Media source', providerKnowledge: 'Knowledge media mix (Recommended)', providerWikimedia: 'Wikimedia Commons only', providerPexels: 'Pexels (API key required)', providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', settingPrivacyNote: 'Speech recognition and rendering run locally; external media modes may contact the selected provider.', uploadButton: 'Upload and generate', invalidFile: 'Choose a valid MP4 file.',
+      processingEyebrow: 'Task in progress', processingTitle: 'Generating video locally', taskProgress: 'Task progress', processCreated: 'Task created', processTranscribe: 'Transcription and planning', processRender: 'Animation and compositing', processComplete: 'Quality check complete', cancelTask: 'Cancel task', agentExecutionEyebrow: 'Real execution state', agentExecutionTitle: 'Agent node trace', agentExecutionHelp: 'States come directly from persistent-workflow SSE node events; no estimated percentage is used.', agentRetries: '{count} retries', nodeStatusNotStarted: 'Not started', nodeStatusStarted: 'Running', nodeStatusResumed: 'Resumed', nodeStatusCompleted: 'Completed', nodeStatusFailed: 'Failed', node_upload_probe: 'Upload and probe', node_audio_asr: 'Audio and ASR', node_correction: 'Transcript correction', node_planning: 'Semantic planning', node_validation: 'Plan validation', node_render: 'Animation render', node_quality: 'Quality check', node_complete: 'Complete task',
       resultEyebrow: 'Generation complete', resultTitle: 'Your video is ready', resultDescription: 'Review playback first, then use the advanced area below to adjust the transcript, animation, or media.', downloadResult: 'Download video', summaryTitle: 'Generated locally', summaryDescription: 'The result passed technical quality checks and is ready to download or review.', durationLabel: 'Duration', resolutionLabel: 'Resolution', taskLabel: 'Task ID', secondsUnit: 'sec',
-      advancedEyebrow: 'Advanced review', advancedTitle: 'Inspect and refine generated content', advancedDescription: 'Advanced data stays out of the initial workflow and appears only after the result is ready.', reviewTabs: 'Review content', transcriptTab: 'Transcript', planTab: 'Animation plan', mediaTab: 'Media review', activityTab: 'Task activity', transcriptTitle: 'Transcript JSON', transcriptHelp: 'Edit segment text and save; the backend reuses the original time span and rebuilds the plan.', planTitle: 'Animation plan JSON', planHelp: 'Inspect the timeline, template parameters, and selected media. Backend validation rejects unsafe edits.',
+      advancedEyebrow: 'Advanced review', advancedTitle: 'Inspect and refine generated content', advancedDescription: 'Advanced data stays out of the initial workflow and appears only after the result is ready.', reviewTabs: 'Review content', transcriptTab: 'Transcript', planTab: 'Animation plan', mediaTab: 'Media review', agentTraceTab: 'Agent trace', activityTab: 'Task activity', transcriptTitle: 'Transcript JSON', transcriptHelp: 'Edit segment text and save; the backend reuses the original time span and rebuilds the plan.', planTitle: 'Animation plan JSON', planHelp: 'Inspect the timeline, template parameters, and selected media. Backend validation rejects unsafe edits.', agentTraceTitle: 'Agent audit summary', agentTraceHelp: 'Shows nodes, tools, retries, durations, and structured errors only—never private chain of thought or content bodies.', traceStatus: 'Status: {status}', tracePlanner: 'Planner: {planner}', traceRetries: 'Retries: {count}', traceEntry: '{node} · {type} · {status}', traceDuration: 'Duration {duration} ms', traceViolations: 'Issues: {codes}', noAgentTrace: 'Agent Trace is not available yet.',
+      approvalEyebrow: 'Human decision required', approvalTitle: 'Review the Agent animation plan', approvalHelp: 'A decision resumes from the durable checkpoint. Edits repeat server-side schema, planning-rule, and safe-area validation.', approvalPlanLabel: 'Animation plan awaiting approval (JSON)', approvePlan: 'Approve and continue', editPlan: 'Validate edits and continue', rejectPlan: 'Reject task', approvalReasonFallback: 'This plan requires human confirmation.', approval_reason_policy_always: 'The current policy requires human review before rendering.', approval_reason_plan_repair_exhausted: 'Automatic repair is exhausted; submit an edited plan that passes validation.', approval_reason_media_relevance_unverified: 'External media relevance has not been confirmed by a reviewer.', approval_reason_external_media_rights_review: 'External media source and rights information requires human review.', approvalSubmittingTitle: 'Submitting approval', approvalSubmitting: 'Saving the human decision…', approvalResumingTitle: 'Resuming Agent', approvalResuming: 'Decision saved. The Agent will continue from the render node.', approvalFailedTitle: 'Approval failed', approvalFailed: 'Could not submit approval: {message}', rejectedTitle: 'Task rejected', event_rejected: 'A reviewer rejected the plan, so the task will not render.', awaitingApprovalTitle: 'Awaiting human approval', event_awaiting_approval: 'The Agent paused before render. Review the plan below.', event_approved: 'Plan approved and ready to resume from checkpoint.', event_edited: 'The edited plan passed validation and is ready to resume.', event_resumed: 'The Agent resumed from its durable checkpoint.',
       reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.', searchQueryLabel: 'Search query', searchPlaceholder: 'e.g. supermarket product', mediaTypeLabel: 'Type', imageKind: 'Image', videoKind: 'Video', searchButton: 'Search media', manualUrlLabel: 'Manual candidate URL', manualUrlPlaceholder: 'https://...', addManualButton: 'Add candidate', activityTitle: 'Task events', activityHelp: 'Events received by this browser session for creation, processing, rendering, and review.', replanNote: 'When transcript text changes, saving rebuilds the animation plan and removes stale media-derived data.', saveReview: 'Save edits and re-render',
       tasksEyebrow: 'On-device tasks', tasksTitle: 'Recent tasks', tasksDescription: 'Only real tasks created or restored by this browser are shown. No sample data is generated.', restoreTitle: 'Restore an existing task', restoreDescription: 'Enter a local task ID to reopen a task that still exists in the storage directory.', taskIdPlaceholder: 'Task ID', restoreButton: 'Restore task', restoringTask: 'Looking for the local task…', restoreFailed: 'Could not restore this task: {message}', noTasks: 'No recent tasks to show.', openTask: 'Open task', unknownFile: 'Filename not recorded', unavailableTask: 'Task is no longer available in local storage',
       settingsEyebrow: 'Platform settings', settingsTitle: 'Settings', settingsDescription: 'Only preferences backed by real local workspace capabilities are shown.', interfaceLanguage: 'Interface language', interfaceLanguageDescription: 'The language preference is stored in this browser and persists after refresh.', storageTitle: 'Local data', storageDescription: 'Uploads, the task database, transcripts, plans, and results are stored by FastAPI in the local storage directory. There is no cloud sync or account feature.', localStorageActive: 'Local storage enabled',
-      statusPending: 'Pending', statusProcessing: 'Processing', statusRendering: 'Rendering', statusCompleted: 'Completed', statusFailed: 'Failed', statusCancelled: 'Cancelled', statusUnavailable: 'Unavailable',
+      statusPending: 'Pending', statusProcessing: 'Processing', statusRendering: 'Rendering', statusAwaitingApproval: 'Awaiting approval', statusRejected: 'Rejected', statusCompleted: 'Completed', statusFailed: 'Failed', statusCancelled: 'Cancelled', statusUnavailable: 'Unavailable',
       uploadingTitle: 'Uploading', uploading: 'Saving the video to the local task directory…', uploadFailedTitle: 'Upload failed', uploadFailed: 'Upload failed: {message}', taskCreatedTitle: 'Task created', event_created: 'Task created and waiting for local processing.', processingStatusTitle: 'Analyzing content', event_processing: 'Extracting audio, transcribing speech, and planning semantic visuals…', renderingStatusTitle: 'Compositing video', event_rendering: 'Rendering animation and compositing the final video…', event_review_rendering: 'Re-rendering the reviewed changes…', cancelRequestedTitle: 'Cancelling', event_cancel_requested: 'Cancellation requested. Waiting for the current safe step to finish.', completedTitle: 'Processing complete', completed: 'Completed: {seconds} seconds, {width} × {height}.', failedTitle: 'Task failed', event_failed: 'Task failed: {message}', cancelledTitle: 'Task cancelled', event_cancelled: 'Task cancelled. You can choose another source and start again.', cancelFailed: 'Could not cancel the task: {message}', taskLoadFailed: 'Could not load the task.', downloadFallback: '{message}\nThe video is downloadable, but the transcript and plan could not be loaded: {error}',
       validatingReviewTitle: 'Saving review', validatingReview: 'Validating edits and re-rendering…', reviewFailedTitle: 'Review failed', reviewFailed: 'Review re-render failed: {message}', replanned: 'The animation plan was rebuilt from the edited transcript; rendering now…', searchingTitle: 'Searching media', searching: 'Searching external B-roll candidates…', searchFailedTitle: 'Media search failed', searchFailed: 'Media search failed: {message}', foundCandidatesTitle: 'Candidates updated', foundCandidates: 'Found {count} candidates. Choose one, then save review edits.', manualFailed: 'Could not add the manual candidate: {message}', manualVisual: 'manual visual', unknownError: 'Unknown error', invalidJson: 'Invalid JSON: {message}',
       chooseTarget: 'Choose a target visual before replacing its B-roll.', selectedCandidateTitle: 'Candidate selected', selectedCandidate: 'Selected “{title}”. Saving the review will download and render the task-local copy.', brollDisabledTitle: 'Media updated', brollDisabled: 'B-roll disabled. Save review edits to re-render.', generatedOriginal: 'Generated original', pendingSelection: 'Pending selection or render', disabled: 'Disabled', disable: 'Disable', enable: 'Enable', useFor: 'Use for: {title}', useThis: 'Use this media', imageAsset: 'external image', videoAsset: 'external video', sourceLink: 'View source', noMediaVisuals: 'The current animation plan has no B-roll visuals.', noCandidates: 'No candidates have been searched or added yet.',
-      event_created_label: 'Task created', event_processing_label: 'Content processing', event_rendering_label: 'Animation render', event_review_rendering_label: 'Review re-render', event_cancel_requested_label: 'Cancellation requested', event_completed_label: 'Processing complete', event_failed_label: 'Task failed', event_cancelled_label: 'Task cancelled', eventGeneric: 'Task status updated',
+      event_created_label: 'Task created', event_processing_label: 'Content processing', event_rendering_label: 'Animation render', event_review_rendering_label: 'Review re-render', event_cancel_requested_label: 'Cancellation requested', event_agent_node_label: 'Agent node', event_awaiting_approval_label: 'Awaiting approval', event_approved_label: 'Plan approved', event_edited_label: 'Plan edited', event_resumed_label: 'Agent resumed', event_rejected_label: 'Plan rejected', event_completed_label: 'Processing complete', event_failed_label: 'Task failed', event_cancelled_label: 'Task cancelled', eventGeneric: 'Task status updated',
     },
   };
 
@@ -76,6 +78,8 @@
     '#/settings': {view: 'settings', titleKey: 'pageSettingsTitle', descriptionKey: 'pageSettingsDescription'},
   };
 
+  const AGENT_NODES = ['upload_probe', 'audio_asr', 'correction', 'planning', 'validation', 'render', 'quality', 'complete'];
+
   const STORAGE_KEYS = {
     language: 'semantic-video-language',
     currentTask: 'semantic-video-current-task',
@@ -87,11 +91,12 @@
     sidebar: $('#sidebar'), navScrim: $('#nav-scrim'), menuButton: $('#menu-button'), primaryNav: $('#primary-nav'),
     pageTitle: $('#page-title'), pageDescription: $('#page-description'), languageSelect: $('#language-select'), settingsLanguage: $('#settings-language'),
     toolGrid: $('#tool-grid'), homeRecent: $('#home-recent'),
-    form: $('#upload-form'), input: $('#video-file'), dropZone: $('#drop-zone'), fileName: $('#file-name'), processingProfile: $('#processing-profile'), uploadMediaProvider: $('#upload-media-provider'), uploadButton: $('#upload-button'),
+    form: $('#upload-form'), input: $('#video-file'), dropZone: $('#drop-zone'), fileName: $('#file-name'), workflowMode: $('#workflow-mode'), agentUploadFields: $('#agent-upload-fields'), directorInstruction: $('#director-instruction'), directorCount: $('#director-count'), approvalPolicy: $('#approval-policy'), processingProfile: $('#processing-profile'), uploadMediaProvider: $('#upload-media-provider'), uploadButton: $('#upload-button'),
     statusBanner: $('#status-banner'), statusTitle: $('#status-title'), status: $('#status'), uploadPanel: $('#upload-panel'), processingPanel: $('#processing-panel'),
-    progressBar: $('#progress-bar'), progressTrack: $('.progress-track'), progressPercent: $('#progress-percent'), activeTaskId: $('#active-task-id'), cancelTask: $('#cancel-task'), newTaskButton: $('#new-task-button'),
+    progressBar: $('#progress-bar'), progressTrack: $('#standard-progress-track'), progressPercent: $('#progress-percent'), standardProcessingStages: $('#standard-processing-stages'), activeTaskId: $('#active-task-id'), cancelTask: $('#cancel-task'), newTaskButton: $('#new-task-button'),
+    agentExecutionPanel: $('#agent-execution-panel'), agentNodeList: $('#agent-node-list'), agentRetryBadge: $('#agent-retry-badge'), approvalPanel: $('#approval-panel'), approvalReasons: $('#approval-reasons'), approvalPlan: $('#approval-plan'), approvalError: $('#approval-error'), approvePlan: $('#approve-plan'), editPlan: $('#edit-plan'), rejectPlan: $('#reject-plan'),
     result: $('#result'), preview: $('#preview'), download: $('#download'), resultDuration: $('#result-duration'), resultResolution: $('#result-resolution'), resultTaskId: $('#result-task-id'),
-    transcript: $('#transcript'), plan: $('#plan'), saveReview: $('#save-review'), mediaList: $('#media-list'), mediaQuery: $('#media-query'), mediaKind: $('#media-kind'), searchMedia: $('#search-media'), manualMediaUrl: $('#manual-media-url'), addManualMedia: $('#add-manual-media'), candidateList: $('#candidate-list'), eventList: $('#event-list'),
+    transcript: $('#transcript'), plan: $('#plan'), saveReview: $('#save-review'), mediaList: $('#media-list'), mediaQuery: $('#media-query'), mediaKind: $('#media-kind'), searchMedia: $('#search-media'), manualMediaUrl: $('#manual-media-url'), addManualMedia: $('#add-manual-media'), candidateList: $('#candidate-list'), eventList: $('#event-list'), agentTraceSummary: $('#agent-trace-summary'), agentTraceList: $('#agent-trace-list'),
     tasksList: $('#tasks-list'), restoreForm: $('#restore-form'), restoreTaskId: $('#restore-task-id'), restoreError: $('#restore-error'),
   };
 
@@ -103,6 +108,9 @@
     lastEventId: 0,
     events: [],
     candidates: [],
+    agentNodes: Object.fromEntries(AGENT_NODES.map((node) => [node, {status: 'not_started'}])),
+    agentTrace: null,
+    approval: null,
     eventSource: null,
     statusKey: 'ready',
     statusParams: {},
@@ -190,6 +198,181 @@
     refs.statusBanner.dataset.tone = state.statusTone;
   }
 
+  function isAgentTask() {
+    return state.currentTask?.workflow_mode === 'agent';
+  }
+
+  function updateDirectorCount() {
+    refs.directorCount.textContent = `${refs.directorInstruction.value.length} / 2000`;
+  }
+
+  function updateWorkflowModeUI(mode = refs.workflowMode.value) {
+    const agent = mode === 'agent';
+    refs.agentUploadFields.hidden = !agent;
+    refs.progressPercent.hidden = agent;
+    refs.progressTrack.hidden = agent;
+    refs.standardProcessingStages.hidden = agent;
+    refs.agentExecutionPanel.hidden = !agent || !state.taskId;
+    const agentTab = document.querySelector('[data-tab="agent"]');
+    if (agentTab) agentTab.hidden = !agent;
+    if (!agent) document.querySelector('[data-tab-panel="agent"]').hidden = true;
+    if (!agent && state.activeTab === 'agent') selectTab('transcript');
+    if (agent) renderAgentExecution();
+  }
+
+  function resetAgentState() {
+    state.agentNodes = Object.fromEntries(AGENT_NODES.map((node) => [node, {status: 'not_started'}]));
+    state.agentTrace = null;
+    state.approval = null;
+    refs.approvalPanel.hidden = true;
+    refs.approvalPlan.value = '';
+    refs.approvalError.textContent = '';
+    renderAgentExecution();
+    renderAgentTrace();
+  }
+
+  function nodeStatusText(status) {
+    const key = {not_started: 'nodeStatusNotStarted', started: 'nodeStatusStarted', resumed: 'nodeStatusResumed', completed: 'nodeStatusCompleted', failed: 'nodeStatusFailed'}[status] || 'nodeStatusNotStarted';
+    return t(key);
+  }
+
+  function renderAgentExecution() {
+    refs.agentNodeList.replaceChildren();
+    AGENT_NODES.forEach((node) => {
+      const detail = state.agentNodes[node] || {status: 'not_started'};
+      const item = document.createElement('li');
+      item.dataset.status = detail.status;
+      const title = document.createElement('strong');
+      title.textContent = t(`node_${node}`);
+      const status = document.createElement('small');
+      status.textContent = detail.error_category ? `${nodeStatusText(detail.status)} · ${detail.error_category}` : nodeStatusText(detail.status);
+      item.append(title, status);
+      refs.agentNodeList.append(item);
+    });
+    const retries = Number(state.agentTrace?.summary?.retry_count || 0);
+    refs.agentRetryBadge.textContent = t('agentRetries', {count: retries});
+    refs.agentRetryBadge.dataset.status = retries ? 'rendering' : 'pending';
+  }
+
+  function renderAgentTrace() {
+    refs.agentTraceSummary.replaceChildren();
+    refs.agentTraceList.replaceChildren();
+    const trace = state.agentTrace;
+    if (!trace) {
+      const item = document.createElement('li');
+      const copy = document.createElement('div');
+      copy.textContent = t('noAgentTrace');
+      item.append(document.createElement('span'), copy);
+      refs.agentTraceList.append(item);
+      return;
+    }
+    const chips = [
+      t('traceStatus', {status: trace.summary?.status || 'running'}),
+      t('traceRetries', {count: trace.summary?.retry_count || 0}),
+      t('tracePlanner', {planner: trace.planner?.planner_id || trace.planner?.model_id || '—'}),
+    ];
+    chips.forEach((value) => {
+      const chip = document.createElement('span');
+      chip.className = 'trace-chip';
+      chip.textContent = value;
+      refs.agentTraceSummary.append(chip);
+    });
+    (trace.entries || []).forEach((entry) => {
+      const item = document.createElement('li');
+      const copy = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = t('traceEntry', {node: t(`node_${entry.node}`), type: entry.event_type, status: entry.status});
+      copy.append(title);
+      if (entry.duration_ms !== undefined) {
+        const duration = document.createElement('small');
+        duration.textContent = t('traceDuration', {duration: entry.duration_ms});
+        copy.append(duration);
+      }
+      const codes = (entry.violations || []).map((item) => item.code).filter(Boolean);
+      if (codes.length) {
+        const violations = document.createElement('small');
+        violations.textContent = t('traceViolations', {codes: [...new Set(codes)].join(', ')});
+        copy.append(violations);
+      }
+      item.append(document.createElement('span'), copy);
+      refs.agentTraceList.append(item);
+    });
+  }
+
+  async function loadAgentTrace(id) {
+    const response = await fetch(`/api/videos/${encodeURIComponent(id)}/agent-trace`);
+    if (response.status === 404) return;
+    if (!response.ok) throw new Error(await responseError(response));
+    if (state.taskId !== id) return;
+    state.agentTrace = await response.json();
+    renderAgentExecution();
+    renderAgentTrace();
+  }
+
+  function setApprovalButtonsDisabled(disabled) {
+    [refs.approvePlan, refs.editPlan, refs.rejectPlan].forEach((button) => { button.disabled = disabled; });
+  }
+
+  function renderApproval(approval) {
+    state.approval = approval;
+    refs.approvalReasons.replaceChildren();
+    (approval.reasons || []).forEach((reason) => {
+      const item = document.createElement('div');
+      item.className = 'approval-reason';
+      const code = document.createElement('strong');
+      code.textContent = reason.code || 'approval_required';
+      const message = document.createElement('span');
+      const reasonKey = `approval_reason_${reason.code}`;
+      message.textContent = translations[state.language][reasonKey] ? t(reasonKey) : (reason.message || t('approvalReasonFallback'));
+      item.append(code, message);
+      refs.approvalReasons.append(item);
+    });
+    refs.approvalPlan.value = pretty(approval.candidate_plan || state.currentTask?.plan || {});
+    refs.approvePlan.disabled = !approval.candidate_plan;
+    refs.editPlan.disabled = false;
+    refs.rejectPlan.disabled = false;
+    refs.approvalError.textContent = '';
+    refs.approvalPanel.hidden = approval.status !== 'pending';
+  }
+
+  async function loadApproval(id) {
+    const response = await fetch(`/api/videos/${encodeURIComponent(id)}/approval`);
+    if (!response.ok) throw new Error(await responseError(response));
+    const approval = await response.json();
+    if (state.taskId === id) renderApproval(approval);
+    return approval;
+  }
+
+  async function submitApproval(action) {
+    if (!state.taskId) return;
+    refs.approvalError.textContent = '';
+    setApprovalButtonsDisabled(true);
+    setStatus('approvalSubmitting', {}, {titleKey: 'approvalSubmittingTitle', tone: 'info'});
+    const options = {method: 'POST'};
+    if (action === 'edit') {
+      try {
+        options.headers = {'Content-Type': 'application/json'};
+        options.body = JSON.stringify({plan: JSON.parse(refs.approvalPlan.value)});
+      } catch (error) {
+        refs.approvalError.textContent = t('invalidJson', {message: error.message});
+        setStatus('approvalFailed', {message: error.message}, {titleKey: 'approvalFailedTitle', tone: 'error'});
+        setApprovalButtonsDisabled(false);
+        return;
+      }
+    }
+    try {
+      const response = await fetch(`/api/videos/${encodeURIComponent(state.taskId)}/approval/${action}`, options);
+      if (!response.ok) throw new Error(await responseError(response));
+      state.approval = {...(state.approval || {}), status: action === 'approve' ? 'approved' : action === 'edit' ? 'edited' : 'rejected'};
+      refs.approvalPanel.hidden = true;
+      setStatus(action === 'reject' ? 'event_rejected' : 'approvalResuming', {}, {titleKey: action === 'reject' ? 'rejectedTitle' : 'approvalResumingTitle', tone: action === 'reject' ? 'warning' : 'info'});
+    } catch (error) {
+      refs.approvalError.textContent = t('approvalFailed', {message: error.message});
+      setStatus('approvalFailed', {message: error.message}, {titleKey: 'approvalFailedTitle', tone: 'error'});
+      setApprovalButtonsDisabled(false);
+    }
+  }
+
   function applyLanguage(language) {
     state.language = translations[language] ? language : 'zh-CN';
     localStorage.setItem(STORAGE_KEYS.language, state.language);
@@ -207,6 +390,10 @@
     renderRoute({loadTask: false});
     renderHomeRecent();
     renderEventList();
+    updateWorkflowModeUI(state.currentTask?.workflow_mode || refs.workflowMode.value);
+    updateDirectorCount();
+    renderAgentExecution();
+    renderAgentTrace();
     if (refs.plan.value.trim()) {
       try { renderMediaReview(currentPlan(), state.candidates); } catch (_error) { /* The editor can temporarily contain invalid JSON. */ }
     }
@@ -271,7 +458,7 @@
 
   function statusText(status) {
     const key = {
-      pending: 'statusPending', processing: 'statusProcessing', rendering: 'statusRendering', completed: 'statusCompleted', failed: 'statusFailed', cancelled: 'statusCancelled', unavailable: 'statusUnavailable',
+      pending: 'statusPending', processing: 'statusProcessing', rendering: 'statusRendering', awaiting_approval: 'statusAwaitingApproval', rejected: 'statusRejected', completed: 'statusCompleted', failed: 'statusFailed', cancelled: 'statusCancelled', unavailable: 'statusUnavailable',
     }[status] || 'statusPending';
     return t(key);
   }
@@ -372,6 +559,7 @@
 
   function openTask(id) {
     closeEventSource();
+    resetAgentState();
     state.taskId = id;
     state.loadedTaskId = null;
     state.currentTask = null;
@@ -456,7 +644,11 @@
       title.textContent = eventLabel(event.type);
       const description = document.createElement('p');
       const statusKey = `event_${event.type}`;
-      description.textContent = translations[state.language][statusKey] ? t(statusKey, {message: event.message || t('unknownError')}) : (event.message || t('eventGeneric'));
+      if (event.type === 'agent_node' && event.payload?.node) {
+        description.textContent = `${t(`node_${event.payload.node}`)} · ${nodeStatusText(event.payload.status)}`;
+      } else {
+        description.textContent = translations[state.language][statusKey] ? t(statusKey, {message: event.message || t('unknownError')}) : (event.message || t('eventGeneric'));
+      }
       copy.append(title, description);
       const time = document.createElement('time');
       time.textContent = event.created_at ? formatDate(event.created_at) : '';
@@ -470,7 +662,7 @@
     state.eventSource = null;
   }
 
-  function watchTask(id) {
+  function watchTask(id, options = {}) {
     closeEventSource();
     const source = new EventSource(`/api/videos/${encodeURIComponent(id)}/events?after_event_id=${state.lastEventId}`);
     state.eventSource = source;
@@ -479,12 +671,13 @@
       detail.type = detail.type || type;
       state.lastEventId = Math.max(state.lastEventId, detail.id || 0);
       recordEvent(detail);
-      updateProgress(type);
+      if (!isAgentTask()) updateProgress(type);
       return detail;
     };
     ['created', 'processing', 'rendering', 'review_rendering', 'cancel_requested'].forEach((name) => {
       source.addEventListener(name, (event) => {
         readEvent(event, name);
+        if (options.terminalReplay) return;
         const preserveResult = name === 'review_rendering' && !refs.result.hidden;
         setWorkflowStage('processing', {preserveResult});
         const config = {
@@ -494,9 +687,56 @@
         rememberTask(id, {status: name === 'review_rendering' ? 'rendering' : name});
       });
     });
+    source.addEventListener('agent_node', (event) => {
+      const detail = readEvent(event, 'agent_node');
+      const payload = detail.payload || {};
+      if (AGENT_NODES.includes(payload.node)) {
+        state.agentNodes[payload.node] = {
+          status: payload.status || 'started',
+          checkpoint_version: payload.checkpoint_version,
+          error_category: payload.error_category,
+        };
+        renderAgentExecution();
+      }
+      if (['planning', 'validation'].includes(payload.node) && payload.status === 'completed') {
+        loadAgentTrace(id).catch(() => {});
+      }
+    });
+    source.addEventListener('awaiting_approval', (event) => {
+      readEvent(event, 'awaiting_approval');
+      if (options.terminalReplay) return;
+      setWorkflowStage('processing');
+      setStatus('event_awaiting_approval', {}, {titleKey: 'awaitingApprovalTitle', tone: 'warning'});
+      rememberTask(id, {status: 'awaiting_approval', workflowMode: 'agent'});
+      loadApproval(id).catch((error) => setStatus('approvalFailed', {message: error.message}, {titleKey: 'approvalFailedTitle', tone: 'error'}));
+      loadAgentTrace(id).catch(() => {});
+    });
+    ['approved', 'edited', 'resumed'].forEach((name) => {
+      source.addEventListener(name, (event) => {
+        readEvent(event, name);
+        if (options.terminalReplay) return;
+        refs.approvalPanel.hidden = true;
+        setWorkflowStage('processing');
+        setStatus(name === 'resumed' ? 'event_resumed' : `event_${name}`, {}, {titleKey: 'approvalResumingTitle', tone: 'info'});
+      });
+    });
+    source.addEventListener('rejected', (event) => {
+      const detail = readEvent(event, 'rejected');
+      closeEventSource();
+      refs.approvalPanel.hidden = true;
+      state.currentTask = {...(state.currentTask || {}), status: 'rejected'};
+      setWorkflowStage('processing');
+      setStatus('event_rejected', {message: detail.message || t('unknownError')}, {titleKey: 'rejectedTitle', tone: 'warning'});
+      rememberTask(id, {status: 'rejected', workflowMode: 'agent'});
+      loadAgentTrace(id).catch(() => {});
+    });
     source.addEventListener('completed', async (event) => {
       const detail = readEvent(event, 'completed');
       closeEventSource();
+      if (options.terminalReplay) {
+        await loadAgentTrace(id).catch(() => {});
+        return;
+      }
       try { await loadTask(id, detail.id || state.lastEventId); }
       catch (error) {
         setStatus('downloadFallback', {message: detail.message || t('completedTitle'), error: error.message}, {titleKey: 'completedTitle', tone: 'warning'});
@@ -510,6 +750,7 @@
         setWorkflowStage('upload');
         setStatus(`event_${name}`, {message: detail.message || t('unknownError')}, {titleKey: name === 'failed' ? 'failedTitle' : 'cancelledTitle', tone: name === 'failed' ? 'error' : 'warning'});
         rememberTask(id, {status: name});
+        if (isAgentTask()) loadAgentTrace(id).catch(() => {});
       });
     });
   }
@@ -532,8 +773,13 @@
     if (state.taskId !== id) return task;
     state.currentTask = task;
     state.loadedTaskId = id;
+    refs.workflowMode.value = task.workflow_mode || 'standard';
+    refs.directorInstruction.value = task.director_instruction || '';
+    refs.approvalPolicy.value = task.approval_policy || 'never';
+    updateDirectorCount();
+    updateWorkflowModeUI(task.workflow_mode || 'standard');
     refs.activeTaskId.textContent = id;
-    rememberTask(id, {status: task.status, metadata: task.metadata});
+    rememberTask(id, {status: task.status, metadata: task.metadata, workflowMode: task.workflow_mode});
     if (task.status === 'completed') {
       refs.transcript.value = pretty(task.transcript);
       refs.plan.value = pretty(task.plan);
@@ -545,6 +791,16 @@
       setStatus('completed', {seconds: Number(task.metadata.duration_seconds).toFixed(2), width: task.metadata.width, height: task.metadata.height}, {titleKey: 'completedTitle', tone: 'success'});
       updateProgress('completed');
       await loadMediaReview(id);
+      if (task.workflow_mode === 'agent') {
+        await loadAgentTrace(id).catch(() => {});
+        if (!state.events.length) watchTask(id, {terminalReplay: true});
+      }
+    } else if (task.status === 'awaiting_approval') {
+      setWorkflowStage('processing');
+      setStatus('event_awaiting_approval', {}, {titleKey: 'awaitingApprovalTitle', tone: 'warning'});
+      await loadApproval(id);
+      await loadAgentTrace(id).catch(() => {});
+      watchTask(id);
     } else if (['pending', 'processing', 'rendering'].includes(task.status)) {
       setWorkflowStage('processing');
       const eventType = task.status === 'pending' ? 'created' : task.status;
@@ -552,10 +808,17 @@
       const config = task.status === 'rendering' ? ['event_rendering', 'renderingStatusTitle'] : task.status === 'processing' ? ['event_processing', 'processingStatusTitle'] : ['event_created', 'taskCreatedTitle'];
       setStatus(config[0], {}, {titleKey: config[1], tone: 'info'});
       watchTask(id);
+    } else if (task.status === 'rejected') {
+      setWorkflowStage('processing');
+      refs.approvalPanel.hidden = true;
+      setStatus('event_rejected', {}, {titleKey: 'rejectedTitle', tone: 'warning'});
+      await loadAgentTrace(id).catch(() => {});
+      if (!state.events.length) watchTask(id, {terminalReplay: true});
     } else {
       setWorkflowStage('upload');
       const failed = task.status === 'failed';
       setStatus(failed ? 'event_failed' : 'event_cancelled', {message: task.error || t('unknownError')}, {titleKey: failed ? 'failedTitle' : 'cancelledTitle', tone: failed ? 'error' : 'warning'});
+      if (task.workflow_mode === 'agent') await loadAgentTrace(id).catch(() => {});
     }
     return task;
   }
@@ -722,6 +985,8 @@
   }
 
   function selectTab(name, focus = false) {
+    const requested = document.querySelector(`[data-tab="${name}"]`);
+    if (!requested || requested.hidden) name = 'transcript';
     state.activeTab = name;
     document.querySelectorAll('[data-tab]').forEach((tab) => {
       const selected = tab.dataset.tab === name;
@@ -741,6 +1006,7 @@
     state.events = [];
     state.candidates = [];
     state.previewVersion = 'stored';
+    resetAgentState();
     localStorage.removeItem(STORAGE_KEYS.currentTask);
     refs.input.value = '';
     refs.transcript.value = '';
@@ -753,6 +1019,7 @@
     setWorkflowStage('upload');
     setStatus('ready', {}, {titleKey: 'readyTitle', tone: 'neutral'});
     renderEventList();
+    updateWorkflowModeUI(refs.workflowMode.value);
   }
 
   refs.form.addEventListener('submit', async (event) => {
@@ -771,8 +1038,13 @@
     refs.uploadButton.disabled = true;
     const data = new FormData();
     data.append('file', file);
+    data.append('workflow_mode', refs.workflowMode.value);
     data.append('processing_profile', refs.processingProfile.value);
     data.append('media_provider', refs.uploadMediaProvider.value);
+    if (refs.workflowMode.value === 'agent') {
+      data.append('director_instruction', refs.directorInstruction.value.trim());
+      data.append('approval_policy', refs.approvalPolicy.value);
+    }
     try {
       const response = await fetch('/api/videos', {method: 'POST', body: data});
       if (!response.ok) throw new Error(await responseError(response));
@@ -782,7 +1054,8 @@
       state.currentTask = body;
       localStorage.setItem(STORAGE_KEYS.currentTask, state.taskId);
       refs.activeTaskId.textContent = state.taskId;
-      rememberTask(state.taskId, {name: file.name, status: 'pending', metadata: body.metadata});
+      updateWorkflowModeUI(body.workflow_mode);
+      rememberTask(state.taskId, {name: file.name, status: 'pending', metadata: body.metadata, workflowMode: body.workflow_mode});
       watchTask(state.taskId);
     } catch (error) {
       setWorkflowStage('upload');
@@ -886,6 +1159,11 @@
   });
 
   refs.input.addEventListener('change', updateFileName);
+  refs.workflowMode.addEventListener('change', () => updateWorkflowModeUI(refs.workflowMode.value));
+  refs.directorInstruction.addEventListener('input', updateDirectorCount);
+  refs.approvePlan.addEventListener('click', () => submitApproval('approve'));
+  refs.editPlan.addEventListener('click', () => submitApproval('edit'));
+  refs.rejectPlan.addEventListener('click', () => submitApproval('reject'));
   ['dragenter', 'dragover'].forEach((name) => refs.dropZone.addEventListener(name, (event) => { event.preventDefault(); refs.dropZone.classList.add('is-dragging'); }));
   ['dragleave', 'drop'].forEach((name) => refs.dropZone.addEventListener(name, (event) => { event.preventDefault(); refs.dropZone.classList.remove('is-dragging'); }));
   refs.dropZone.addEventListener('drop', (event) => {
@@ -898,7 +1176,7 @@
   document.querySelectorAll('[data-tab]').forEach((tab) => {
     tab.addEventListener('click', () => selectTab(tab.dataset.tab));
     tab.addEventListener('keydown', (event) => {
-      const tabs = [...document.querySelectorAll('[data-tab]')];
+      const tabs = [...document.querySelectorAll('[data-tab]:not([hidden])')];
       const index = tabs.indexOf(tab);
       let next = null;
       if (event.key === 'ArrowRight') next = tabs[(index + 1) % tabs.length];

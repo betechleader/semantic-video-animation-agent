@@ -130,3 +130,52 @@ def test_completed_review_uses_accessible_tabs_and_keeps_all_existing_tools() ->
     assert "/review" in script
     assert "/cancel" in script
     assert "event.key === 'ArrowRight'" in script
+
+
+def test_agent_upload_controls_are_additive_and_standard_stays_default() -> None:
+    html = HTML.read_text(encoding="utf-8")
+    script = SCRIPT.read_text(encoding="utf-8")
+    assert 'id="workflow-mode"' in html
+    assert '<option value="standard" selected' in html
+    assert '<option value="agent"' in html
+    assert 'id="agent-upload-fields"' in html
+    assert 'id="director-instruction"' in html
+    assert 'maxlength="2000"' in html
+    assert 'id="approval-policy"' in html
+    assert 'value="never" selected' in html
+    assert "data.append('workflow_mode', refs.workflowMode.value)" in script
+    agent_fields = script.split("if (refs.workflowMode.value === 'agent') {", 1)[1].split("\n    }", 1)[0]
+    assert "data.append('director_instruction'" in agent_fields
+    assert "data.append('approval_policy'" in agent_fields
+
+
+def test_agent_progress_and_approval_use_real_backend_events_and_contracts() -> None:
+    html = HTML.read_text(encoding="utf-8")
+    script = SCRIPT.read_text(encoding="utf-8")
+    for node in ("upload_probe", "audio_asr", "correction", "planning", "validation", "render", "quality", "complete"):
+        assert f"node_{node}" in script
+    assert 'id="agent-node-list"' in html
+    assert 'id="approval-panel"' in html
+    assert 'id="approval-plan"' in html
+    assert 'data-tab="agent"' in html
+    assert "source.addEventListener('agent_node'" in script
+    assert "source.addEventListener('awaiting_approval'" in script
+    assert "if (!isAgentTask()) updateProgress(type)" in script
+    assert "/agent-trace`" in script
+    assert "/approval`" in script
+    for action in ("approve", "edit", "reject"):
+        assert f"submitApproval('{action}')" in script
+    assert "task.status === 'awaiting_approval'" in script
+    assert "task.status === 'rejected'" in script
+
+
+def test_agent_ui_preserves_accessibility_mobile_layout_and_reduced_motion() -> None:
+    html = HTML.read_text(encoding="utf-8")
+    styles = STYLES.read_text(encoding="utf-8")
+    assert 'aria-labelledby="agent-execution-heading"' in html
+    assert 'aria-labelledby="approval-heading"' in html
+    assert 'role="alert"' in html
+    assert '.agent-node-list { grid-template-columns: 1fr; }' in styles
+    assert '.approval-actions .button { width: 100%; }' in styles
+    assert "@media (prefers-reduced-motion: reduce)" in styles
+    assert "overflow-x: hidden" in styles
