@@ -1,0 +1,45 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.remotion/
+
+# Configuration
+.env
+.env.local
+
+# Runtime data
+storage/*
+!storage/.gitkeep
+temp/
+tmp/
+
+# Video and audio
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.webm
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+# Conda project environment
+.conda/

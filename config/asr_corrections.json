@@ -1,0 +1,32 @@
+[
+  {
+    "source": "会姑娘",
+    "target": "灰姑娘",
+    "context_any": ["故事", "改写", "复述"]
+  },
+  {
+    "source": "心理学有生活",
+    "target": "心理学与生活",
+    "context_any": ["心理学", "书", "阅读"]
+  },
+  {
+    "source": "对抑",
+    "target": "可以",
+    "context_any": ["创新性", "方法"]
+  },
+  {
+    "source": "应有更高的创新性",
+    "target": "拥有更高的创新性",
+    "context_any": ["文化", "研究发现"]
+  },
+  {
+    "source": "更加好的创新性",
+    "target": "更高的创新性",
+    "context_any": ["设想", "未来", "研究发现"]
+  },
+  {
+    "source": "你的拍的",
+    "target": "你拍的",
+    "context_any": ["视频", "灵感"]
+  }
+]
