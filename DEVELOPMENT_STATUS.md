@@ -1,8 +1,64 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `629d445 增加 DeepSeek 规划服务`
-- Current stage: P5, Agent eval harness and observability - completed after user acceptance and approved for commit.
+- Current commit before this work: `60bf537 增加 Agent 离线评测与可观测性`
+- Current stage: P6, Local knowledge base and hybrid retrieval - completed after user acceptance and approved for commit.
+
+## P6 delivered
+
+- Added a project-controlled knowledge base under `storage/knowledge/`, separate from UUID video-task directories. It imports UTF-8 `txt`, `md`, and `json` only, enforces a configurable 5 MB default limit, rejects path-bearing upload names, and stores source copies only beneath the knowledge root.
+- Added Alembic revision `0005_local_knowledge_base` with durable `knowledge_documents` and `knowledge_chunks` tables. Content hashes produce stable document IDs; document/ordinal/chunk hashes produce stable chunk IDs. The stored contract includes source metadata, deterministic summaries, content digests, chunk ordinals, token counts, embedding/model identifiers, and `knowledge-index-v1`.
+- Reimporting identical content is idempotent and does not recompute embeddings. If the index version or embedding model changes, the same document ID is reindexed in place and retains stable chunk IDs whenever chunk content and order remain unchanged.
+- Added Chinese-aware BM25 tokenization using Latin terms plus individual and adjacent Han characters. Added vector cosine search, weighted hybrid fusion, chunk-ID deduplication, and an optional bounded lexical coverage rerank. Every hit returns `chunk_id`, source, content, summary, score, component scores, retrieval method, metadata, and index version.
+- Added a zero-download `local_hash` embedding Provider as the offline default and a replaceable Provider protocol used by Fake Embedding tests. Added optional BGE-M3 through pinned `sentence-transformers==6.0.0`; the loader requires `local_files_only=True`, sets `trust_remote_code=False`, uses the project model cache, and converts cache/package failures to fixed errors without attempting model downloads.
+- Kept SQLite as the vector store for the current small project corpus. This avoids a new Qdrant process and preserves the project's single-file local recovery model while leaving embedding and retrieval boundaries replaceable if corpus scale later warrants Qdrant local mode.
+- Added `POST/GET /api/knowledge/documents`, `DELETE /api/knowledge/documents/{document_id}`, and `POST /api/knowledge/search`. CPU/model indexing runs outside the async event loop. Added matching `python -m backend.app.knowledge_cli import|list|search|delete` commands; CLI imports are restricted to paths inside the project.
+- P6 remains isolated from AnimationPlan, Agent planning, the semantic-video frontend, and existing video APIs. Evidence retrieval in planning and citation fields are deliberately deferred to P7.
+
+## P6 code structure and learning notes
+
+- `knowledge_base.py` owns parsing, deterministic chunking, IDs, embeddings, BM25/vector/hybrid scoring, storage-path validation, CRUD, and the Provider boundary. The service receives an embedding Provider, so tests never need a model or network.
+- `KnowledgeDocument` is the source-level audit row; `KnowledgeChunk` is the retrieval unit. Deleting through the ORM cascades chunk deletion, while the source file path is resolved and verified against `storage/knowledge` before any unlink.
+- `local_hash` is a transparent character/token feature vector, not a learned semantic model. Its role is deterministic zero-download vector retrieval. The configured BGE-M3 backend is the semantic option when the operator has installed dependencies and pre-populated the local cache.
+- `json` imports are flattened deterministically with sorted object keys and a nesting bound. Markdown is indexed as text in P6; heading-aware structural parsing and PDF extraction were intentionally omitted to keep this phase scoped.
+- Retrieval is read-only with respect to the index. Optional reranking changes only result order/score and does not mutate stored chunks.
+
+## P6 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` → `139 passed in 89.03s`.
+- Final focused P6 suite: `.\.conda\python.exe -m pytest -q tests\test_knowledge_base.py` → `11 passed in 2.81s`.
+- Broader knowledge/migration/storage/Provider regression: `.\.conda\python.exe -m pytest -vv tests\test_knowledge_base.py tests\test_task_database.py tests\test_storage_and_providers.py` → `24 passed in 4.20s` before the final API thread-pool hardening; the final focused and full suites passed afterward.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` → `150 passed in 92.35s`, including the existing standard Mock and Agent Mock real FFmpeg/Remotion end-to-end pipelines.
+- `.\.conda\python.exe -m compileall -q backend\app alembic\versions` completed successfully. `.\.conda\python.exe -m alembic heads` reported the single head `0005_local_knowledge_base`.
+- `git diff --check` is part of final verification. P6 changes no TypeScript, Remotion source, renderer props, or `AnimationPlan`, so a renderer build is not required.
+
+## P6 user acceptance verification
+
+- The project database upgraded successfully and `.\.conda\python.exe -m alembic current` reported `0005_local_knowledge_base (head)`.
+- A real offline CLI run imported the project `README.md` as eight chunks with `local-char-feature-hash-v1`. Reimport returned the same document ID with `created=false` and `reindexed=false`.
+- Real keyword, vector, and hybrid-plus-rerank queries all returned source, stable chunk IDs, component scores, retrieval method, metadata, and `knowledge-index-v1` without a network or model download.
+- The acceptance document was deleted through the CLI. A subsequent list returned no documents and `storage/knowledge/sources` was empty, so the temporary acceptance content was not left behind.
+- Final acceptance-focused suite: `.\.conda\python.exe -m pytest -q tests\test_knowledge_base.py` → `11 passed in 2.85s`.
+- Final acceptance full suite: `.\.conda\python.exe -m pytest -vv` → `150 passed in 91.81s`, including existing standard Mock and Agent Mock real FFmpeg/Remotion end-to-end pipelines.
+
+## P6 known limitations
+
+- The default feature-hash vectors provide local vector similarity but are not a substitute for a learned multilingual semantic model. BGE-M3 must already exist in the configured local model cache; no model was downloaded, and no real BGE-M3 quality/performance run was claimed in this phase.
+- SQLite performs exact in-process cosine scans, which is appropriate for a small project knowledge base but not a large multi-user corpus. Qdrant local mode remains a replaceable scaling option rather than a runtime prerequisite.
+- JSON is flattened and Markdown is treated as text. PDF, OCR, heading-aware chunking, learned rerankers, document update/version history, and background bulk indexing are not included.
+- P6 exposes backend API/CLI only and does not add a knowledge-management page. It does not alter AnimationPlan or use retrieved text in planning; those citation and RAG trust-boundary changes belong to P7.
+- Source-file persistence and database writes are durable but not yet coordinated by a cross-process import lease. Concurrent duplicate imports are constrained by unique content hashes, but production distributed-worker behavior belongs to P10.
+
+## Recommended P6 manual acceptance
+
+1. Run `.\.conda\python.exe -m alembic upgrade head`, then start FastAPI. Confirm the migration reports head `0005_local_knowledge_base` and an existing standard/Agent video task is still readable.
+2. Create one small UTF-8 `.md` or `.txt` inside the project, run `.\.conda\python.exe -m backend.app.knowledge_cli import <path> --metadata '{"topic":"manual"}'`, and confirm the response contains `doc_...`, a positive `chunk_count`, `knowledge-index-v1`, and a source copy under `storage/knowledge/sources/`.
+3. Import the same bytes again. Confirm `created=false`, `reindexed=false`, the same document/chunk IDs, and no duplicate in the `list` command.
+4. Search a phrase with `--method keyword`, `--method vector`, and `--method hybrid --rerank`. Confirm each hit includes chunk ID, source, method, scores, summary, and index version; repeat with network disabled and confirm the default `local_hash` path still works.
+5. Exercise the same import/list/search endpoints through FastAPI, then delete the returned document ID. Confirm the list and search no longer return it and an invalid/path-like ID cannot remove anything outside `storage/knowledge`.
+6. Optionally pre-populate a local BGE-M3 cache, set `KNOWLEDGE_EMBEDDING_PROVIDER=bge_m3`, keep `KNOWLEDGE_EMBEDDING_LOCAL_FILES_ONLY=true`, restart, and import a new document. If no local model exists, expect a fixed local-cache error and no network download.
+
+P6 was explicitly accepted and approved for commit. P7 has not been started.
 
 ## P5 delivered
 

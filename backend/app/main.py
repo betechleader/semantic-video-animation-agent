@@ -9,8 +9,9 @@ from uuid import uuid4
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
-from .config import MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, STORAGE_ROOT
+from .config import KNOWLEDGE_ROOT, MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, STORAGE_ROOT
 from .asr_corrections import correct_transcript, load_phrase_corrections, normalize_review_transcript
 from .database import (
     append_task_event,
@@ -32,13 +33,20 @@ from .process_control import process_registry
 from .planning_rules import PlanningRuleError, validate_animation_plan
 from .quality import QualityValidationError, validate_animation_safe_areas
 from .providers import TranscriptAnimationPlanningProvider
-from .schemas import AgentApprovalEdit, AnimationPlan, ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
+from .schemas import AgentApprovalEdit, AnimationPlan, KnowledgeSearchRequest, ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
 from .agent_workflow import get_active_agent_thread, recover_agent_tasks, resume_agent_task, start_agent_task
 from .agent_tools import DIRECTOR_INSTRUCTION_MAX_LENGTH
 from .agent_trace import AgentTraceError, read_agent_trace
+from .knowledge_base import (
+    KnowledgeBaseError,
+    KnowledgeBaseService,
+    KnowledgeEmbeddingError,
+    KnowledgeNotFoundError,
+    KnowledgeValidationError,
+)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -455,6 +463,76 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
         metrics.current_or_start_attempt("review")
     start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), transcript, plan, task["trace_id"])
     return {"task_id": task_id, "status": "rendering", "transcript": transcript, "plan": plan, "replanned": transcript_changed}
+
+
+def _knowledge_service() -> KnowledgeBaseService:
+    return KnowledgeBaseService(root=KNOWLEDGE_ROOT, settings=SETTINGS)
+
+
+@app.post("/api/knowledge/documents", status_code=status.HTTP_201_CREATED)
+async def import_knowledge_document(
+    file: UploadFile = File(...),
+    metadata_json: str = Form("{}"),
+) -> dict:
+    if len(metadata_json) > 8_000:
+        raise HTTPException(status_code=422, detail="knowledge metadata is too large")
+    try:
+        metadata = json.loads(metadata_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail="knowledge metadata must be valid JSON") from exc
+    maximum_bytes = SETTINGS.knowledge_max_file_mb * 1024 * 1024
+    data = bytearray()
+    try:
+        while chunk := await file.read(1024 * 1024):
+            data.extend(chunk)
+            if len(data) > maximum_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Knowledge upload exceeds {SETTINGS.knowledge_max_file_mb} MB limit",
+                )
+    finally:
+        await file.close()
+    try:
+        return await run_in_threadpool(
+            _knowledge_service().import_document,
+            file.filename or "",
+            bytes(data),
+            metadata,
+        )
+    except KnowledgeValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except KnowledgeEmbeddingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/knowledge/documents")
+def list_knowledge_documents() -> dict:
+    return {"documents": _knowledge_service().list_documents()}
+
+
+@app.delete("/api/knowledge/documents/{document_id}")
+def delete_knowledge_document(document_id: str) -> dict:
+    try:
+        return _knowledge_service().delete_document(document_id)
+    except KnowledgeNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/knowledge/search")
+def search_project_knowledge(request: KnowledgeSearchRequest) -> dict:
+    try:
+        return _knowledge_service().search(
+            request.query,
+            method=request.method,
+            limit=request.limit,
+            rerank=request.rerank,
+        )
+    except KnowledgeValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except KnowledgeEmbeddingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 app.mount("/", StaticFiles(directory=PROJECT_ROOT / "frontend", html=True), name="frontend")

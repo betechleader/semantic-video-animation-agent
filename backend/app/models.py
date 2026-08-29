@@ -93,3 +93,47 @@ class AgentApproval(Base):
     )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     task: Mapped[VideoTask] = relationship(back_populates="approval")
+
+
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+
+    document_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_path: Mapped[str] = mapped_column(String(320), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    summary: Mapped[str] = mapped_column(String(400), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    index_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = (
+        UniqueConstraint("document_id", "ordinal", name="uq_knowledge_chunks_document_ordinal"),
+    )
+
+    chunk_id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    document_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_documents.document_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    embedding_json: Mapped[list] = mapped_column(JSON, nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(160), nullable=False)
+    index_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    document: Mapped[KnowledgeDocument] = relationship(back_populates="chunks")

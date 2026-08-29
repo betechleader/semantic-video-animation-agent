@@ -9,6 +9,7 @@ MODEL_ROOT = PROJECT_ROOT / "storage" / "models"
 DATABASE_PATH = STORAGE_ROOT / "tasks.sqlite3"
 ASR_CORRECTION_DICTIONARY_PATH = PROJECT_ROOT / "config" / "asr_corrections.json"
 KNOWLEDGE_ASSET_ROOT = PROJECT_ROOT / "assets" / "knowledge"
+KNOWLEDGE_ROOT = STORAGE_ROOT / "knowledge"
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,12 @@ class Settings:
     media_search_timeout_seconds: int
     media_max_download_mb: int
     pexels_api_key: str | None
+    knowledge_max_file_mb: int
+    knowledge_chunk_chars: int
+    knowledge_chunk_overlap_chars: int
+    knowledge_embedding_provider: str
+    knowledge_embedding_model: str
+    knowledge_embedding_local_files_only: bool
 
     @property
     def max_upload_bytes(self) -> int:
@@ -53,6 +60,14 @@ def load_settings() -> Settings:
         media_search_timeout_seconds=int(os.getenv("MEDIA_SEARCH_TIMEOUT_SECONDS", "20")),
         media_max_download_mb=int(os.getenv("MEDIA_MAX_DOWNLOAD_MB", "20")),
         pexels_api_key=os.getenv("PEXELS_API_KEY") or None,
+        knowledge_max_file_mb=int(os.getenv("KNOWLEDGE_MAX_FILE_MB", "5")),
+        knowledge_chunk_chars=int(os.getenv("KNOWLEDGE_CHUNK_CHARS", "600")),
+        knowledge_chunk_overlap_chars=int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP_CHARS", "80")),
+        knowledge_embedding_provider=os.getenv("KNOWLEDGE_EMBEDDING_PROVIDER", "local_hash").lower(),
+        knowledge_embedding_model=os.getenv("KNOWLEDGE_EMBEDDING_MODEL", "BAAI/bge-m3"),
+        knowledge_embedding_local_files_only=os.getenv(
+            "KNOWLEDGE_EMBEDDING_LOCAL_FILES_ONLY", "true"
+        ).lower() == "true",
     )
 
 

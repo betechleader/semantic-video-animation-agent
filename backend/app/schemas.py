@@ -312,3 +312,14 @@ class AgentApprovalEdit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     plan: AnimationPlan
+
+
+class KnowledgeSearchRequest(BaseModel):
+    """A bounded project-knowledge retrieval request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=500)
+    method: Literal["keyword", "vector", "hybrid"] = "hybrid"
+    limit: int = Field(default=5, ge=1, le=20)
+    rerank: bool = False
