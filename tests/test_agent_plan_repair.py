@@ -111,6 +111,12 @@ def test_invalid_first_plan_is_repaired_once_and_trace_is_redacted(isolated_data
     assert trace["plan_schema_version"] == "animation-plan-v1"
     assert any(entry["event_type"] == "validation_error" for entry in trace["entries"])
     assert any(entry["event_type"] == "retry" for entry in trace["entries"])
+    completed_node_runs = {
+        entry["node"]
+        for entry in trace["entries"]
+        if entry["event_type"] == "node_run" and entry["status"] == "completed"
+    }
+    assert completed_node_runs == set(agent_workflow.AGENT_NODES)
 
 
 def test_persistent_invalid_plan_stops_after_two_repairs_for_human_approval(isolated_database: Path) -> None:

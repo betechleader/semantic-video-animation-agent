@@ -1,8 +1,56 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `f1fd257 接入 Agent 模式与人工审批前端`
-- Current stage: DeepSeek Planner Provider - completed after user acceptance and approved for commit.
+- Current commit before this work: `629d445 增加 DeepSeek 规划服务`
+- Current stage: P5, Agent eval harness and observability - completed after user acceptance and approved for commit.
+
+## P5 delivered
+
+- Added an independent `evals/agent/` offline evaluation package and CLI. It reads a versioned dataset, executes both standard and Agent planning paths with the same deterministic Mock planning Provider, applies regression thresholds, and writes machine-readable JSON plus human-readable Markdown under project `storage/` only.
+- Added 12 small self-authored Chinese transcript cases. No video, transcript, or artifact from user `storage/` is part of the dataset. Two deterministic scenarios fail once and repair successfully; one persistently overlaps and stops for human intervention after the bounded repair limit.
+- Implemented AnimationPlan schema pass rate, transcript grounding precision, legal timing rate, overlap violation rate, tool-call success rate, automatic repair success rate, average retry count, human-intervention rate, task success rate, and per-stage nearest-rank P50/P95 latency.
+- Added an explicit standard-versus-Agent comparison with metric deltas. The report excludes transcript text, absolute paths, user task content, prompts, model content, and internal reasoning.
+- Added versioned min/max regression gates in `default_thresholds.json`. The CLI returns exit code 1 when a gate fails and returns 0 only when all configured gates pass.
+- Upgraded production Agent Trace to `agent-trace-v2`. Every entry has a stable run ID and node-run ID; planning/model/validation calls also have stable tool names and tool-call IDs. All eight graph nodes now record started/completed/failed lifecycle entries with measured duration. Existing v1 trace JSON is upgraded in memory and remains readable.
+- Added focused documentation describing the package structure, CLI, metric definitions, privacy boundary, and the deliberate choice to keep OpenTelemetry disabled in P5.
+
+## P5 code structure and learning notes
+
+- `evals/agent/data/chinese_cases.json` is data, not executable test logic. Its schema version and typed Pydantic loader make malformed cases fail early.
+- `evals/agent/harness.py` separates per-run observation from aggregation. Standard and Agent use the same Provider input; only their orchestration boundary differs. This makes the comparison attributable to workflow behavior instead of different model output.
+- `invoke_planning_tool` and `invoke_validation_tool` are reused directly. The repair loop is bounded by the production `MAX_PLAN_REPAIR_ATTEMPTS`, so the eval does not create a second definition of retry behavior.
+- Metric numerators and denominators are retained in run observations and converted to ratios only during aggregation. Empty denominators become JSON `null` rather than a misleading zero.
+- `evals/agent/reporting.py` keeps regression policy separate from measurement. A stricter threshold file can therefore change CI acceptance without changing evaluator code.
+- `backend/app/agent_trace.py` treats run → node → tool as identifiers rather than nested mutable objects. This keeps append-only audit entries easy to stream, compare, and migrate while avoiding chain-of-thought storage.
+
+## P5 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` → `134 passed in 98.91s`.
+- User-acceptance targeted eval/Trace/Agent/metrics suite: `.\.conda\python.exe -m pytest -q tests\test_agent_eval.py tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_metrics.py` → `17 passed in 9.34s`.
+- User-acceptance full suite: `.\.conda\python.exe -m pytest -vv` → `139 passed in 87.65s`, including the real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
+- Final CLI: `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\p5_final` → exit code `0`, `Agent eval PASS`; it wrote `agent_eval_report.json` and `agent_eval_report.md`.
+- Final default-dataset results: standard task success `1.000000`; Agent task success `0.916667`; Agent tool-call success `0.843750`; auto-repair success `0.666667`; average retries `0.333333`; human intervention `0.083333`; transcript grounding precision `1.000000`; overlap violation rate `0.040000`.
+- Manual acceptance reran the default CLI and verified 24 unique run IDs, 56 stable run/node/tool call records, privacy exclusions, and absence of transcript text or the project absolute path. A deliberately strict Agent task-success threshold returned exit code `1`, wrote `Agent eval FAIL`, and identified the expected `0.916667 < 1.0` failed gate.
+- `.\.conda\python.exe -m compileall -q backend\app evals\agent tests\test_agent_eval.py` completed successfully. `git diff --check` passed; only existing line-ending warnings were emitted.
+- Renderer build was not required because P5 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema.
+
+## P5 known limitations
+
+- The initial corpus is a deliberately small smoke/regression set, not a statistically representative editorial-quality benchmark. It uses the deterministic Mock Provider and synthetic fault scenarios; no real local LLM, DeepSeek, faster-whisper model, network Provider, or user content was evaluated.
+- Grounding precision is lexical/timing based. It does not yet score factual correctness, visual aesthetics, evidence citation, or human preference; evidence metrics belong after P6/P7.
+- Sub-millisecond local Mock latencies primarily validate instrumentation and percentile calculation, not production capacity. Real-provider latency baselines must be collected separately without weakening offline CI.
+- OpenTelemetry export is intentionally not implemented. The default remains local JSON/Markdown with no telemetry dependency or outbound connection.
+
+## Recommended P5 manual acceptance
+
+1. Run `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\manual_acceptance` with network access disabled; expect exit code 0 and `Agent eval PASS`.
+2. Open the generated JSON and Markdown. Confirm both standard and Agent columns contain all nine quality/outcome metrics plus planning/validation P50/P95 latency, and the report has 24 stable `eval:<mode>:<case>` runs with node/tool call IDs.
+3. Inspect `evals/agent/data/chinese_cases.json`; confirm there are 12 `self_authored` Chinese cases, two one-repair scenarios, one persistent-overlap scenario, and no user task/video/transcript paths.
+4. Copy `default_thresholds.json` under `storage/`, change Agent `task_success_rate.min` to `1.0`, rerun with `--thresholds <copy>` and a new storage output directory; expect exit code 1, `Agent eval FAIL`, and a failed gate in both reports.
+5. Run one short `agent + mock` task through the existing API/UI, then open its Agent Trace. Confirm schema `agent-trace-v2`, one run ID, node lifecycle records for all eight graph nodes, and named planning/validation tool-call IDs without transcript/director text or absolute paths.
+6. Run a standard Mock task and confirm its upload, render, preview, download, and existing metrics behavior remain unchanged.
+
+P5 was explicitly accepted and approved for commit. P6 has not been started.
 
 ## DeepSeek Planner Provider delivered
 

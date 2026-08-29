@@ -12,7 +12,7 @@ from typing import Any
 from .agent_tools import AGENT_PROMPT_VERSION, ANIMATION_PLAN_SCHEMA_VERSION
 
 TRACE_FILENAME = "agent_trace.json"
-TRACE_SCHEMA_VERSION = "agent-trace-v1"
+TRACE_SCHEMA_VERSION = "agent-trace-v2"
 
 
 class AgentTraceError(RuntimeError):
@@ -45,6 +45,10 @@ class AgentTrace:
             "schema_version": TRACE_SCHEMA_VERSION,
             "task_id": self.task_id,
             "workflow_mode": "agent",
+            "run": {
+                "run_id": self.task_id,
+                "kind": "video_agent_workflow",
+            },
             "prompt_version": AGENT_PROMPT_VERSION,
             "plan_schema_version": ANIMATION_PLAN_SCHEMA_VERSION,
             "planner": None,
@@ -56,6 +60,33 @@ class AgentTrace:
             "entries": [],
         }
 
+    def _upgrade(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Upgrade v1 traces in memory while preserving their audit entries."""
+
+        if payload.get("schema_version") == TRACE_SCHEMA_VERSION:
+            return payload
+        if payload.get("schema_version") != "agent-trace-v1":
+            raise AgentTraceError("Agent trace schema is unsupported")
+        payload["schema_version"] = TRACE_SCHEMA_VERSION
+        payload["run"] = {
+            "run_id": self.task_id,
+            "kind": "video_agent_workflow",
+        }
+        tool_ordinals: dict[tuple[str, str], int] = {}
+        for entry in payload.get("entries", []):
+            node = str(entry.get("node", "unknown"))
+            entry["run_id"] = self.task_id
+            entry["node_run_id"] = f"{self.task_id}:{node}"
+            if entry.get("event_type") in {"tool_call", "model_call"}:
+                tool_name = "legacy_model" if entry.get("event_type") == "model_call" else "legacy_tool"
+                key = (node, tool_name)
+                tool_ordinals[key] = tool_ordinals.get(key, 0) + 1
+                entry["tool_name"] = tool_name
+                entry["tool_call_id"] = (
+                    f"{self.task_id}:{node}:{tool_name}:{tool_ordinals[key]}"
+                )
+        return payload
+
     def read(self) -> dict[str, Any]:
         if not self.path.is_file():
             return self._empty()
@@ -65,7 +96,7 @@ class AgentTrace:
             raise AgentTraceError("Agent trace is not readable") from exc
         if not isinstance(payload, dict) or payload.get("task_id") != self.task_id:
             raise AgentTraceError("Agent trace identity is invalid")
-        return payload
+        return self._upgrade(payload)
 
     def _write(self, payload: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +121,7 @@ class AgentTrace:
         violations: list[dict[str, Any]] | None = None,
         planner: dict[str, Any] | None = None,
         retry_count: int | None = None,
+        tool_name: str | None = None,
     ) -> None:
         with self._lock:
             payload = self.read()
@@ -105,7 +137,23 @@ class AgentTrace:
                 "event_type": event_type,
                 "node": node,
                 "status": status,
+                "run_id": self.task_id,
+                "node_run_id": f"{self.task_id}:{node}",
             }
+            if event_type in {"tool_call", "model_call"}:
+                safe_tool_name = tool_name or (
+                    "model" if event_type == "model_call" else "unspecified_tool"
+                )
+                ordinal = 1 + sum(
+                    previous.get("node") == node
+                    and previous.get("tool_name") == safe_tool_name
+                    and previous.get("event_type") in {"tool_call", "model_call"}
+                    for previous in payload["entries"]
+                )
+                entry["tool_name"] = safe_tool_name
+                entry["tool_call_id"] = (
+                    f"{self.task_id}:{node}:{safe_tool_name}:{ordinal}"
+                )
             if duration_ms is not None:
                 entry["duration_ms"] = max(0, duration_ms)
             if input_summary is not None:

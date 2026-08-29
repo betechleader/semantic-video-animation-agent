@@ -463,6 +463,7 @@ def _planning_tool_call(
         context.agent_trace.append(
             "model_call",
             node="planning",
+            tool_name="planner_model",
             status="completed" if output.candidate is not None else "failed",
             duration_ms=duration_ms,
             input_summary=input_summary,
@@ -474,6 +475,7 @@ def _planning_tool_call(
     context.agent_trace.append(
         "tool_call",
         node="planning",
+        tool_name="plan_animation",
         status="completed" if output.candidate is not None else "failed",
         duration_ms=duration_ms,
         input_summary=input_summary,
@@ -506,6 +508,7 @@ def _validation_tool_call(
     context.agent_trace.append(
         "tool_call",
         node="validation",
+        tool_name="validate_animation_plan",
         status="completed" if result.valid else "failed",
         duration_ms=duration_ms,
         input_summary={
@@ -1048,6 +1051,13 @@ def run_agent_task(
             return checkpoint
 
         _node_event(context, node, "started", checkpoint["checkpoint_version"])
+        node_started_at = time.perf_counter()
+        context.agent_trace.append(
+            "node_run",
+            node=node,
+            status="started",
+            retry_count=int(state.get("repair_attempts", 0)),
+        )
         try:
             updated = _run_node(node, context, state)
             completed_nodes = list(updated["completed_nodes"])
@@ -1069,6 +1079,13 @@ def run_agent_task(
             )
             state = updated
             _node_event(context, node, "completed", checkpoint["checkpoint_version"])
+            context.agent_trace.append(
+                "node_run",
+                node=node,
+                status="completed",
+                duration_ms=round((time.perf_counter() - node_started_at) * 1_000),
+                retry_count=int(updated.get("repair_attempts", 0)),
+            )
             if node == "validation" and updated.get("approval_reasons"):
                 checkpoint = store.save(
                     task_id,
@@ -1090,6 +1107,14 @@ def run_agent_task(
                 expected_version=checkpoint["checkpoint_version"],
             )
             _node_event(context, node, "failed", checkpoint["checkpoint_version"], error_category="cancelled")
+            context.agent_trace.append(
+                "node_run",
+                node=node,
+                status="failed",
+                duration_ms=round((time.perf_counter() - node_started_at) * 1_000),
+                error_category="cancelled",
+                retry_count=int(state.get("repair_attempts", 0)),
+            )
             _reconcile_terminal_checkpoint(context, checkpoint)
             return checkpoint
         except Exception as exc:
@@ -1114,6 +1139,14 @@ def run_agent_task(
                 next_node=node,
                 run_status="failed",
                 expected_version=checkpoint["checkpoint_version"],
+            )
+            context.agent_trace.append(
+                "node_run",
+                node=node,
+                status="failed",
+                duration_ms=round((time.perf_counter() - node_started_at) * 1_000),
+                error_category=error_category,
+                retry_count=int(failed_state.get("repair_attempts", 0)),
             )
             _reconcile_terminal_checkpoint(context, checkpoint, error=str(exc))
             return checkpoint

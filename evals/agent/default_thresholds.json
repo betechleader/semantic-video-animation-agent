@@ -1,0 +1,23 @@
+{
+  "schema_version": "agent-eval-thresholds-v1",
+  "modes": {
+    "standard": {
+      "animation_plan_schema_pass_rate": {"min": 1.0},
+      "transcript_grounding_precision": {"min": 0.95},
+      "time_interval_valid_rate": {"min": 1.0},
+      "overlap_violation_rate": {"max": 0.0},
+      "task_success_rate": {"min": 1.0}
+    },
+    "agent": {
+      "animation_plan_schema_pass_rate": {"min": 1.0},
+      "transcript_grounding_precision": {"min": 0.95},
+      "time_interval_valid_rate": {"min": 1.0},
+      "overlap_violation_rate": {"max": 0.10},
+      "tool_call_success_rate": {"min": 0.80},
+      "auto_repair_success_rate": {"min": 0.60},
+      "average_retry_count": {"max": 0.50},
+      "human_intervention_rate": {"max": 0.10},
+      "task_success_rate": {"min": 0.90}
+    }
+  }
+}

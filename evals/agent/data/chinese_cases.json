@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent-eval-dataset-v1",
+  "name": "self-authored-chinese-planning-smoke-v1",
+  "cases": [
+    {"id": "structured_output", "source": "self_authored", "description": "抽象概念强调", "segments": [{"text": "结构化输出非常重要", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "innovation_methods", "source": "self_authored", "description": "数字方法表达", "segments": [{"text": "三种提高创新性的方法值得反复练习", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "psychology_book", "source": "self_authored", "description": "书籍实体视觉", "segments": [{"text": "阅读心理学与生活可以帮助我们理解行为", "start_ms": 1000, "end_ms": 5000}], "agent_scenario": "invalid_schema_once"},
+    {"id": "factory_flow", "source": "self_authored", "description": "工厂生产视觉", "segments": [{"text": "工厂生产需要稳定的流程和质量检查", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "product_budget", "source": "self_authored", "description": "产品成本主题", "segments": [{"text": "产品成本和价格共同决定项目预算", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "learning_review", "source": "self_authored", "description": "学习主题视觉", "segments": [{"text": "学习新知识以后要及时练习和复盘", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "task_steps", "source": "self_authored", "description": "流程信息图与一次规则修复", "segments": [{"text": "首先确定目标然后拆分任务最后复盘结果", "start_ms": 1000, "end_ms": 5000}], "agent_scenario": "invalid_rule_once"},
+    {"id": "cultural_diversity", "source": "self_authored", "description": "文化主题素材", "segments": [{"text": "接触各种各样的文化能带来新的视角", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "future_research", "source": "self_authored", "description": "研究和未来概念", "segments": [{"text": "研究发现设想一年之后有助于长期决策", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "cinderella_story", "source": "self_authored", "description": "故事实体视觉", "segments": [{"text": "改写灰姑娘故事可以训练创造性表达", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "user_feedback", "source": "self_authored", "description": "用户反馈主题", "segments": [{"text": "用户反馈能帮助团队持续改进产品", "start_ms": 1000, "end_ms": 5000}]},
+    {"id": "clear_communication", "source": "self_authored", "description": "持续重叠违规触发人工介入", "segments": [{"text": "清晰表达能够减少团队沟通中的误解", "start_ms": 1000, "end_ms": 5000}], "agent_scenario": "persistent_overlap"}
+  ]
+}
