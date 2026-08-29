@@ -337,6 +337,71 @@ class AgentApprovalEdit(BaseModel):
     plan: AnimationPlan
 
 
+class PlanPatchOperation(BaseModel):
+    """One reviewable, server-verified change to an existing animation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_id: str = Field(pattern=r"^operation_[A-Za-z0-9_-]+$")
+    operation: Literal["replace_animation", "remove_animation"]
+    target_animation_id: str = Field(pattern=r"^animation_[A-Za-z0-9_-]+$")
+    before: Animation
+    after: Animation | None = None
+    reason: str = Field(min_length=1, max_length=240)
+    confidence: float = Field(ge=0, le=1)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_patch_shape(self) -> "PlanPatchOperation":
+        if self.before.id != self.target_animation_id:
+            raise ValueError("before animation must match target_animation_id")
+        if self.operation == "replace_animation":
+            if self.after is None or self.after.id != self.target_animation_id:
+                raise ValueError("replace_animation requires a matching after animation")
+        elif self.after is not None:
+            raise ValueError("remove_animation must not include an after animation")
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("patch evidence_ids must be unique")
+        return self
+
+
+class PlanPatch(BaseModel):
+    """Typed output boundary for natural-language plan modification."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["plan-patch-v1"] = "plan-patch-v1"
+    operations: list[PlanPatchOperation] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_operation_ids(self) -> "PlanPatch":
+        ids = [item.operation_id for item in self.operations]
+        if len(ids) != len(set(ids)):
+            raise ValueError("patch operation IDs must be unique")
+        targets = [item.target_animation_id for item in self.operations]
+        if len(targets) != len(set(targets)):
+            raise ValueError("a patch may change each animation at most once")
+        return self
+
+
+class PlanPatchPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instruction: str = Field(min_length=1, max_length=1_000)
+
+
+class PlanPatchApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class PlanPatchRejectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = Field(default=None, max_length=240)
+
+
 class KnowledgeSearchRequest(BaseModel):
     """A bounded project-knowledge retrieval request."""
 

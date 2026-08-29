@@ -18,6 +18,7 @@
       resultEyebrow: '生成完成', resultTitle: '成片已准备好', resultDescription: '先检查播放效果，再进入下方高级审核区调整转写、动画或素材。', downloadResult: '下载成片', summaryTitle: '本地生成完成', summaryDescription: '成片已通过技术质量检查，可下载或继续审核。', durationLabel: '时长', resolutionLabel: '分辨率', taskLabel: '任务编号', secondsUnit: '秒',
       advancedEyebrow: '高级审核', advancedTitle: '检查并微调生成内容', advancedDescription: '这些内容不会占据初始创作界面，仅在成片完成后按需展开。', reviewTabs: '审核内容', transcriptTab: '转写文本', planTab: '动画计划', mediaTab: '素材审核', evidenceTab: '知识证据', agentTraceTab: 'Agent 轨迹', activityTab: '任务记录', transcriptTitle: '转写文本 JSON', transcriptHelp: '修改分段文本后保存，后端会沿用原时间区间并重新规划动画。', planTitle: '动画计划 JSON', planHelp: '可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。', evidenceTitle: '知识证据与引用', evidenceHelp: '显示 Agent 采用的本地知识片段、来源和实时索引状态；失效引用不能进入审批或重渲染。', evidenceValid: '全部引用有效（{count}）', evidenceInvalid: '存在失效引用（{count}）', evidenceEmpty: '本计划没有采用知识证据，事实视觉会安全降级。', evidenceSource: '来源：{source}', evidenceCitedBy: '引用动画：{animations}', evidenceStatus: '索引状态：{status}', agentTraceTitle: 'Agent 审计摘要', agentTraceHelp: '仅展示节点、工具、重试、耗时和结构化错误，不展示内部思维链或内容正文。', traceStatus: '状态：{status}', tracePlanner: '规划器：{planner}', traceRetries: '重试：{count}', traceEntry: '{node} · {type} · {status}', traceDuration: '耗时 {duration} ms', traceViolations: '问题：{codes}', noAgentTrace: 'Agent Trace 尚未生成。',
       approvalEyebrow: '需要人工决策', approvalTitle: '审核 Agent 动画计划', approvalHelp: '确认后从持久 Checkpoint 继续；编辑会再次经过服务端 schema、规划规则与安全区校验。', approvalPlanLabel: '待审批动画计划 JSON', approvePlan: '批准并继续', editPlan: '验证修改并继续', rejectPlan: '拒绝任务', approvalReasonFallback: '该计划需要人工确认。', approval_reason_policy_always: '当前策略要求在渲染前进行人工审核。', approval_reason_plan_repair_exhausted: '自动修复次数已耗尽，需要提交一份通过校验的编辑计划。', approval_reason_media_relevance_unverified: '外部素材与内容的相关性尚未由审核者确认。', approval_reason_external_media_rights_review: '外部素材来源与权利信息需要人工审核。', approvalSubmittingTitle: '正在提交审批', approvalSubmitting: '正在保存人工决策…', approvalResumingTitle: '正在恢复 Agent', approvalResuming: '决策已保存，Agent 将从渲染节点继续。', approvalFailedTitle: '审批失败', approvalFailed: '无法提交审批：{message}', rejectedTitle: '任务已拒绝', event_rejected: '人工已拒绝该计划，任务不会进入渲染。', awaitingApprovalTitle: '等待人工审批', event_awaiting_approval: 'Agent 已在渲染前暂停，请审核下方计划。', event_approved: '计划已批准，准备从 Checkpoint 恢复。', event_edited: '修改后的计划已通过校验，准备恢复。', event_resumed: 'Agent 已从持久 Checkpoint 恢复。',
+      planPatchTab: '自然语言修改', planPatchTitle: '自然语言计划修改', planPatchHelp: '先预览强类型逐项修改；批准不会改变正式计划，只有应用后才会重新校验和渲染。', planTimelineLabel: '动画时间轴', planPatchInstruction: '修改指令', planPatchPlaceholder: '例如：前三秒更抓人，减少全屏素材', previewPlanPatch: '预览修改', approveSelectedPatch: '批准选中项', rejectPatch: '拒绝本次修改', applyPatch: '应用并重新渲染', undoPatch: '撤销最近修改', patchBefore: '修改前', patchAfter: '修改后', patchReason: '原因：{reason} · 置信度 {confidence}', patchEmpty: '输入一条导演修改指令以生成逐项预览。', patchPreviewed: '修改预览已生成，正式计划尚未改变。', patchApproved: '选中修改已批准，正式计划仍未改变。', patchRejected: '本次修改已拒绝。', patchRendering: '修改已应用，正在重新渲染。', patchUndone: '最近一次修改已撤销，正在恢复上一版本。',
       reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。', searchQueryLabel: '搜索词', searchPlaceholder: '例如：supermarket product', mediaTypeLabel: '类型', imageKind: '图片', videoKind: '视频', searchButton: '搜索素材', manualUrlLabel: '人工候选 URL', manualUrlPlaceholder: 'https://...', addManualButton: '添加候选', activityTitle: '任务事件', activityHelp: '记录当前浏览器会话中收到的创建、处理、渲染和审核状态。', replanNote: '修改转写后保存时，后端会根据修改后的文本自动重建动画计划，并清理旧素材派生数据。', saveReview: '保存修改并重新渲染',
       tasksEyebrow: '本机任务', tasksTitle: '最近任务', tasksDescription: '这里仅显示此浏览器在本机创建或恢复过的真实任务，不生成示例数据。', restoreTitle: '恢复已有任务', restoreDescription: '输入本机任务编号，可重新打开仍保存在 storage 目录中的任务。', taskIdPlaceholder: '任务编号', restoreButton: '恢复任务', restoringTask: '正在查找本机任务…', restoreFailed: '无法恢复该任务：{message}', noTasks: '没有可显示的最近任务。', openTask: '打开任务', unknownFile: '未记录文件名', unavailableTask: '任务已不在本机存储中',
       settingsEyebrow: '平台设置', settingsTitle: '设置', settingsDescription: '当前仅提供与本地工作台真实能力相关的偏好。', interfaceLanguage: '界面语言', interfaceLanguageDescription: '语言偏好会保存在浏览器中，刷新后继续生效。', storageTitle: '本地数据', storageDescription: '上传素材、任务数据库、转写、计划与成片由 FastAPI 服务保存在本机 storage 目录。本页面不提供云同步或账户功能。', localStorageActive: '本地存储已启用',
@@ -43,6 +44,7 @@
       resultEyebrow: 'Generation complete', resultTitle: 'Your video is ready', resultDescription: 'Review playback first, then use the advanced area below to adjust the transcript, animation, or media.', downloadResult: 'Download video', summaryTitle: 'Generated locally', summaryDescription: 'The result passed technical quality checks and is ready to download or review.', durationLabel: 'Duration', resolutionLabel: 'Resolution', taskLabel: 'Task ID', secondsUnit: 'sec',
       advancedEyebrow: 'Advanced review', advancedTitle: 'Inspect and refine generated content', advancedDescription: 'Advanced data stays out of the initial workflow and appears only after the result is ready.', reviewTabs: 'Review content', transcriptTab: 'Transcript', planTab: 'Animation plan', mediaTab: 'Media review', evidenceTab: 'Evidence', agentTraceTab: 'Agent trace', activityTab: 'Task activity', transcriptTitle: 'Transcript JSON', transcriptHelp: 'Edit segment text and save; the backend reuses the original time span and rebuilds the plan.', planTitle: 'Animation plan JSON', planHelp: 'Inspect the timeline, template parameters, and selected media. Backend validation rejects unsafe edits.', evidenceTitle: 'Knowledge evidence and citations', evidenceHelp: 'Shows local knowledge excerpts, sources, and live index status used by the Agent. Invalid citations cannot pass approval or re-render.', evidenceValid: 'All citations are valid ({count})', evidenceInvalid: 'Invalid citations found ({count})', evidenceEmpty: 'This plan uses no knowledge evidence; factual visuals are safely downgraded.', evidenceSource: 'Source: {source}', evidenceCitedBy: 'Cited by: {animations}', evidenceStatus: 'Index status: {status}', agentTraceTitle: 'Agent audit summary', agentTraceHelp: 'Shows nodes, tools, retries, durations, and structured errors only—never private chain of thought or content bodies.', traceStatus: 'Status: {status}', tracePlanner: 'Planner: {planner}', traceRetries: 'Retries: {count}', traceEntry: '{node} · {type} · {status}', traceDuration: 'Duration {duration} ms', traceViolations: 'Issues: {codes}', noAgentTrace: 'Agent Trace is not available yet.',
       approvalEyebrow: 'Human decision required', approvalTitle: 'Review the Agent animation plan', approvalHelp: 'A decision resumes from the durable checkpoint. Edits repeat server-side schema, planning-rule, and safe-area validation.', approvalPlanLabel: 'Animation plan awaiting approval (JSON)', approvePlan: 'Approve and continue', editPlan: 'Validate edits and continue', rejectPlan: 'Reject task', approvalReasonFallback: 'This plan requires human confirmation.', approval_reason_policy_always: 'The current policy requires human review before rendering.', approval_reason_plan_repair_exhausted: 'Automatic repair is exhausted; submit an edited plan that passes validation.', approval_reason_media_relevance_unverified: 'External media relevance has not been confirmed by a reviewer.', approval_reason_external_media_rights_review: 'External media source and rights information requires human review.', approvalSubmittingTitle: 'Submitting approval', approvalSubmitting: 'Saving the human decision…', approvalResumingTitle: 'Resuming Agent', approvalResuming: 'Decision saved. The Agent will continue from the render node.', approvalFailedTitle: 'Approval failed', approvalFailed: 'Could not submit approval: {message}', rejectedTitle: 'Task rejected', event_rejected: 'A reviewer rejected the plan, so the task will not render.', awaitingApprovalTitle: 'Awaiting human approval', event_awaiting_approval: 'The Agent paused before render. Review the plan below.', event_approved: 'Plan approved and ready to resume from checkpoint.', event_edited: 'The edited plan passed validation and is ready to resume.', event_resumed: 'The Agent resumed from its durable checkpoint.',
+      planPatchTab: 'Natural-language edit', planPatchTitle: 'Natural-language plan edit', planPatchHelp: 'Preview typed changes item by item. Approval does not change the formal plan; Apply revalidates and renders it.', planTimelineLabel: 'Animation timeline', planPatchInstruction: 'Edit instruction', planPatchPlaceholder: 'e.g. Make the first three seconds stronger and reduce full-screen media', previewPlanPatch: 'Preview changes', approveSelectedPatch: 'Approve selected', rejectPatch: 'Reject patch', applyPatch: 'Apply and re-render', undoPatch: 'Undo latest edit', patchBefore: 'Before', patchAfter: 'After', patchReason: 'Reason: {reason} · confidence {confidence}', patchEmpty: 'Enter a director edit instruction to generate an itemized preview.', patchPreviewed: 'Patch preview created; the formal plan is unchanged.', patchApproved: 'Selected changes approved; the formal plan is still unchanged.', patchRejected: 'The patch was rejected.', patchRendering: 'The patch was applied and is re-rendering.', patchUndone: 'The latest edit was undone and the previous version is rendering.',
       reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.', searchQueryLabel: 'Search query', searchPlaceholder: 'e.g. supermarket product', mediaTypeLabel: 'Type', imageKind: 'Image', videoKind: 'Video', searchButton: 'Search media', manualUrlLabel: 'Manual candidate URL', manualUrlPlaceholder: 'https://...', addManualButton: 'Add candidate', activityTitle: 'Task events', activityHelp: 'Events received by this browser session for creation, processing, rendering, and review.', replanNote: 'When transcript text changes, saving rebuilds the animation plan and removes stale media-derived data.', saveReview: 'Save edits and re-render',
       tasksEyebrow: 'On-device tasks', tasksTitle: 'Recent tasks', tasksDescription: 'Only real tasks created or restored by this browser are shown. No sample data is generated.', restoreTitle: 'Restore an existing task', restoreDescription: 'Enter a local task ID to reopen a task that still exists in the storage directory.', taskIdPlaceholder: 'Task ID', restoreButton: 'Restore task', restoringTask: 'Looking for the local task…', restoreFailed: 'Could not restore this task: {message}', noTasks: 'No recent tasks to show.', openTask: 'Open task', unknownFile: 'Filename not recorded', unavailableTask: 'Task is no longer available in local storage',
       settingsEyebrow: 'Platform settings', settingsTitle: 'Settings', settingsDescription: 'Only preferences backed by real local workspace capabilities are shown.', interfaceLanguage: 'Interface language', interfaceLanguageDescription: 'The language preference is stored in this browser and persists after refresh.', storageTitle: 'Local data', storageDescription: 'Uploads, the task database, transcripts, plans, and results are stored by FastAPI in the local storage directory. There is no cloud sync or account feature.', localStorageActive: 'Local storage enabled',
@@ -100,6 +102,7 @@
     agentExecutionPanel: $('#agent-execution-panel'), agentNodeList: $('#agent-node-list'), agentRetryBadge: $('#agent-retry-badge'), approvalPanel: $('#approval-panel'), approvalReasons: $('#approval-reasons'), approvalEvidence: $('#approval-evidence'), approvalPlan: $('#approval-plan'), approvalError: $('#approval-error'), approvePlan: $('#approve-plan'), editPlan: $('#edit-plan'), rejectPlan: $('#reject-plan'),
     result: $('#result'), preview: $('#preview'), download: $('#download'), resultDuration: $('#result-duration'), resultResolution: $('#result-resolution'), resultTaskId: $('#result-task-id'),
     transcript: $('#transcript'), plan: $('#plan'), saveReview: $('#save-review'), mediaList: $('#media-list'), mediaQuery: $('#media-query'), mediaKind: $('#media-kind'), searchMedia: $('#search-media'), manualMediaUrl: $('#manual-media-url'), addManualMedia: $('#add-manual-media'), candidateList: $('#candidate-list'), evidenceSummary: $('#evidence-summary'), evidenceList: $('#evidence-list'), eventList: $('#event-list'), agentTraceSummary: $('#agent-trace-summary'), agentTraceList: $('#agent-trace-list'),
+    planTimeline: $('#plan-timeline'), planPatchInstruction: $('#plan-patch-instruction'), previewPlanPatch: $('#preview-plan-patch'), planPatchList: $('#plan-patch-list'), approvePlanPatch: $('#approve-plan-patch'), rejectPlanPatch: $('#reject-plan-patch'), applyPlanPatch: $('#apply-plan-patch'), undoPlanPatch: $('#undo-plan-patch'),
     tasksList: $('#tasks-list'), restoreForm: $('#restore-form'), restoreTaskId: $('#restore-task-id'), restoreError: $('#restore-error'),
   };
 
@@ -115,6 +118,7 @@
     agentTrace: null,
     evidence: null,
     approval: null,
+    planPatch: null,
     eventSource: null,
     statusKey: 'ready',
     statusParams: {},
@@ -217,9 +221,9 @@
     refs.progressTrack.hidden = agent;
     refs.standardProcessingStages.hidden = agent;
     refs.agentExecutionPanel.hidden = !agent || !state.taskId;
-    document.querySelectorAll('[data-tab="agent"], [data-tab="evidence"]').forEach((tab) => { tab.hidden = !agent; });
-    if (!agent) document.querySelectorAll('[data-tab-panel="agent"], [data-tab-panel="evidence"]').forEach((panel) => { panel.hidden = true; });
-    if (!agent && ['agent', 'evidence'].includes(state.activeTab)) selectTab('transcript');
+    document.querySelectorAll('[data-tab="agent"], [data-tab="evidence"], [data-tab="patch"]').forEach((tab) => { tab.hidden = !agent; });
+    if (!agent) document.querySelectorAll('[data-tab-panel="agent"], [data-tab-panel="evidence"], [data-tab-panel="patch"]').forEach((panel) => { panel.hidden = true; });
+    if (!agent && ['agent', 'evidence', 'patch'].includes(state.activeTab)) selectTab('transcript');
     if (agent) renderAgentExecution();
   }
 
@@ -847,6 +851,7 @@
     if (task.status === 'completed') {
       refs.transcript.value = pretty(task.transcript);
       refs.plan.value = pretty(task.plan);
+      renderPlanTimeline(task.plan);
       state.previewVersion = version || 'stored';
       showResult(id, state.previewVersion);
       refs.resultDuration.textContent = `${Number(task.metadata.duration_seconds).toFixed(2)} ${t('secondsUnit')}`;
@@ -856,6 +861,7 @@
       updateProgress('completed');
       await loadMediaReview(id);
       if (task.workflow_mode === 'agent') {
+        if (!state.planPatch || state.planPatch.task_id !== id) renderPlanPatch(null);
         await loadEvidence(id).catch(() => {});
         await loadAgentTrace(id).catch(() => {});
         if (!state.events.length) watchTask(id, {terminalReplay: true});
@@ -913,6 +919,68 @@
 
   function writePlan(value) {
     refs.plan.value = pretty(value);
+  }
+
+  function renderPlanTimeline(plan) {
+    refs.planTimeline.replaceChildren();
+    const duration = Math.max(1, Number(state.currentTask?.metadata?.duration_seconds || 1) * 1000);
+    (plan?.animations || []).forEach((animation) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `timeline-item timeline-${animation.type}`;
+      item.style.left = `${Math.min(100, animation.start_ms / duration * 100)}%`;
+      item.style.width = `${Math.max(3, (animation.end_ms - animation.start_ms) / duration * 100)}%`;
+      item.title = `${animation.id} · ${animation.start_ms}–${animation.end_ms} ms`;
+      item.textContent = animation.parameters?.title || animation.parameters?.text || animation.id;
+      refs.planTimeline.append(item);
+    });
+  }
+
+  function renderPlanPatch(record) {
+    state.planPatch = record;
+    refs.planPatchList.replaceChildren();
+    const operations = record?.patch?.operations || [];
+    if (!operations.length) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-state';
+      empty.textContent = t('patchEmpty');
+      refs.planPatchList.append(empty);
+    }
+    operations.forEach((operation) => {
+      const card = document.createElement('article');
+      card.className = 'patch-card';
+      const choice = document.createElement('input');
+      choice.type = 'checkbox';
+      choice.value = operation.operation_id;
+      choice.checked = true;
+      choice.disabled = record.status !== 'pending';
+      choice.setAttribute('aria-label', operation.target_animation_id);
+      const heading = document.createElement('div');
+      heading.className = 'patch-card-heading';
+      const title = document.createElement('strong');
+      title.textContent = `${operation.operation} · ${operation.target_animation_id}`;
+      const reason = document.createElement('small');
+      reason.textContent = t('patchReason', {reason: operation.reason, confidence: Number(operation.confidence).toFixed(2)});
+      heading.append(choice, title, reason);
+      const diff = document.createElement('div');
+      diff.className = 'patch-diff';
+      [[t('patchBefore'), operation.before], [t('patchAfter'), operation.after]].forEach(([label, value]) => {
+        const column = document.createElement('div');
+        const caption = document.createElement('b'); caption.textContent = label;
+        const content = document.createElement('pre'); content.textContent = pretty(value);
+        column.append(caption, content); diff.append(column);
+      });
+      card.append(heading, diff); refs.planPatchList.append(card);
+    });
+    refs.approvePlanPatch.disabled = !operations.length || record.status !== 'pending';
+    refs.rejectPlanPatch.disabled = !operations.length || record.status !== 'pending';
+    refs.applyPlanPatch.disabled = record?.status !== 'approved';
+  }
+
+  async function patchRequest(path, options = {}) {
+    const response = await fetch(`/api/videos/${encodeURIComponent(state.taskId)}/plan-patches${path}`, options);
+    if (!response.ok) throw new Error(await responseError(response));
+    return response.json();
   }
 
   function findMediaAnimation(plan, assetId) {
@@ -1016,11 +1084,22 @@
     candidates.forEach((candidate) => {
       const card = document.createElement('article');
       card.className = 'media-card';
+      if (candidate.asset_kind === 'external_image' && candidate.source_url) {
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'candidate-thumbnail';
+        thumbnail.src = candidate.source_url;
+        thumbnail.alt = candidate.title;
+        thumbnail.loading = 'lazy';
+        thumbnail.referrerPolicy = 'no-referrer';
+        card.append(thumbnail);
+      }
       const title = document.createElement('strong');
       const kindLabel = candidate.asset_kind === 'external_video' ? t('videoAsset') : t('imageAsset');
       title.textContent = `${candidate.title} · ${kindLabel}`;
       const source = document.createElement('small');
       source.textContent = `${candidate.provider} · ${candidate.author_or_provider} · ${candidate.license}`;
+      const relevance = document.createElement('small');
+      relevance.textContent = `${Math.round(Number(candidate.review_relevance || 0) * 100)}% · ${candidate.selection_reason || ''}`;
       const actions = document.createElement('div');
       actions.className = 'media-card-actions';
       const target = document.createElement('select');
@@ -1038,7 +1117,7 @@
       use.disabled = !target.options.length;
       use.addEventListener('click', () => useCandidate(candidate, target.value));
       actions.append(target, use);
-      card.append(title, source, actions);
+      card.append(title, source, relevance, actions);
       refs.candidateList.append(card);
     });
   }
@@ -1071,12 +1150,16 @@
     state.lastEventId = 0;
     state.events = [];
     state.candidates = [];
+    state.planPatch = null;
     state.previewVersion = 'stored';
     resetAgentState();
     localStorage.removeItem(STORAGE_KEYS.currentTask);
     refs.input.value = '';
     refs.transcript.value = '';
     refs.plan.value = '';
+    refs.planPatchInstruction.value = '';
+    renderPlanPatch(null);
+    refs.planTimeline.replaceChildren();
     refs.preview.removeAttribute('src');
     delete refs.preview.dataset.sourceKey;
     refs.preview.load();
@@ -1129,6 +1212,66 @@
     } finally {
       refs.uploadButton.disabled = false;
     }
+  });
+
+  refs.previewPlanPatch.addEventListener('click', async () => {
+    if (!state.taskId || !refs.planPatchInstruction.value.trim()) return;
+    try {
+      refs.previewPlanPatch.disabled = true;
+      const record = await patchRequest('/preview', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({instruction: refs.planPatchInstruction.value.trim()}),
+      });
+      renderPlanPatch(record);
+      setStatus('patchPreviewed', {}, {titleKey: 'planPatchTitle', tone: 'success'});
+    } catch (error) {
+      setStatus('reviewFailed', {message: error.message}, {titleKey: 'reviewFailedTitle', tone: 'error'});
+    } finally { refs.previewPlanPatch.disabled = false; }
+  });
+
+  refs.approvePlanPatch.addEventListener('click', async () => {
+    if (!state.planPatch) return;
+    const operationIds = [...refs.planPatchList.querySelectorAll('input[type="checkbox"]:checked')].map((item) => item.value);
+    if (!operationIds.length) return;
+    try {
+      const record = await patchRequest(`/${encodeURIComponent(state.planPatch.patch_id)}/approve`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({operation_ids: operationIds}),
+      });
+      renderPlanPatch(record);
+      setStatus('patchApproved', {}, {titleKey: 'planPatchTitle', tone: 'success'});
+    } catch (error) { setStatus('reviewFailed', {message: error.message}, {titleKey: 'reviewFailedTitle', tone: 'error'}); }
+  });
+
+  refs.rejectPlanPatch.addEventListener('click', async () => {
+    if (!state.planPatch) return;
+    try {
+      const record = await patchRequest(`/${encodeURIComponent(state.planPatch.patch_id)}/reject`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({reason: null}),
+      });
+      renderPlanPatch(record);
+      setStatus('patchRejected', {}, {titleKey: 'planPatchTitle', tone: 'warning'});
+    } catch (error) { setStatus('reviewFailed', {message: error.message}, {titleKey: 'reviewFailedTitle', tone: 'error'}); }
+  });
+
+  refs.applyPlanPatch.addEventListener('click', async () => {
+    if (!state.planPatch) return;
+    try {
+      await patchRequest(`/${encodeURIComponent(state.planPatch.patch_id)}/apply`, {method: 'POST'});
+      setWorkflowStage('processing', {preserveResult: true});
+      setStatus('patchRendering', {}, {titleKey: 'renderingStatusTitle', tone: 'info'});
+      watchTask(state.taskId);
+    } catch (error) { setStatus('reviewFailed', {message: error.message}, {titleKey: 'reviewFailedTitle', tone: 'error'}); }
+  });
+
+  refs.undoPlanPatch.addEventListener('click', async () => {
+    if (!state.taskId) return;
+    try {
+      await patchRequest('/undo', {method: 'POST'});
+      state.planPatch = null;
+      setWorkflowStage('processing', {preserveResult: true});
+      setStatus('patchUndone', {}, {titleKey: 'renderingStatusTitle', tone: 'info'});
+      watchTask(state.taskId);
+    } catch (error) { setStatus('reviewFailed', {message: error.message}, {titleKey: 'reviewFailedTitle', tone: 'error'}); }
   });
 
   refs.saveReview.addEventListener('click', async () => {

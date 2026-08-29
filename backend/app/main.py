@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import threading
 import time
@@ -15,13 +16,21 @@ from .config import KNOWLEDGE_ROOT, MAX_UPLOAD_BYTES, PROJECT_ROOT, SETTINGS, ST
 from .asr_corrections import correct_transcript, load_phrase_corrections, normalize_review_transcript
 from .database import (
     append_task_event,
+    begin_latest_plan_undo,
+    begin_plan_patch_apply,
     create_task,
+    create_plan_patch,
+    decide_plan_patch,
     decide_agent_approval,
+    ensure_plan_version,
     get_agent_approval,
     get_task,
     get_task_events,
+    get_plan_patch,
+    get_latest_plan_undo_candidate,
     initialize_database,
     request_cancellation,
+    list_plan_versions,
     start_review_render,
     update_transcript,
 )
@@ -33,7 +42,7 @@ from .process_control import process_registry
 from .planning_rules import PlanningRuleError, validate_animation_plan
 from .quality import QualityValidationError, validate_animation_safe_areas
 from .providers import TranscriptAnimationPlanningProvider
-from .schemas import AgentApprovalEdit, AnimationPlan, KnowledgeSearchRequest, ManualMediaCandidateInput, MediaSearchRequest, ReviewUpdate, Transcript, VideoMetadata
+from .schemas import AgentApprovalEdit, AnimationPlan, KnowledgeSearchRequest, ManualMediaCandidateInput, MediaSearchRequest, PlanPatch, PlanPatchApprovalRequest, PlanPatchPreviewRequest, PlanPatchRejectRequest, ReviewUpdate, Transcript, VideoMetadata
 from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
@@ -55,6 +64,7 @@ from .knowledge_base import (
     KnowledgeValidationError,
 )
 from .workflow_services import retrieve_agent_evidence, validate_agent_plan_evidence
+from .plan_patches import PlanPatchError, apply_plan_patch, build_rule_plan_patch
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -319,6 +329,162 @@ def reject_video_agent_plan(task_id: str) -> dict:
     return {"task_id": task_id, "status": "rejected", "decision_version": decided["decision_version"]}
 
 
+def _completed_agent_task(task_id: str) -> dict:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["workflow_mode"] != "agent":
+        raise HTTPException(status_code=409, detail="Natural-language plan patches are only available for Agent tasks")
+    if task["status"] != "completed" or task.get("plan") is None or task.get("transcript") is None:
+        raise HTTPException(status_code=409, detail="Plan patches are available after an Agent task completes")
+    return task
+
+
+def _validate_patched_plan(task: dict, plan: AnimationPlan) -> AnimationPlan:
+    validated = validate_animation_plan(plan, Transcript.model_validate(task["transcript"]))
+    validated = validate_agent_plan_evidence(validated)
+    metadata = VideoMetadata.model_validate(task["metadata"])
+    validate_animation_safe_areas(validated, metadata.width, metadata.height)
+    return validated
+
+
+def _start_patch_render(task_id: str, task: dict, plan: AnimationPlan, patch_id: str | None) -> None:
+    task_dir = StorageService(STORAGE_ROOT).task_directory(task_id)
+    metrics = TaskMetrics(task_dir, task_id)
+    try:
+        metrics.current_or_start_attempt("review")
+    except RuntimeError:
+        metrics = initialize_initial_metrics(task_dir, task_id, task["trace_id"], 0)
+        metrics.finalize(1, "completed")
+        metrics.current_or_start_attempt("review")
+    start_review_task(
+        task_id,
+        task_dir,
+        VideoMetadata.model_validate(task["metadata"]),
+        Transcript.model_validate(task["transcript"]),
+        plan,
+        task["trace_id"],
+        patch_id,
+    )
+
+
+@app.post("/api/videos/{task_id}/plan-patches/preview", status_code=status.HTTP_201_CREATED)
+def preview_video_plan_patch(task_id: str, request: PlanPatchPreviewRequest) -> dict:
+    task = _completed_agent_task(task_id)
+    current = AnimationPlan.model_validate(task["plan"])
+    try:
+        patch = build_rule_plan_patch(request.instruction, current)
+        preview = _validate_patched_plan(
+            task, apply_plan_patch(current, patch, [item.operation_id for item in patch.operations])
+        )
+    except (PlanPatchError, PlanningRuleError, EvidenceValidationError, QualityValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    base_version = ensure_plan_version(task_id, current.model_dump())
+    patch_id = str(uuid4())
+    record = create_plan_patch(
+        task_id,
+        patch_id,
+        hashlib.sha256(request.instruction.encode("utf-8")).hexdigest(),
+        base_version,
+        patch.model_dump(),
+    )
+    append_task_event(task_id, "plan_patch_previewed", "Natural-language plan patch preview created", {
+        "patch_id": patch_id, "base_version": base_version, "operation_count": len(patch.operations),
+    })
+    return {**record, "preview_plan": preview.model_dump()}
+
+
+@app.get("/api/videos/{task_id}/plan-patches/{patch_id}")
+def get_video_plan_patch(task_id: str, patch_id: str) -> dict:
+    record = get_plan_patch(task_id, patch_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Plan patch not found")
+    return record
+
+
+@app.get("/api/videos/{task_id}/plan-versions")
+def get_video_plan_versions(task_id: str) -> dict:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["workflow_mode"] != "agent":
+        raise HTTPException(status_code=409, detail="Plan versions are only available for Agent tasks")
+    return {"task_id": task_id, "versions": list_plan_versions(task_id)}
+
+
+@app.post("/api/videos/{task_id}/plan-patches/{patch_id}/approve")
+def approve_video_plan_patch(task_id: str, patch_id: str, request: PlanPatchApprovalRequest) -> dict:
+    task = _completed_agent_task(task_id)
+    record = get_plan_patch(task_id, patch_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Plan patch not found")
+    try:
+        patch = PlanPatch.model_validate(record["patch"])
+        preview = _validate_patched_plan(
+            task,
+            apply_plan_patch(AnimationPlan.model_validate(task["plan"]), patch, request.operation_ids),
+        )
+    except (PlanPatchError, PlanningRuleError, EvidenceValidationError, QualityValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    decided = decide_plan_patch(task_id, patch_id, "approved", request.operation_ids)
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Plan patch has already been decided")
+    append_task_event(task_id, "plan_patch_approved", "Plan patch operations approved", {
+        "patch_id": patch_id, "operation_count": len(request.operation_ids),
+    })
+    return {**decided, "preview_plan": preview.model_dump()}
+
+
+@app.post("/api/videos/{task_id}/plan-patches/{patch_id}/reject")
+def reject_video_plan_patch(task_id: str, patch_id: str, request: PlanPatchRejectRequest) -> dict:
+    _completed_agent_task(task_id)
+    decided = decide_plan_patch(task_id, patch_id, "rejected", reason=request.reason)
+    if decided is None:
+        raise HTTPException(status_code=409, detail="Plan patch has already been decided")
+    append_task_event(task_id, "plan_patch_rejected", "Plan patch rejected", {"patch_id": patch_id})
+    return decided
+
+
+@app.post("/api/videos/{task_id}/plan-patches/{patch_id}/apply", status_code=status.HTTP_202_ACCEPTED)
+def apply_video_plan_patch(task_id: str, patch_id: str) -> dict:
+    task = _completed_agent_task(task_id)
+    record = get_plan_patch(task_id, patch_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Plan patch not found")
+    if record["status"] != "approved":
+        raise HTTPException(status_code=409, detail="Plan patch must be approved before apply")
+    try:
+        plan = _validate_patched_plan(task, apply_plan_patch(
+            AnimationPlan.model_validate(task["plan"]),
+            PlanPatch.model_validate(record["patch"]),
+            record["approved_operation_ids"],
+        ))
+    except (PlanPatchError, PlanningRuleError, EvidenceValidationError, QualityValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    started = begin_plan_patch_apply(task_id, patch_id, plan.model_dump())
+    if started is None:
+        raise HTTPException(status_code=409, detail="Plan patch is stale, already applied, or the task is busy")
+    _start_patch_render(task_id, task, plan, patch_id)
+    return {"task_id": task_id, "patch_id": patch_id, "status": "rendering", "plan_version": started["resulting_version"]}
+
+
+@app.post("/api/videos/{task_id}/plan-patches/undo", status_code=status.HTTP_202_ACCEPTED)
+def undo_latest_video_plan_patch(task_id: str) -> dict:
+    task = _completed_agent_task(task_id)
+    candidate = get_latest_plan_undo_candidate(task_id)
+    if candidate is None:
+        raise HTTPException(status_code=409, detail="There is no applied plan patch to undo")
+    try:
+        plan = _validate_patched_plan(task, AnimationPlan.model_validate(candidate["plan"]))
+    except (PlanningRuleError, EvidenceValidationError, QualityValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    restored = begin_latest_plan_undo(task_id, plan.model_dump())
+    if restored is None:
+        raise HTTPException(status_code=409, detail="The latest plan patch can no longer be undone")
+    _start_patch_render(task_id, task, plan, None)
+    return {"task_id": task_id, "patch_id": restored["patch_id"], "status": "rendering", "plan_version": restored["plan_version"]}
+
+
 @app.get("/api/videos/{task_id}/evidence")
 def get_video_agent_evidence(task_id: str) -> dict:
     task = get_task(task_id)
@@ -332,6 +498,21 @@ def get_video_agent_evidence(task_id: str) -> dict:
         return evidence_status(AnimationPlan.model_validate(task["plan"]), _knowledge_service())
     except (KnowledgeBaseError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _candidate_review(candidate: dict | object) -> dict:
+    data = candidate.model_dump() if hasattr(candidate, "model_dump") else dict(candidate)
+    query = str(data.get("query", "")).lower()
+    searchable = f"{data.get('title', '')} {data.get('author_or_provider', '')}".lower()
+    terms = {token for token in query.replace("-", " ").split() if len(token) > 1}
+    matched = sorted(term for term in terms if term in searchable)
+    relevance = round(len(matched) / max(1, len(terms)), 3)
+    data["review_relevance"] = relevance
+    data["selection_reason"] = (
+        f"Matched candidate metadata: {', '.join(matched[:4])}"
+        if matched else "No direct metadata match; reviewer confirmation required"
+    )
+    return data
 
 
 @app.get("/api/videos/{task_id}/media")
@@ -354,7 +535,7 @@ def get_video_media_review(task_id: str) -> dict:
         }
         for animation in plan["animations"] if animation["type"] == "media_visual"
     }
-    return {"assets": plan.get("media_assets", []), "usage": usage, "candidates": candidates}
+    return {"assets": plan.get("media_assets", []), "usage": usage, "candidates": [_candidate_review(item) for item in candidates]}
 
 
 @app.post("/api/videos/{task_id}/media/search")
@@ -371,7 +552,7 @@ def search_video_media(task_id: str, request: MediaSearchRequest) -> dict:
         save_candidates(task_dir, candidates)
     except (ValueError, MediaProviderError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"query": request.query, "candidates": candidates}
+    return {"query": request.query, "candidates": [_candidate_review(item) for item in candidates]}
 
 
 @app.post("/api/videos/{task_id}/media/candidates")
@@ -387,7 +568,7 @@ def add_manual_video_media_candidate(task_id: str, request: ManualMediaCandidate
         save_candidates(task_dir, [candidate])
     except (ValueError, MediaProviderError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"candidate": candidate}
+    return {"candidate": _candidate_review(candidate)}
 
 
 @app.get("/api/videos/{task_id}/download")

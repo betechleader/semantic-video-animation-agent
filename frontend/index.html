@@ -195,6 +195,7 @@
               <div class="tabs" role="tablist" aria-label="审核内容" data-i18n-aria-label="reviewTabs">
                 <button id="tab-transcript" role="tab" type="button" aria-selected="true" aria-controls="panel-transcript" data-tab="transcript" data-i18n="transcriptTab">转写文本</button>
                 <button id="tab-plan" role="tab" type="button" aria-selected="false" aria-controls="panel-plan" data-tab="plan" data-i18n="planTab">动画计划</button>
+                <button id="tab-patch" class="agent-only" role="tab" type="button" aria-selected="false" aria-controls="panel-patch" data-tab="patch" data-i18n="planPatchTab" hidden>自然语言修改</button>
                 <button id="tab-media" role="tab" type="button" aria-selected="false" aria-controls="panel-media" data-tab="media" data-i18n="mediaTab">素材审核</button>
                 <button id="tab-evidence" class="agent-only" role="tab" type="button" aria-selected="false" aria-controls="panel-evidence" data-tab="evidence" data-i18n="evidenceTab" hidden>知识证据</button>
                 <button id="tab-agent" class="agent-only" role="tab" type="button" aria-selected="false" aria-controls="panel-agent" data-tab="agent" data-i18n="agentTraceTab" hidden>Agent 轨迹</button>
@@ -207,6 +208,13 @@
               <div id="panel-plan" class="tab-panel" role="tabpanel" aria-labelledby="tab-plan" data-tab-panel="plan" hidden>
                 <div class="editor-heading"><div><h3 data-i18n="planTitle">动画计划 JSON</h3><p data-i18n="planHelp">可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。</p></div><span class="code-label">JSON</span></div>
                 <label class="sr-only" for="plan" data-i18n="planTitle">动画计划 JSON</label><textarea id="plan" spellcheck="false"></textarea>
+              </div>
+              <div id="panel-patch" class="tab-panel agent-only" role="tabpanel" aria-labelledby="tab-patch" data-tab-panel="patch" hidden>
+                <div class="editor-heading"><div><h3 data-i18n="planPatchTitle">自然语言计划修改</h3><p data-i18n="planPatchHelp">先预览强类型逐项修改；批准不会改变正式计划，只有应用后才会重新校验和渲染。</p></div></div>
+                <div id="plan-timeline" class="plan-timeline" aria-label="动画时间轴" data-i18n-aria-label="planTimelineLabel"></div>
+                <div class="patch-compose"><label class="field field-grow"><span data-i18n="planPatchInstruction">修改指令</span><input id="plan-patch-instruction" maxlength="1000" placeholder="例如：前三秒更抓人，减少全屏素材" data-i18n-placeholder="planPatchPlaceholder" /></label><button id="preview-plan-patch" class="button button-secondary align-end" type="button" data-i18n="previewPlanPatch">预览修改</button></div>
+                <div id="plan-patch-list" class="plan-patch-list"></div>
+                <div class="patch-actions"><button id="approve-plan-patch" class="button button-secondary" type="button" disabled data-i18n="approveSelectedPatch">批准选中项</button><button id="reject-plan-patch" class="button button-secondary" type="button" disabled data-i18n="rejectPatch">拒绝本次修改</button><button id="apply-plan-patch" class="button button-primary" type="button" disabled data-i18n="applyPatch">应用并重新渲染</button><button id="undo-plan-patch" class="button button-ghost" type="button" data-i18n="undoPatch">撤销最近修改</button></div>
               </div>
               <div id="panel-media" class="tab-panel" role="tabpanel" aria-labelledby="tab-media" data-tab-panel="media" hidden>
                 <div class="editor-heading"><div><h3 data-i18n="reviewTitle">外部 B-roll 素材审核</h3><p class="warning-copy" data-i18n="reviewNote">外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。</p></div></div>

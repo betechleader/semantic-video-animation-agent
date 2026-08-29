@@ -6,13 +6,13 @@ from alembic import command
 from alembic.config import Config
 from datetime import datetime, timezone
 
-from sqlalchemy import create_engine, select, update
+from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import DATABASE_PATH, PROJECT_ROOT, STORAGE_ROOT
-from .models import AgentApproval, ApprovalPolicy, TaskEvent, TaskStatus, VideoTask, WorkflowMode
+from .models import AgentApproval, AgentPlanPatch, ApprovalPolicy, PlanVersion, TaskEvent, TaskStatus, VideoTask, WorkflowMode
 
 _engine: Engine | None = None
 _engine_path: Path | None = None
@@ -365,3 +365,184 @@ def decide_agent_approval(task_id: str, decision: str, plan: dict | None = None)
         approval = session.get(AgentApproval, task_id)
         assert approval is not None
         return _serialize_approval(approval)
+
+
+def _latest_plan_version(session: Session, task_id: str) -> int:
+    return int(session.scalar(select(func.max(PlanVersion.version)).where(PlanVersion.task_id == task_id)) or 0)
+
+
+def _version_plan(plan: dict) -> dict:
+    normalized = dict(plan)
+    normalized["media_assets"] = []
+    normalized["face_regions"] = []
+    normalized["media_placements"] = []
+    return normalized
+
+
+def ensure_plan_version(task_id: str, plan: dict) -> int:
+    """Return the current version, creating the immutable baseline when needed."""
+
+    initialize_database()
+    with next(get_session()) as session:
+        latest = _latest_plan_version(session, task_id)
+        plan = _version_plan(plan)
+        if latest == 0:
+            session.add(PlanVersion(task_id=task_id, version=1, plan_json=plan, source="baseline"))
+            session.commit()
+            return 1
+        row = session.scalar(select(PlanVersion).where(PlanVersion.task_id == task_id, PlanVersion.version == latest))
+        if row is None or row.plan_json != plan:
+            latest += 1
+            session.add(PlanVersion(task_id=task_id, version=latest, plan_json=plan, source="external_review"))
+            session.commit()
+        return latest
+
+
+def _serialize_plan_patch(row: AgentPlanPatch) -> dict:
+    return {
+        "patch_id": row.patch_id,
+        "task_id": row.task_id,
+        "status": row.status,
+        "base_version": row.base_version,
+        "patch": row.patch_json,
+        "approved_operation_ids": row.approved_operation_ids_json,
+        "resulting_version": row.resulting_version,
+        "rejection_reason": row.rejection_reason,
+        "instruction_sha256": row.instruction_sha256,
+        "created_at": row.created_at.isoformat(),
+        "decided_at": row.decided_at.isoformat() if row.decided_at else None,
+    }
+
+
+def create_plan_patch(task_id: str, patch_id: str, instruction_sha256: str, base_version: int, patch: dict) -> dict:
+    with next(get_session()) as session:
+        row = AgentPlanPatch(
+            patch_id=patch_id,
+            task_id=task_id,
+            status="pending",
+            instruction_sha256=instruction_sha256,
+            base_version=base_version,
+            patch_json=patch,
+            approved_operation_ids_json=[],
+        )
+        session.add(row)
+        session.commit()
+        return _serialize_plan_patch(row)
+
+
+def get_plan_patch(task_id: str, patch_id: str) -> dict | None:
+    initialize_database()
+    with next(get_session()) as session:
+        row = session.get(AgentPlanPatch, patch_id)
+        return None if row is None or row.task_id != task_id else _serialize_plan_patch(row)
+
+
+def list_plan_versions(task_id: str) -> list[dict]:
+    initialize_database()
+    with next(get_session()) as session:
+        rows = session.scalars(select(PlanVersion).where(PlanVersion.task_id == task_id).order_by(PlanVersion.version)).all()
+        return [{"version": row.version, "source": row.source, "source_patch_id": row.source_patch_id, "created_at": row.created_at.isoformat()} for row in rows]
+
+
+def decide_plan_patch(task_id: str, patch_id: str, decision: str, operation_ids: list[str] | None = None, reason: str | None = None) -> dict | None:
+    if decision not in {"approved", "rejected"}:
+        raise ValueError("Unsupported plan patch decision")
+    with next(get_session()) as session:
+        values = {
+            "status": decision,
+            "decided_at": datetime.now(timezone.utc),
+            "approved_operation_ids_json": operation_ids or [],
+            "rejection_reason": reason,
+        }
+        result = session.execute(update(AgentPlanPatch).where(
+            AgentPlanPatch.patch_id == patch_id,
+            AgentPlanPatch.task_id == task_id,
+            AgentPlanPatch.status == "pending",
+        ).values(**values))
+        if result.rowcount != 1:
+            session.rollback()
+            return None
+        session.commit()
+        row = session.get(AgentPlanPatch, patch_id)
+        assert row is not None
+        return _serialize_plan_patch(row)
+
+
+def begin_plan_patch_apply(task_id: str, patch_id: str, plan: dict) -> dict | None:
+    """Atomically consume one approved patch and return the task to rendering."""
+
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        patch = session.get(AgentPlanPatch, patch_id)
+        latest = _latest_plan_version(session, task_id)
+        if (
+            task is None or patch is None or patch.task_id != task_id
+            or task.status != TaskStatus.COMPLETED or patch.status != "approved"
+            or patch.base_version != latest
+        ):
+            return None
+        new_version = latest + 1
+        patch.status = "applying"
+        patch.resulting_version = new_version
+        task.status = TaskStatus.RENDERING
+        task.plan_json = plan
+        task.error = None
+        task.cancel_requested = False
+        session.add(PlanVersion(task_id=task_id, version=new_version, plan_json=plan, source="agent_patch", source_patch_id=patch_id))
+        session.add(_event(task_id, "plan_patch_applying", "Approved plan patch is rendering", {"patch_id": patch_id, "plan_version": new_version}))
+        session.commit()
+        return _serialize_plan_patch(patch)
+
+
+def finish_plan_patch(task_id: str, patch_id: str, succeeded: bool) -> None:
+    with next(get_session()) as session:
+        patch = session.get(AgentPlanPatch, patch_id)
+        if patch is not None and patch.task_id == task_id and patch.status == "applying":
+            patch.status = "applied" if succeeded else "failed"
+            session.commit()
+
+
+def get_latest_plan_undo_candidate(task_id: str) -> dict | None:
+    initialize_database()
+    with next(get_session()) as session:
+        patch = session.scalar(select(AgentPlanPatch).where(
+            AgentPlanPatch.task_id == task_id,
+            AgentPlanPatch.status == "applied",
+        ).order_by(AgentPlanPatch.decided_at.desc(), AgentPlanPatch.patch_id.desc()))
+        latest = _latest_plan_version(session, task_id)
+        if patch is None or patch.resulting_version != latest:
+            return None
+        previous = session.scalar(select(PlanVersion).where(
+            PlanVersion.task_id == task_id, PlanVersion.version == patch.base_version,
+        ))
+        return None if previous is None else {"patch_id": patch.patch_id, "plan": previous.plan_json}
+
+
+def begin_latest_plan_undo(task_id: str, validated_plan: dict) -> dict | None:
+    """Restore the version preceding the most recently applied, non-undone patch."""
+
+    with next(get_session()) as session:
+        task = session.get(VideoTask, task_id)
+        patch = session.scalar(select(AgentPlanPatch).where(
+            AgentPlanPatch.task_id == task_id,
+            AgentPlanPatch.status == "applied",
+        ).order_by(AgentPlanPatch.decided_at.desc(), AgentPlanPatch.patch_id.desc()))
+        latest = _latest_plan_version(session, task_id)
+        if task is None or task.status != TaskStatus.COMPLETED or patch is None or patch.resulting_version != latest:
+            return None
+        previous = session.scalar(select(PlanVersion).where(
+            PlanVersion.task_id == task_id,
+            PlanVersion.version == patch.base_version,
+        ))
+        if previous is None or previous.plan_json != validated_plan:
+            return None
+        restored_version = latest + 1
+        restored_plan = previous.plan_json
+        patch.status = "undone"
+        task.status = TaskStatus.RENDERING
+        task.plan_json = restored_plan
+        task.error = None
+        session.add(PlanVersion(task_id=task_id, version=restored_version, plan_json=restored_plan, source="undo", source_patch_id=patch.patch_id))
+        session.add(_event(task_id, "plan_patch_undone", "Latest applied plan patch was undone", {"patch_id": patch.patch_id, "plan_version": restored_version}))
+        session.commit()
+        return {"patch_id": patch.patch_id, "plan": restored_plan, "plan_version": restored_version}

@@ -137,3 +137,40 @@ class KnowledgeChunk(Base):
     embedding_model: Mapped[str] = mapped_column(String(160), nullable=False)
     index_version: Mapped[str] = mapped_column(String(64), nullable=False)
     document: Mapped[KnowledgeDocument] = relationship(back_populates="chunks")
+
+
+class PlanVersion(Base):
+    __tablename__ = "plan_versions"
+    __table_args__ = (UniqueConstraint("task_id", "version", name="uq_plan_versions_task_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(
+        ForeignKey("video_tasks.task_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    plan_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_patch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AgentPlanPatch(Base):
+    __tablename__ = "agent_plan_patches"
+
+    patch_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(
+        ForeignKey("video_tasks.task_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    instruction_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    patch_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    approved_operation_ids_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    resulting_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 
 from .audio import AudioExtractionError, AudioService
-from .database import get_task, transition_task
+from .database import finish_plan_patch, get_task, transition_task
 from .metrics import TaskMetrics, initialize_initial_metrics
 from .models import TaskStatus
 from .processing import ProcessingCancelled, ProcessingError, render_and_composite
@@ -86,7 +86,7 @@ def start_task(
     return thread
 
 
-def rerender_review(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str) -> None:
+def rerender_review(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str, patch_id: str | None = None) -> None:
     metrics = TaskMetrics(task_dir, task_id)
     attempt = metrics.current_or_start_attempt("review")
     output_quality: dict | None = None
@@ -95,11 +95,17 @@ def rerender_review(task_id: str, task_dir: Path, metadata: VideoMetadata, trans
             task_dir, metadata, transcript, plan, task_id=task_id, stage_runner=lambda stage, action: metrics.record_stage(attempt, stage, action),
         )
         transition_task(task_id, TaskStatus.COMPLETED, "Review result video created", transcript=transcript_data, plan=plan_data)
+        if patch_id:
+            finish_plan_patch(task_id, patch_id, True)
         logger.info("review_task_completed", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "completed"})
     except ProcessingCancelled:
         transition_task(task_id, TaskStatus.CANCELLED, "Review rendering cancelled")
+        if patch_id:
+            finish_plan_patch(task_id, patch_id, False)
     except (ProcessingError, RuntimeError) as exc:
         transition_task(task_id, TaskStatus.FAILED, "Review rendering failed", error=str(exc))
+        if patch_id:
+            finish_plan_patch(task_id, patch_id, False)
         logger.error("review_task_failed", extra={"task_id": task_id, "trace_id": trace_id, "event_type": "failed"})
     finally:
         task = get_task(task_id)
@@ -108,10 +114,10 @@ def rerender_review(task_id: str, task_dir: Path, metadata: VideoMetadata, trans
             metrics.finalize(attempt, task["status"], failure_category=failure_category, output_quality=output_quality)
 
 
-def start_review_task(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str) -> threading.Thread:
+def start_review_task(task_id: str, task_dir: Path, metadata: VideoMetadata, transcript: Transcript, plan: AnimationPlan, trace_id: str, patch_id: str | None = None) -> threading.Thread:
     thread = threading.Thread(
         target=rerender_review,
-        args=(task_id, task_dir, metadata, transcript, plan, trace_id),
+        args=(task_id, task_dir, metadata, transcript, plan, trace_id, patch_id),
         daemon=True,
         name=f"review-video-task-{task_id}",
     )

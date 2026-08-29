@@ -191,3 +191,20 @@ def test_agent_ui_preserves_accessibility_mobile_layout_and_reduced_motion() -> 
     assert '.evidence-card-heading { flex-direction: column; }' in styles
     assert "@media (prefers-reduced-motion: reduce)" in styles
     assert "overflow-x: hidden" in styles
+
+
+def test_agent_plan_patch_ui_is_preview_first_and_mobile_safe() -> None:
+    html = HTML.read_text(encoding="utf-8")
+    script = SCRIPT.read_text(encoding="utf-8")
+    styles = STYLES.read_text(encoding="utf-8")
+    assert 'data-tab="patch"' in html
+    assert 'id="plan-timeline"' in html
+    assert 'id="plan-patch-instruction"' in html
+    assert 'id="approve-plan-patch"' in html
+    assert 'id="apply-plan-patch"' in html
+    assert 'id="undo-plan-patch"' in html
+    assert "/plan-patches${path}" in script
+    assert "operation_ids" in script
+    assert "candidate-thumbnail" in script
+    assert "selection_reason" in script
+    assert ".patch-diff { grid-template-columns: 1fr; }" in styles

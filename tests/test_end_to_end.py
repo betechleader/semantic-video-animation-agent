@@ -74,6 +74,7 @@ def test_full_video_processing_pipeline(tmp_path: Path, monkeypatch) -> None:
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
+
         # A real review render must accept a disabled media visual even while
         # the submitted JSON still contains its stale audit and placement.
         reviewed_plan = task["plan"]
@@ -168,3 +169,28 @@ def test_agent_mock_video_processing_pipeline(tmp_path: Path, monkeypatch) -> No
         download = client.get(f"/api/videos/{task_id}/download")
         assert download.status_code == 200
         assert download.headers["content-type"].startswith("video/mp4")
+
+        patch_preview = client.post(
+            f"/api/videos/{task_id}/plan-patches/preview",
+            json={"instruction": "前三秒更抓人"},
+        )
+        assert patch_preview.status_code == 201, patch_preview.text
+        patch = patch_preview.json()
+        operation_ids = [item["operation_id"] for item in patch["patch"]["operations"]]
+        assert client.post(
+            f"/api/videos/{task_id}/plan-patches/{patch['patch_id']}/approve",
+            json={"operation_ids": operation_ids},
+        ).status_code == 200
+        apply_response = client.post(
+            f"/api/videos/{task_id}/plan-patches/{patch['patch_id']}/apply"
+        )
+        assert apply_response.status_code == 202, apply_response.text
+        deadline = time.monotonic() + 120
+        while True:
+            patched_task = client.get(f"/api/videos/{task_id}").json()
+            if patched_task["status"] in {"completed", "failed", "cancelled"} or time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
+        assert patched_task["status"] == "completed", patched_task.get("error")
+        assert patched_task["plan"]["animations"][0]["selection_reason"] == "Natural-language request: stronger opening"
+        assert probe_video(storage / task_id / "result.mp4").has_video is True

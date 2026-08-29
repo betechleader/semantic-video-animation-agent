@@ -339,6 +339,19 @@ textarea { display: block; width: 100%; min-height: 380px; resize: vertical; bor
 .media-search-panel { display: grid; gap: 12px; margin-top: 20px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: #11141a; }
 .media-search-row, .manual-row { display: flex; align-items: end; gap: 10px; }
 .media-search-row .field, .manual-row .field { margin-top: 0; }
+.plan-timeline { position: relative; min-height: 92px; margin-bottom: 18px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md); background: repeating-linear-gradient(90deg, #11141a 0, #11141a calc(10% - 1px), #252a34 10%); }
+.timeline-item { position: absolute; top: 20px; min-width: 34px; height: 48px; overflow: hidden; padding: 6px; border: 1px solid #5b6474; border-radius: 7px; background: #283244; color: var(--text); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-media_visual { background: #303d2d; }
+.timeline-info_graphic { background: #3b3150; }
+.patch-compose, .patch-actions { display: flex; align-items: end; gap: 10px; margin: 16px 0; }
+.patch-compose .field { margin: 0; }
+.plan-patch-list { display: grid; gap: 12px; }
+.patch-card { min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-soft); }
+.patch-card-heading { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+.patch-card-heading small { grid-column: 2; color: var(--muted); }
+.patch-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.patch-diff pre { max-height: 240px; overflow: auto; padding: 10px; border-radius: var(--radius-sm); background: #0b0d11; font-size: 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-thumbnail { width: 100%; max-height: 180px; margin-bottom: 10px; border-radius: var(--radius-sm); object-fit: contain; background: #090b0e; }
 .align-end { flex: 0 0 auto; }
 .candidate-list { margin-top: 14px; }
 .event-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
@@ -459,6 +472,9 @@ textarea { display: block; width: 100%; min-height: 380px; resize: vertical; bor
   .review-footer { align-items: stretch; flex-direction: column; padding: 17px 18px; }
   .review-footer .button { width: 100%; }
   .media-search-row, .manual-row { align-items: stretch; flex-direction: column; }
+  .patch-compose, .patch-actions { align-items: stretch; flex-direction: column; }
+  .patch-actions .button { width: 100%; }
+  .patch-diff { grid-template-columns: 1fr; }
   .align-end { width: 100%; }
   .media-card-header { flex-direction: column; }
   .agent-node-list { grid-template-columns: 1fr; }

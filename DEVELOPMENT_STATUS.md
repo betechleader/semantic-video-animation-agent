@@ -1,8 +1,48 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `4059a45 增加本地知识库与混合检索`
-- Current stage: P7, Citation-grounded RAG semantic planning - implementation, automated verification, and browser acceptance complete; explicitly accepted for commit.
+- Current commit before this work: `9e2e427 增加带引用的RAG语义规划`
+- Current stage: P8, Natural-language edits and visual timeline - implementation and automated/browser verification complete; explicitly accepted for commit.
+
+## P8 delivered
+
+- Added Agent-only natural-language plan editing for completed tasks. The offline deterministic interpreter supports the acceptance phrases for a stronger opening, reduced full-screen media/face-safe side cards, and explicit animation-ID removal or media disable; it emits only Pydantic `PlanPatch`/`PlanPatchOperation` objects rather than replacing the whole server plan.
+- Each operation carries its operation type, target `animation_id`, authoritative `before`, typed `after`, reason, confidence, and applicable evidence IDs. Multiple requested changes to one animation are merged into one operation.
+- Added the durable `preview -> approve selected items / reject -> apply` protocol. Preview and approval do not mutate `video_tasks.plan_json`; Apply atomically consumes one approved, non-stale patch, creates a plan version, moves the task to rendering, and rejects repeated or stale Apply calls.
+- The apply boundary compares every `before` snapshot with the current server plan, accepts only operation IDs present in the stored patch, clears browser-untrusted `media_assets`, `face_regions`, and `media_placements`, removes unused evidence references, and reruns Pydantic schema validation, transcript grounding/planning rules, live evidence validation, and renderer safe-area checks.
+- Added immutable plan-version history and latest-applied-patch Undo through Alembic revision `0006_agent_plan_patches`. Undo restores the prior validated formal plan as a new version and reuses the existing review-render pipeline.
+- Extended the existing Agent review area with a lightweight real-time animation timeline, bounded natural-language input, per-item checkboxes, before/after JSON diff, separate approve/reject/apply actions, and latest-edit Undo. The controls remain Agent-only, bilingual, keyboard accessible, reduced-motion compatible, and mobile stacked.
+- B-roll candidate cards now show lazy image thumbnails plus deterministic metadata relevance and a concise selection reason. Candidate choice still goes through the existing server-owned audit/download/render boundary.
+- Reused the existing `start_review_task`, metrics, Remotion, FFmpeg, evidence, media preparation, face-safety, and quality services. Standard workflow APIs and rendering behavior were not changed.
+
+## P8 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` -> `154 passed in 96.46s`.
+- Final focused typed-patch/API/version tests: `.\.conda\python.exe -m pytest -q tests\test_plan_patches.py` -> `5 passed in 2.47s`.
+- Focused P8 frontend and patch suite: `.\.conda\python.exe -m pytest -q tests\test_plan_patches.py tests\test_frontend_i18n.py` -> `18 passed in 2.50s`.
+- Actual Agent Mock patch render: `.\.conda\python.exe -m pytest -vv tests\test_end_to_end.py::test_agent_mock_video_processing_pipeline` -> `1 passed in 47.69s`; the task completed once, then Preview/Approve/Apply triggered a second real Remotion/FFmpeg render and retained the approved plan change.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` -> `160 passed in 119.98s`, including standard Mock, Agent Mock, approval/recovery, RAG, knowledge, review, and both actual render paths.
+- `.\.conda\python.exe -m compileall -q backend\app alembic\versions tests\test_plan_patches.py` passed; `.\.conda\python.exe -m alembic heads` reported the single head `0006_agent_plan_patches`; `node.exe --check frontend\app.js` passed.
+- Browser acceptance restored an existing completed Agent task without creating a patch. The page showed two real timeline items and the Agent-only patch tab; at 390x844 the controls stacked vertically, document width did not overflow the viewport, and the console had no warnings/errors.
+- Renderer build was not required because P8 does not change TypeScript, Remotion source, or the `AnimationPlan` render contract. The final full suite nevertheless exercised the renderer in both original and patch re-render paths.
+
+## P8 known limitations
+
+- The offline interpreter is deliberately deterministic and currently recognizes the documented acceptance phrases plus explicit animation-ID remove/disable commands. It does not claim open-domain editorial understanding; a future validated local/model Provider can implement the same typed boundary.
+- P8 edits existing animations only; adding entirely new animations from prose is not included in this first patch contract.
+- Candidate relevance is explainable metadata overlap rather than a learned visual ranker. Remote candidate thumbnails are loaded by the reviewer's browser only when that existing external-media review surface is opened; rights and factual suitability still require human review.
+- Undo is intentionally limited to the latest successfully applied patch. Distributed render recovery and failed-review worker recovery remain P10 scope.
+
+## Recommended P8 manual acceptance
+
+1. Run `.\.conda\python.exe -m alembic upgrade head`, start FastAPI, and complete a short `agent + mock` task. Confirm the standard workflow still completes unchanged and has no natural-language edit tab.
+2. Open the completed Agent task's “自然语言修改 / Natural-language edit” tab. Confirm the timeline matches the plan intervals, enter `前三秒更抓人，减少全屏素材`, and click Preview. Verify every item shows a checkbox, target animation ID, before/after, reason, confidence, and that the formal plan/result has not changed.
+3. Uncheck one item if multiple are shown, approve the selected items, and confirm the formal plan is still unchanged. Click Apply once; expect rendering, a new completed result, and HTTP 409/no second render from a repeated Apply.
+4. Enter an unknown animation ID or unsupported/out-of-range edit; expect HTTP 422 or a clear UI error and no render. Reject a fresh valid preview; confirm Apply remains disabled and the formal plan is unchanged.
+5. Click Undo after a successful Apply. Expect another validated render and restoration of the preceding plan version. Refresh the page and confirm the restored task/result remains available.
+6. Check the media tab for candidate thumbnails, relevance percentage, and selection reason; repeat the patch flow in Chinese/English and around 390 px width, confirming no horizontal overflow and usable keyboard focus.
+
+P8 was explicitly accepted and approved for commit. P9 has not been started.
 
 ## P7 delivered
 
