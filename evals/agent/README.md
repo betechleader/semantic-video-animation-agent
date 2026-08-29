@@ -1,6 +1,6 @@
 # Agent Eval Harness
 
-This directory is an independent, fully offline planning evaluation suite. It does not read `storage/`, call a model, download media, or render video. The default dataset contains only self-authored Chinese transcript snippets.
+This directory is an independent, fully offline planning and citation evaluation suite. It does not read `storage/`, call a model, download media, or render video. The default dataset contains only self-authored Chinese transcript and knowledge snippets.
 
 Run it from the repository root:
 
@@ -28,6 +28,8 @@ The command writes `agent_eval_report.json` for automation and `agent_eval_repor
 - `average_retry_count`: repair calls per run.
 - `human_intervention_rate`: runs that exhaust repair and enter `awaiting_human` divided by all runs.
 - `task_success_rate`: completed runs divided by all runs.
-- `stage_latency_ms`: nearest-rank P50/P95 for planning and validation calls. Latency is observational and may vary; semantic outcomes and counts are deterministic.
+- `evidence_retrieval_hit_rate`: self-authored evidence cases whose expected chunk is returned by the typed retrieval boundary.
+- `citation_correctness_rate`: selected citations that point to the expected supporting chunk rather than the distractor.
+- `stage_latency_ms`: nearest-rank P50/P95 for retrieval, planning, and validation calls. Latency is observational and may vary; semantic outcomes and counts are deterministic.
 
 The report deliberately excludes transcript text, absolute paths, user task content, model prompts, and internal reasoning. OpenTelemetry export is not enabled in P5; local JSON/Markdown remain the only default outputs.

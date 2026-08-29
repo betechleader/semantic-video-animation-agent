@@ -16,7 +16,7 @@
       readyTitle: '准备开始', ready: '请选择一个 MP4 视频开始处理。', sourceEyebrow: '第一步', uploadTitle: '添加口播原片', uploadDescription: '支持最大 100 MB 的 MP4 文件。素材将保存在本地任务目录。', dropTitle: '拖放视频到这里，或点击选择', noFileChosen: '尚未选择文件', dropHint: 'MP4 · 最大 100 MB', generationSettings: '生成设置', settingsHint: '推荐配置适合正式本地处理', workflowMode: '工作流模式', workflowStandard: '标准工作流（稳定）', workflowAgent: 'Agent 工作流', directorInstruction: '导演指令（可选）', directorInstructionPlaceholder: '例如：前三秒更抓人，减少全屏素材', approvalPolicy: '审批策略', approvalNever: '无需审批', approvalOnRisk: '遇到风险时审批', approvalAlways: '始终审批', agentSettingsHelp: 'Agent 将按真实节点执行；导演指令只进入 Agent 状态，审批会在渲染前暂停。', processingMode: '处理模式', profileReal: '真实转写 + 语义规划（推荐）', profileMock: 'Mock 测试文案', profileConfigured: '使用服务端环境变量', externalMedia: '素材来源', providerKnowledge: '知识素材组合（推荐）', providerWikimedia: '仅 Wikimedia Commons', providerPexels: 'Pexels（需要 API Key）', providerMock: '本地原创信息图', providerManual: '仅人工候选 URL', settingPrivacyNote: '语音识别与渲染在本机完成；外部素材模式可能访问所选素材服务。', uploadButton: '上传并开始生成', invalidFile: '请选择有效的 MP4 文件。',
       processingEyebrow: '任务进行中', processingTitle: '正在本地生成视频', taskProgress: '任务进度', processCreated: '任务已创建', processTranscribe: '转写与语义规划', processRender: '动画渲染与合成', processComplete: '质量检查完成', cancelTask: '取消任务', agentExecutionEyebrow: '真实执行状态', agentExecutionTitle: 'Agent 节点轨迹', agentExecutionHelp: '状态直接来自持久工作流的 SSE 节点事件，不使用估算百分比。', agentRetries: '重试 {count} 次', nodeStatusNotStarted: '未开始', nodeStatusStarted: '执行中', nodeStatusResumed: '已恢复', nodeStatusCompleted: '已完成', nodeStatusFailed: '失败', node_upload_probe: '上传与探测', node_audio_asr: '音频与转写', node_correction: '转写校正', node_planning: '语义规划', node_validation: '计划校验', node_render: '动画渲染', node_quality: '质量检查', node_complete: '完成任务',
       resultEyebrow: '生成完成', resultTitle: '成片已准备好', resultDescription: '先检查播放效果，再进入下方高级审核区调整转写、动画或素材。', downloadResult: '下载成片', summaryTitle: '本地生成完成', summaryDescription: '成片已通过技术质量检查，可下载或继续审核。', durationLabel: '时长', resolutionLabel: '分辨率', taskLabel: '任务编号', secondsUnit: '秒',
-      advancedEyebrow: '高级审核', advancedTitle: '检查并微调生成内容', advancedDescription: '这些内容不会占据初始创作界面，仅在成片完成后按需展开。', reviewTabs: '审核内容', transcriptTab: '转写文本', planTab: '动画计划', mediaTab: '素材审核', agentTraceTab: 'Agent 轨迹', activityTab: '任务记录', transcriptTitle: '转写文本 JSON', transcriptHelp: '修改分段文本后保存，后端会沿用原时间区间并重新规划动画。', planTitle: '动画计划 JSON', planHelp: '可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。', agentTraceTitle: 'Agent 审计摘要', agentTraceHelp: '仅展示节点、工具、重试、耗时和结构化错误，不展示内部思维链或内容正文。', traceStatus: '状态：{status}', tracePlanner: '规划器：{planner}', traceRetries: '重试：{count}', traceEntry: '{node} · {type} · {status}', traceDuration: '耗时 {duration} ms', traceViolations: '问题：{codes}', noAgentTrace: 'Agent Trace 尚未生成。',
+      advancedEyebrow: '高级审核', advancedTitle: '检查并微调生成内容', advancedDescription: '这些内容不会占据初始创作界面，仅在成片完成后按需展开。', reviewTabs: '审核内容', transcriptTab: '转写文本', planTab: '动画计划', mediaTab: '素材审核', evidenceTab: '知识证据', agentTraceTab: 'Agent 轨迹', activityTab: '任务记录', transcriptTitle: '转写文本 JSON', transcriptHelp: '修改分段文本后保存，后端会沿用原时间区间并重新规划动画。', planTitle: '动画计划 JSON', planHelp: '可检查时间轴、模板参数和已选素材。无效修改会由后端安全校验拒绝。', evidenceTitle: '知识证据与引用', evidenceHelp: '显示 Agent 采用的本地知识片段、来源和实时索引状态；失效引用不能进入审批或重渲染。', evidenceValid: '全部引用有效（{count}）', evidenceInvalid: '存在失效引用（{count}）', evidenceEmpty: '本计划没有采用知识证据，事实视觉会安全降级。', evidenceSource: '来源：{source}', evidenceCitedBy: '引用动画：{animations}', evidenceStatus: '索引状态：{status}', agentTraceTitle: 'Agent 审计摘要', agentTraceHelp: '仅展示节点、工具、重试、耗时和结构化错误，不展示内部思维链或内容正文。', traceStatus: '状态：{status}', tracePlanner: '规划器：{planner}', traceRetries: '重试：{count}', traceEntry: '{node} · {type} · {status}', traceDuration: '耗时 {duration} ms', traceViolations: '问题：{codes}', noAgentTrace: 'Agent Trace 尚未生成。',
       approvalEyebrow: '需要人工决策', approvalTitle: '审核 Agent 动画计划', approvalHelp: '确认后从持久 Checkpoint 继续；编辑会再次经过服务端 schema、规划规则与安全区校验。', approvalPlanLabel: '待审批动画计划 JSON', approvePlan: '批准并继续', editPlan: '验证修改并继续', rejectPlan: '拒绝任务', approvalReasonFallback: '该计划需要人工确认。', approval_reason_policy_always: '当前策略要求在渲染前进行人工审核。', approval_reason_plan_repair_exhausted: '自动修复次数已耗尽，需要提交一份通过校验的编辑计划。', approval_reason_media_relevance_unverified: '外部素材与内容的相关性尚未由审核者确认。', approval_reason_external_media_rights_review: '外部素材来源与权利信息需要人工审核。', approvalSubmittingTitle: '正在提交审批', approvalSubmitting: '正在保存人工决策…', approvalResumingTitle: '正在恢复 Agent', approvalResuming: '决策已保存，Agent 将从渲染节点继续。', approvalFailedTitle: '审批失败', approvalFailed: '无法提交审批：{message}', rejectedTitle: '任务已拒绝', event_rejected: '人工已拒绝该计划，任务不会进入渲染。', awaitingApprovalTitle: '等待人工审批', event_awaiting_approval: 'Agent 已在渲染前暂停，请审核下方计划。', event_approved: '计划已批准，准备从 Checkpoint 恢复。', event_edited: '修改后的计划已通过校验，准备恢复。', event_resumed: 'Agent 已从持久 Checkpoint 恢复。',
       reviewTitle: '外部 B-roll 素材审核', reviewNote: '外部素材仅用于效果验证原型。商业发布前必须人工审核来源、权利、准确性和适用性。', searchQueryLabel: '搜索词', searchPlaceholder: '例如：supermarket product', mediaTypeLabel: '类型', imageKind: '图片', videoKind: '视频', searchButton: '搜索素材', manualUrlLabel: '人工候选 URL', manualUrlPlaceholder: 'https://...', addManualButton: '添加候选', activityTitle: '任务事件', activityHelp: '记录当前浏览器会话中收到的创建、处理、渲染和审核状态。', replanNote: '修改转写后保存时，后端会根据修改后的文本自动重建动画计划，并清理旧素材派生数据。', saveReview: '保存修改并重新渲染',
       tasksEyebrow: '本机任务', tasksTitle: '最近任务', tasksDescription: '这里仅显示此浏览器在本机创建或恢复过的真实任务，不生成示例数据。', restoreTitle: '恢复已有任务', restoreDescription: '输入本机任务编号，可重新打开仍保存在 storage 目录中的任务。', taskIdPlaceholder: '任务编号', restoreButton: '恢复任务', restoringTask: '正在查找本机任务…', restoreFailed: '无法恢复该任务：{message}', noTasks: '没有可显示的最近任务。', openTask: '打开任务', unknownFile: '未记录文件名', unavailableTask: '任务已不在本机存储中',
@@ -41,7 +41,7 @@
       readyTitle: 'Ready to begin', ready: 'Choose an MP4 video to begin processing.', sourceEyebrow: 'Step one', uploadTitle: 'Add talking-head footage', uploadDescription: 'Supports MP4 files up to 100 MB. The source stays in the local task directory.', dropTitle: 'Drop a video here, or click to choose', noFileChosen: 'No file selected', dropHint: 'MP4 · Up to 100 MB', generationSettings: 'Generation settings', settingsHint: 'Recommended defaults suit full local processing', workflowMode: 'Workflow mode', workflowStandard: 'Standard workflow (Stable)', workflowAgent: 'Agent workflow', directorInstruction: 'Director instruction (Optional)', directorInstructionPlaceholder: 'e.g. Make the first three seconds stronger and reduce full-screen media', approvalPolicy: 'Approval policy', approvalNever: 'Never require approval', approvalOnRisk: 'Require approval on risk', approvalAlways: 'Always require approval', agentSettingsHelp: 'Agent runs on real workflow nodes. Director instructions stay Agent-only, and approval pauses before rendering.', processingMode: 'Processing mode', profileReal: 'Real transcription + semantic planning (Recommended)', profileMock: 'Mock test transcript', profileConfigured: 'Use server environment settings', externalMedia: 'Media source', providerKnowledge: 'Knowledge media mix (Recommended)', providerWikimedia: 'Wikimedia Commons only', providerPexels: 'Pexels (API key required)', providerMock: 'Local original infographic', providerManual: 'Manual candidate URLs only', settingPrivacyNote: 'Speech recognition and rendering run locally; external media modes may contact the selected provider.', uploadButton: 'Upload and generate', invalidFile: 'Choose a valid MP4 file.',
       processingEyebrow: 'Task in progress', processingTitle: 'Generating video locally', taskProgress: 'Task progress', processCreated: 'Task created', processTranscribe: 'Transcription and planning', processRender: 'Animation and compositing', processComplete: 'Quality check complete', cancelTask: 'Cancel task', agentExecutionEyebrow: 'Real execution state', agentExecutionTitle: 'Agent node trace', agentExecutionHelp: 'States come directly from persistent-workflow SSE node events; no estimated percentage is used.', agentRetries: '{count} retries', nodeStatusNotStarted: 'Not started', nodeStatusStarted: 'Running', nodeStatusResumed: 'Resumed', nodeStatusCompleted: 'Completed', nodeStatusFailed: 'Failed', node_upload_probe: 'Upload and probe', node_audio_asr: 'Audio and ASR', node_correction: 'Transcript correction', node_planning: 'Semantic planning', node_validation: 'Plan validation', node_render: 'Animation render', node_quality: 'Quality check', node_complete: 'Complete task',
       resultEyebrow: 'Generation complete', resultTitle: 'Your video is ready', resultDescription: 'Review playback first, then use the advanced area below to adjust the transcript, animation, or media.', downloadResult: 'Download video', summaryTitle: 'Generated locally', summaryDescription: 'The result passed technical quality checks and is ready to download or review.', durationLabel: 'Duration', resolutionLabel: 'Resolution', taskLabel: 'Task ID', secondsUnit: 'sec',
-      advancedEyebrow: 'Advanced review', advancedTitle: 'Inspect and refine generated content', advancedDescription: 'Advanced data stays out of the initial workflow and appears only after the result is ready.', reviewTabs: 'Review content', transcriptTab: 'Transcript', planTab: 'Animation plan', mediaTab: 'Media review', agentTraceTab: 'Agent trace', activityTab: 'Task activity', transcriptTitle: 'Transcript JSON', transcriptHelp: 'Edit segment text and save; the backend reuses the original time span and rebuilds the plan.', planTitle: 'Animation plan JSON', planHelp: 'Inspect the timeline, template parameters, and selected media. Backend validation rejects unsafe edits.', agentTraceTitle: 'Agent audit summary', agentTraceHelp: 'Shows nodes, tools, retries, durations, and structured errors only—never private chain of thought or content bodies.', traceStatus: 'Status: {status}', tracePlanner: 'Planner: {planner}', traceRetries: 'Retries: {count}', traceEntry: '{node} · {type} · {status}', traceDuration: 'Duration {duration} ms', traceViolations: 'Issues: {codes}', noAgentTrace: 'Agent Trace is not available yet.',
+      advancedEyebrow: 'Advanced review', advancedTitle: 'Inspect and refine generated content', advancedDescription: 'Advanced data stays out of the initial workflow and appears only after the result is ready.', reviewTabs: 'Review content', transcriptTab: 'Transcript', planTab: 'Animation plan', mediaTab: 'Media review', evidenceTab: 'Evidence', agentTraceTab: 'Agent trace', activityTab: 'Task activity', transcriptTitle: 'Transcript JSON', transcriptHelp: 'Edit segment text and save; the backend reuses the original time span and rebuilds the plan.', planTitle: 'Animation plan JSON', planHelp: 'Inspect the timeline, template parameters, and selected media. Backend validation rejects unsafe edits.', evidenceTitle: 'Knowledge evidence and citations', evidenceHelp: 'Shows local knowledge excerpts, sources, and live index status used by the Agent. Invalid citations cannot pass approval or re-render.', evidenceValid: 'All citations are valid ({count})', evidenceInvalid: 'Invalid citations found ({count})', evidenceEmpty: 'This plan uses no knowledge evidence; factual visuals are safely downgraded.', evidenceSource: 'Source: {source}', evidenceCitedBy: 'Cited by: {animations}', evidenceStatus: 'Index status: {status}', agentTraceTitle: 'Agent audit summary', agentTraceHelp: 'Shows nodes, tools, retries, durations, and structured errors only—never private chain of thought or content bodies.', traceStatus: 'Status: {status}', tracePlanner: 'Planner: {planner}', traceRetries: 'Retries: {count}', traceEntry: '{node} · {type} · {status}', traceDuration: 'Duration {duration} ms', traceViolations: 'Issues: {codes}', noAgentTrace: 'Agent Trace is not available yet.',
       approvalEyebrow: 'Human decision required', approvalTitle: 'Review the Agent animation plan', approvalHelp: 'A decision resumes from the durable checkpoint. Edits repeat server-side schema, planning-rule, and safe-area validation.', approvalPlanLabel: 'Animation plan awaiting approval (JSON)', approvePlan: 'Approve and continue', editPlan: 'Validate edits and continue', rejectPlan: 'Reject task', approvalReasonFallback: 'This plan requires human confirmation.', approval_reason_policy_always: 'The current policy requires human review before rendering.', approval_reason_plan_repair_exhausted: 'Automatic repair is exhausted; submit an edited plan that passes validation.', approval_reason_media_relevance_unverified: 'External media relevance has not been confirmed by a reviewer.', approval_reason_external_media_rights_review: 'External media source and rights information requires human review.', approvalSubmittingTitle: 'Submitting approval', approvalSubmitting: 'Saving the human decision…', approvalResumingTitle: 'Resuming Agent', approvalResuming: 'Decision saved. The Agent will continue from the render node.', approvalFailedTitle: 'Approval failed', approvalFailed: 'Could not submit approval: {message}', rejectedTitle: 'Task rejected', event_rejected: 'A reviewer rejected the plan, so the task will not render.', awaitingApprovalTitle: 'Awaiting human approval', event_awaiting_approval: 'The Agent paused before render. Review the plan below.', event_approved: 'Plan approved and ready to resume from checkpoint.', event_edited: 'The edited plan passed validation and is ready to resume.', event_resumed: 'The Agent resumed from its durable checkpoint.',
       reviewTitle: 'External B-roll review', reviewNote: 'External material is an effect-validation prototype only. Review source, rights, accuracy, and suitability before commercial publication.', searchQueryLabel: 'Search query', searchPlaceholder: 'e.g. supermarket product', mediaTypeLabel: 'Type', imageKind: 'Image', videoKind: 'Video', searchButton: 'Search media', manualUrlLabel: 'Manual candidate URL', manualUrlPlaceholder: 'https://...', addManualButton: 'Add candidate', activityTitle: 'Task events', activityHelp: 'Events received by this browser session for creation, processing, rendering, and review.', replanNote: 'When transcript text changes, saving rebuilds the animation plan and removes stale media-derived data.', saveReview: 'Save edits and re-render',
       tasksEyebrow: 'On-device tasks', tasksTitle: 'Recent tasks', tasksDescription: 'Only real tasks created or restored by this browser are shown. No sample data is generated.', restoreTitle: 'Restore an existing task', restoreDescription: 'Enter a local task ID to reopen a task that still exists in the storage directory.', taskIdPlaceholder: 'Task ID', restoreButton: 'Restore task', restoringTask: 'Looking for the local task…', restoreFailed: 'Could not restore this task: {message}', noTasks: 'No recent tasks to show.', openTask: 'Open task', unknownFile: 'Filename not recorded', unavailableTask: 'Task is no longer available in local storage',
@@ -97,9 +97,9 @@
     form: $('#upload-form'), input: $('#video-file'), dropZone: $('#drop-zone'), fileName: $('#file-name'), workflowMode: $('#workflow-mode'), agentUploadFields: $('#agent-upload-fields'), directorInstruction: $('#director-instruction'), directorCount: $('#director-count'), approvalPolicy: $('#approval-policy'), processingProfile: $('#processing-profile'), uploadMediaProvider: $('#upload-media-provider'), uploadButton: $('#upload-button'),
     statusBanner: $('#status-banner'), statusTitle: $('#status-title'), status: $('#status'), uploadPanel: $('#upload-panel'), processingPanel: $('#processing-panel'),
     progressBar: $('#progress-bar'), progressTrack: $('#standard-progress-track'), progressPercent: $('#progress-percent'), standardProcessingStages: $('#standard-processing-stages'), activeTaskId: $('#active-task-id'), cancelTask: $('#cancel-task'), newTaskButton: $('#new-task-button'),
-    agentExecutionPanel: $('#agent-execution-panel'), agentNodeList: $('#agent-node-list'), agentRetryBadge: $('#agent-retry-badge'), approvalPanel: $('#approval-panel'), approvalReasons: $('#approval-reasons'), approvalPlan: $('#approval-plan'), approvalError: $('#approval-error'), approvePlan: $('#approve-plan'), editPlan: $('#edit-plan'), rejectPlan: $('#reject-plan'),
+    agentExecutionPanel: $('#agent-execution-panel'), agentNodeList: $('#agent-node-list'), agentRetryBadge: $('#agent-retry-badge'), approvalPanel: $('#approval-panel'), approvalReasons: $('#approval-reasons'), approvalEvidence: $('#approval-evidence'), approvalPlan: $('#approval-plan'), approvalError: $('#approval-error'), approvePlan: $('#approve-plan'), editPlan: $('#edit-plan'), rejectPlan: $('#reject-plan'),
     result: $('#result'), preview: $('#preview'), download: $('#download'), resultDuration: $('#result-duration'), resultResolution: $('#result-resolution'), resultTaskId: $('#result-task-id'),
-    transcript: $('#transcript'), plan: $('#plan'), saveReview: $('#save-review'), mediaList: $('#media-list'), mediaQuery: $('#media-query'), mediaKind: $('#media-kind'), searchMedia: $('#search-media'), manualMediaUrl: $('#manual-media-url'), addManualMedia: $('#add-manual-media'), candidateList: $('#candidate-list'), eventList: $('#event-list'), agentTraceSummary: $('#agent-trace-summary'), agentTraceList: $('#agent-trace-list'),
+    transcript: $('#transcript'), plan: $('#plan'), saveReview: $('#save-review'), mediaList: $('#media-list'), mediaQuery: $('#media-query'), mediaKind: $('#media-kind'), searchMedia: $('#search-media'), manualMediaUrl: $('#manual-media-url'), addManualMedia: $('#add-manual-media'), candidateList: $('#candidate-list'), evidenceSummary: $('#evidence-summary'), evidenceList: $('#evidence-list'), eventList: $('#event-list'), agentTraceSummary: $('#agent-trace-summary'), agentTraceList: $('#agent-trace-list'),
     tasksList: $('#tasks-list'), restoreForm: $('#restore-form'), restoreTaskId: $('#restore-task-id'), restoreError: $('#restore-error'),
   };
 
@@ -113,6 +113,7 @@
     candidates: [],
     agentNodes: Object.fromEntries(AGENT_NODES.map((node) => [node, {status: 'not_started'}])),
     agentTrace: null,
+    evidence: null,
     approval: null,
     eventSource: null,
     statusKey: 'ready',
@@ -216,20 +217,23 @@
     refs.progressTrack.hidden = agent;
     refs.standardProcessingStages.hidden = agent;
     refs.agentExecutionPanel.hidden = !agent || !state.taskId;
-    const agentTab = document.querySelector('[data-tab="agent"]');
-    if (agentTab) agentTab.hidden = !agent;
-    if (!agent) document.querySelector('[data-tab-panel="agent"]').hidden = true;
-    if (!agent && state.activeTab === 'agent') selectTab('transcript');
+    document.querySelectorAll('[data-tab="agent"], [data-tab="evidence"]').forEach((tab) => { tab.hidden = !agent; });
+    if (!agent) document.querySelectorAll('[data-tab-panel="agent"], [data-tab-panel="evidence"]').forEach((panel) => { panel.hidden = true; });
+    if (!agent && ['agent', 'evidence'].includes(state.activeTab)) selectTab('transcript');
     if (agent) renderAgentExecution();
   }
 
   function resetAgentState() {
     state.agentNodes = Object.fromEntries(AGENT_NODES.map((node) => [node, {status: 'not_started'}]));
     state.agentTrace = null;
+    state.evidence = null;
     state.approval = null;
     refs.approvalPanel.hidden = true;
     refs.approvalPlan.value = '';
     refs.approvalError.textContent = '';
+    refs.approvalEvidence.replaceChildren();
+    refs.evidenceSummary.replaceChildren();
+    refs.evidenceList.replaceChildren();
     renderAgentExecution();
     renderAgentTrace();
   }
@@ -312,6 +316,59 @@
     renderAgentTrace();
   }
 
+  function renderEvidenceCards(container, payload) {
+    container.replaceChildren();
+    if (!payload?.items?.length) {
+      const empty = document.createElement('p');
+      empty.className = 'evidence-empty';
+      empty.textContent = t('evidenceEmpty');
+      container.append(empty);
+      return;
+    }
+    payload.items.forEach((evidence) => {
+      const card = document.createElement('article');
+      card.className = 'evidence-card';
+      card.dataset.status = evidence.status || 'missing';
+      const heading = document.createElement('div');
+      heading.className = 'evidence-card-heading';
+      const source = document.createElement('strong');
+      source.textContent = t('evidenceSource', {source: evidence.source || '—'});
+      const status = document.createElement('span');
+      status.className = 'status-pill';
+      status.dataset.status = evidence.status === 'valid' ? 'completed' : 'failed';
+      status.textContent = t('evidenceStatus', {status: evidence.status || 'missing'});
+      heading.append(source, status);
+      const excerpt = document.createElement('p');
+      excerpt.textContent = evidence.excerpt || '';
+      const metadata = document.createElement('small');
+      metadata.textContent = `${evidence.chunk_id} · ${t('evidenceCitedBy', {animations: (evidence.cited_by || []).join(', ') || '—'})}`;
+      card.append(heading, excerpt, metadata);
+      container.append(card);
+    });
+  }
+
+  function renderEvidence() {
+    refs.evidenceSummary.replaceChildren();
+    const payload = state.evidence;
+    if (payload) {
+      const chip = document.createElement('span');
+      chip.className = 'trace-chip';
+      chip.textContent = t(payload.valid ? 'evidenceValid' : 'evidenceInvalid', {count: payload.count || 0});
+      refs.evidenceSummary.append(chip);
+    }
+    renderEvidenceCards(refs.evidenceList, payload);
+    if (!refs.approvalPanel.hidden) renderEvidenceCards(refs.approvalEvidence, payload);
+  }
+
+  async function loadEvidence(id) {
+    const response = await fetch(`/api/videos/${encodeURIComponent(id)}/evidence`);
+    if (response.status === 404) return;
+    if (!response.ok) throw new Error(await responseError(response));
+    if (state.taskId !== id) return;
+    state.evidence = await response.json();
+    renderEvidence();
+  }
+
   function setApprovalButtonsDisabled(disabled) {
     [refs.approvePlan, refs.editPlan, refs.rejectPlan].forEach((button) => { button.disabled = disabled; });
   }
@@ -342,7 +399,10 @@
     const response = await fetch(`/api/videos/${encodeURIComponent(id)}/approval`);
     if (!response.ok) throw new Error(await responseError(response));
     const approval = await response.json();
-    if (state.taskId === id) renderApproval(approval);
+    if (state.taskId === id) {
+      renderApproval(approval);
+      await loadEvidence(id).catch(() => {});
+    }
     return approval;
   }
 
@@ -397,6 +457,7 @@
     updateDirectorCount();
     renderAgentExecution();
     renderAgentTrace();
+    renderEvidence();
     if (refs.plan.value.trim()) {
       try { renderMediaReview(currentPlan(), state.candidates); } catch (_error) { /* The editor can temporarily contain invalid JSON. */ }
     }
@@ -795,6 +856,7 @@
       updateProgress('completed');
       await loadMediaReview(id);
       if (task.workflow_mode === 'agent') {
+        await loadEvidence(id).catch(() => {});
         await loadAgentTrace(id).catch(() => {});
         if (!state.events.length) watchTask(id, {terminalReplay: true});
       }
@@ -802,6 +864,7 @@
       setWorkflowStage('processing');
       setStatus('event_awaiting_approval', {}, {titleKey: 'awaitingApprovalTitle', tone: 'warning'});
       await loadApproval(id);
+      await loadEvidence(id).catch(() => {});
       await loadAgentTrace(id).catch(() => {});
       watchTask(id);
     } else if (['pending', 'processing', 'rendering'].includes(task.status)) {

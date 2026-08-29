@@ -49,6 +49,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         "average_retry_count",
         "human_intervention_rate",
         "task_success_rate",
+        "evidence_retrieval_hit_rate",
+        "citation_correctness_rate",
     )
     lines = [
         "# Offline Agent Evaluation Report",

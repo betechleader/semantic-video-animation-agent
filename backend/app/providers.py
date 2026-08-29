@@ -346,18 +346,21 @@ class LocalLlmAnimationPlanningProvider:
         director_instruction: str | None = None,
         violations: list[dict[str, Any]] | None = None,
         repair_attempt: int = 0,
+        evidence: list[dict[str, Any]] | None = None,
     ) -> str:
         prompt = """You are a Chinese short-video semantic planner. Return one JSON object only, without Markdown.
 Use only the supplied transcript text and timestamps. Do not invent words or times.
 The object must match this schema exactly:
 {
-  "animations": [{"id": "animation_<id>", "type": "keyword_pop", "template_id": "keyword_pop_v1", "start_ms": 0, "end_ms": 1, "trigger_text": "source text", "parameters": {"text": "max 80 chars", "color": "#RRGGBB", "position": "top-left|top-right|bottom-left|bottom-right|center"}}],
+  "animations": [{"id": "animation_<id>", "type": "keyword_pop", "template_id": "keyword_pop_v1", "start_ms": 0, "end_ms": 1, "trigger_text": "source text", "parameters": {"text": "max 80 chars", "color": "#RRGGBB", "position": "top-left|top-right|bottom-left|bottom-right|center"}, "evidence_ids": [], "confidence": 0.75, "selection_reason": "transcript_emphasis"}],
+  "evidence": [],
   "semantic_segments": [{"id": "semantic_<id>", "text": "source text", "start_ms": 0, "end_ms": 1, "intent": "emphasis|explanation|transition|summary", "keywords": ["source keyword"]}]
 }
 Return at least one animation. Each animation must be fully contained in one supplied word or transcript segment, last 300-5000 ms, never overlap another animation, and have no more than two animation starts in any 10-second window.
 For a quote_card use type quote_card, template_id quote_card_v1, and parameters {"headline": "max 48 chars", "body": "max 160 chars", "accent_color": "#RRGGBB"}.
 For a topic visual use type media_visual, template_id media_visual_v1, and parameters {"asset_id": "media_<id>", "title": "transcript-grounded topic label", "theme": "book|factory|product|money|learning|people|place|concept|wellbeing|business|technology", "accent_color": "#RRGGBB", "search_query": "short search query", "desired_asset_kind": "external_image|external_video", "display_mode": "side_card|full_screen"}. Never invent facts from a visual source: external materials are B-roll only and their source is selected by the pipeline.
 For an original diagram use type info_graphic, template_id knowledge_infographic_v1, and parameters {"variant": "number_list|comparison|flow", "headline": "transcript-grounded headline", "items": ["two to four transcript-grounded labels"], "accent_color": "#RRGGBB"}.
+Specific facts, numbers, named books, people, places, and factual relationships require evidence_ids from the supplied project evidence. A cited animation must include confidence from 0 to 1 and a concise selection_reason. Copy every cited evidence object unchanged into the top-level evidence array. Never cite an ID that was not supplied. When no evidence supports a factual visual, use only transcript emphasis or clearly abstract, fact-free visual packaging.
 Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only visible parameter text into concise, context-aware Chinese labels; remove filler words and repair an obvious local ASR wording only when the surrounding transcript makes the intended meaning unambiguous.
 """
         if director_instruction:
@@ -368,6 +371,9 @@ Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only v
                 "Do not relax or bypass any rule.\nViolations JSON:\n"
                 + json.dumps(violations, ensure_ascii=False)
             )
+        prompt += "\nProject evidence JSON (the only allowed factual sources):\n" + json.dumps(
+            evidence or [], ensure_ascii=False
+        )
         return prompt + "\nTranscript JSON:\n" + transcript.model_dump_json()
 
     @staticmethod
@@ -392,6 +398,7 @@ Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only v
         director_instruction: str | None = None,
         violations: list[dict[str, Any]] | None = None,
         repair_attempt: int = 0,
+        evidence: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         try:
             response = requests.post(
@@ -405,6 +412,7 @@ Keep trigger_text grounded verbatim in the transcript for timing. Rewrite only v
                             director_instruction,
                             violations,
                             repair_attempt,
+                            evidence,
                         ),
                     }],
                     "temperature": 0.2,
@@ -546,6 +554,7 @@ class DeepSeekAnimationPlanningProvider:
         director_instruction: str | None = None,
         violations: list[dict[str, Any]] | None = None,
         repair_attempt: int = 0,
+        evidence: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         content = self._request_content(
             {
@@ -558,6 +567,7 @@ class DeepSeekAnimationPlanningProvider:
                             director_instruction,
                             violations,
                             repair_attempt,
+                            evidence,
                         ),
                     }
                 ],

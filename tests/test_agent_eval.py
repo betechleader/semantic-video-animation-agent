@@ -27,6 +27,8 @@ def test_offline_dataset_and_standard_agent_metrics_are_deterministic() -> None:
     assert first["modes"]["agent"]["auto_repair_success_rate"] == 0.666667
     assert first["modes"]["agent"]["human_intervention_rate"] == 0.083333
     assert first["modes"]["agent"]["task_success_rate"] == 0.916667
+    assert first["modes"]["agent"]["evidence_retrieval_hit_rate"] == 1.0
+    assert first["modes"]["agent"]["citation_correctness_rate"] == 1.0
     assert first["privacy"] == {
         "contains_user_storage_content": False,
         "contains_transcript_text": False,
@@ -45,7 +47,7 @@ def test_reports_include_all_metrics_and_default_regression_passes(tmp_path: Pat
     json_path, markdown_path = write_reports(report, tmp_path)
 
     assert report["regression"]["passed"] is True
-    assert json.loads(json_path.read_text(encoding="utf-8"))["schema_version"] == "agent-eval-v1"
+    assert json.loads(json_path.read_text(encoding="utf-8"))["schema_version"] == "agent-eval-v2-rag"
     markdown = markdown_path.read_text(encoding="utf-8")
     for metric in (
         "animation_plan_schema_pass_rate",
@@ -57,6 +59,8 @@ def test_reports_include_all_metrics_and_default_regression_passes(tmp_path: Pat
         "average_retry_count",
         "human_intervention_rate",
         "task_success_rate",
+        "evidence_retrieval_hit_rate",
+        "citation_correctness_rate",
     ):
         assert metric in markdown
     assert "P50" in markdown and "P95" in markdown

@@ -38,6 +38,7 @@ from .agent_tools import (
     PlanningToolInput,
     PlanningToolOutput,
     ValidationToolInput,
+    ValidationToolOutput,
     invoke_planning_tool,
     invoke_validation_tool,
 )
@@ -48,17 +49,25 @@ from .processing import (
     verify_and_write_output_quality,
 )
 from .schemas import AnimationPlan, Transcript, VideoMetadata
+from .rag_tools import (
+    EvidenceValidationError,
+    RetrieveEvidenceInput,
+    RetrieveEvidenceOutput,
+    build_evidence_queries,
+)
 from .workflow_services import (
     build_animation_plan,
     correct_asr_transcript,
     extract_audio,
     plan_agent_candidate,
+    retrieve_agent_evidence,
     transcribe_audio,
+    validate_agent_plan_evidence,
     validate_plan,
 )
 
 CHECKPOINT_FILENAME = "agent_checkpoints.sqlite3"
-CHECKPOINT_SCHEMA_VERSION = 2
+CHECKPOINT_SCHEMA_VERSION = 3
 AGENT_NODES = (
     "upload_probe",
     "audio_asr",
@@ -106,7 +115,9 @@ class AgentWorkflowServices:
     plan_agent_candidate: Callable[
         [PlanningToolInput, str, str | None], PlanningToolOutput
     ] | None = None
+    retrieve_evidence: Callable[[RetrieveEvidenceInput], RetrieveEvidenceOutput] | None = None
     validate_plan: Callable[[AnimationPlan, Transcript], AnimationPlan] = validate_plan
+    validate_plan_evidence: Callable[[AnimationPlan], AnimationPlan] = validate_agent_plan_evidence
     render_and_composite_video: Callable[
         [Path, VideoMetadata, Transcript, AnimationPlan, str | None, Any | None],
         tuple[dict, dict],
@@ -116,7 +127,10 @@ class AgentWorkflowServices:
     ] = verify_and_write_output_quality
 
 
-DEFAULT_AGENT_SERVICES = AgentWorkflowServices(plan_agent_candidate=plan_agent_candidate)
+DEFAULT_AGENT_SERVICES = AgentWorkflowServices(
+    plan_agent_candidate=plan_agent_candidate,
+    retrieve_evidence=retrieve_agent_evidence,
+)
 
 
 class AgentCheckpointStore:
@@ -305,6 +319,8 @@ def _new_state(context: _RunContext, director_instruction: str | None) -> dict:
         "completed_nodes": [],
         "node_versions": {},
         "transcript": None,
+        "evidence": [],
+        "evidence_queries": [],
         "plan_candidate": None,
         "plan": None,
         "repair_attempts": 0,
@@ -317,7 +333,7 @@ def _new_state(context: _RunContext, director_instruction: str | None) -> dict:
 def _validated_state(checkpoint: dict, task_id: str) -> dict:
     state = checkpoint["state"]
     schema_version = state.get("schema_version")
-    if schema_version not in {1, CHECKPOINT_SCHEMA_VERSION}:
+    if schema_version not in {1, 2, CHECKPOINT_SCHEMA_VERSION}:
         raise AgentWorkflowError("Unsupported Agent checkpoint schema version")
     if state.get("thread_id") != task_id:
         raise AgentWorkflowError("Agent checkpoint thread ID does not match task ID")
@@ -334,6 +350,13 @@ def _validated_state(checkpoint: dict, task_id: str) -> dict:
             "plan_candidate": state.get("plan"),
             "repair_attempts": 0,
             "validation_violations": [],
+        }
+    if schema_version in {1, 2}:
+        state = {
+            **state,
+            "schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "evidence": state.get("evidence", []),
+            "evidence_queries": state.get("evidence_queries", []),
         }
     instruction = state.get("director_instruction")
     if instruction is not None and (
@@ -416,6 +439,7 @@ def _planning_tool_call(
         director_instruction=state.get("director_instruction"),
         repair_attempt=repair_attempt,
         violations=violations,
+        evidence=state.get("evidence", []),
     )
     started_at = time.perf_counter()
     if context.services.plan_agent_candidate is not None:
@@ -451,6 +475,7 @@ def _planning_tool_call(
         "director_instruction_length": len(tool_input.director_instruction or ""),
         "repair_attempt": repair_attempt,
         "violation_count": len(violations),
+        "evidence_count": len(tool_input.evidence),
     }
     output_summary = {
         "candidate_present": output.candidate is not None,
@@ -458,6 +483,13 @@ def _planning_tool_call(
         if isinstance(output.candidate, dict) and isinstance(output.candidate.get("animations"), list)
         else None,
         "violation_count": len(output.violations),
+        "adopted_evidence_ids": sorted({
+            chunk_id
+            for animation in output.candidate.get("animations", [])
+            if isinstance(animation, dict)
+            for chunk_id in animation.get("evidence_ids", [])
+            if isinstance(chunk_id, str)
+        }) if isinstance(output.candidate, dict) else [],
     }
     if output.planner_id == "local_llm":
         context.agent_trace.append(
@@ -488,6 +520,52 @@ def _planning_tool_call(
     return output
 
 
+def _retrieve_evidence_tool_call(
+    context: _RunContext,
+    state: dict,
+) -> RetrieveEvidenceOutput:
+    transcript = Transcript.model_validate(state["transcript"])
+    tool_input = RetrieveEvidenceInput(queries=build_evidence_queries(transcript))
+    started_at = time.perf_counter()
+    if context.services.retrieve_evidence is None:
+        output = RetrieveEvidenceOutput()
+    else:
+        try:
+            output = RetrieveEvidenceOutput.model_validate(
+                context.services.retrieve_evidence(tool_input)
+            )
+        except Exception as exc:
+            output = RetrieveEvidenceOutput(errors=[exc.__class__.__name__])
+    duration_ms = round((time.perf_counter() - started_at) * 1_000)
+    query_summaries = [item.model_dump() for item in output.queries]
+    context.agent_trace.append(
+        "tool_call",
+        node="planning",
+        tool_name="retrieve_evidence",
+        status="completed" if not output.errors else "degraded",
+        duration_ms=duration_ms,
+        input_summary={
+            "query_count": len(tool_input.queries),
+            "queries": [
+                {
+                    "query_id": item["query_id"],
+                    "query_sha256": item["query_sha256"],
+                    "character_count": item["character_count"],
+                }
+                for item in query_summaries
+            ],
+        },
+        output_summary={
+            "retrieved_count": len(output.evidence),
+            "evidence_ids": [item.chunk_id for item in output.evidence],
+            "error_categories": output.errors,
+        },
+        error_category="evidence_retrieval_degraded" if output.errors else None,
+        retry_count=int(state.get("repair_attempts", 0)),
+    )
+    return output
+
+
 def _validation_tool_call(
     context: _RunContext,
     state: dict,
@@ -503,6 +581,23 @@ def _validation_tool_call(
         ),
         context.services.validate_plan,
     )
+    if result.valid and result.plan is not None:
+        try:
+            result = ValidationToolOutput(
+                valid=True,
+                plan=context.services.validate_plan_evidence(result.plan),
+            )
+        except EvidenceValidationError as exc:
+            result = ValidationToolOutput(
+                valid=False,
+                violations=[
+                    PlanViolation(
+                        code="evidence_grounding",
+                        path=["evidence"],
+                        message=str(exc)[:240],
+                    )
+                ],
+            )
     duration_ms = round((time.perf_counter() - started_at) * 1_000)
     violations = [item.model_dump() for item in result.violations]
     context.agent_trace.append(
@@ -579,10 +674,21 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
         )
         return {**state, "transcript": Transcript.model_validate(corrected).model_dump()}
     if node == "planning":
+        retrieved = _retrieve_evidence_tool_call(context, state)
+        state_with_evidence = {
+            **state,
+            "evidence": [item.model_dump() for item in retrieved.evidence],
+            "evidence_queries": [item.model_dump() for item in retrieved.queries],
+        }
         planned = context.metrics.record_stage(
             context.attempt,
             "planning",
-            lambda: _planning_tool_call(context, state, repair_attempt=0, violations=[]),
+            lambda: _planning_tool_call(
+                context,
+                state_with_evidence,
+                repair_attempt=0,
+                violations=[],
+            ),
         )
         if planned.candidate is None:
             codes = sorted({item.code for item in planned.violations})
@@ -590,7 +696,7 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
                 f"Agent planner failed before returning a candidate; violation codes: {', '.join(codes)}"
             )
         return {
-            **state,
+            **state_with_evidence,
             "plan_candidate": planned.candidate,
             "validation_violations": [item.model_dump() for item in planned.violations],
         }
@@ -662,6 +768,7 @@ def _run_node(node: str, context: _RunContext, state: dict) -> dict:
             "approval_reasons": _approval_reasons(context, validated_plan),
         }
     if node == "render":
+        context.services.validate_plan_evidence(plan())
         _transition(context, TaskStatus.RENDERING, "Agent is rendering animation and compositing video")
         transcript_data, plan_data = context.services.render_and_composite_video(
             context.task_dir,

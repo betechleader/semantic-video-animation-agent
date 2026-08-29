@@ -40,6 +40,13 @@ from .workflow import start_review_task, start_task
 from .agent_workflow import get_active_agent_thread, recover_agent_tasks, resume_agent_task, start_agent_task
 from .agent_tools import DIRECTOR_INSTRUCTION_MAX_LENGTH
 from .agent_trace import AgentTraceError, read_agent_trace
+from .rag_tools import (
+    EvidenceValidationError,
+    RetrieveEvidenceInput,
+    build_evidence_queries,
+    evidence_status,
+    ground_candidate_with_evidence,
+)
 from .knowledge_base import (
     KnowledgeBaseError,
     KnowledgeBaseService,
@@ -47,6 +54,7 @@ from .knowledge_base import (
     KnowledgeNotFoundError,
     KnowledgeValidationError,
 )
+from .workflow_services import retrieve_agent_evidence, validate_agent_plan_evidence
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -226,6 +234,7 @@ def _validate_approval_plan(task: dict, plan: AnimationPlan) -> AnimationPlan:
     """Apply every deterministic pre-render validator before consuming approval."""
 
     validated = validate_animation_plan(plan, Transcript.model_validate(task["transcript"]))
+    validated = validate_agent_plan_evidence(validated)
     metadata = VideoMetadata.model_validate(task["metadata"])
     validate_animation_safe_areas(validated, metadata.width, metadata.height)
     return validated
@@ -265,7 +274,7 @@ def approve_video_agent_plan(task_id: str) -> dict:
         plan = _validate_approval_plan(
             task, AnimationPlan.model_validate(approval["candidate_plan"])
         )
-    except (PlanningRuleError, QualityValidationError, ValueError) as exc:
+    except (EvidenceValidationError, PlanningRuleError, QualityValidationError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     decided = decide_agent_approval(task_id, "approved", plan.model_dump())
     if decided is None:
@@ -285,7 +294,7 @@ def edit_video_agent_plan(task_id: str, edit: AgentApprovalEdit) -> dict:
         raise HTTPException(status_code=409, detail="Agent approval has already been decided")
     try:
         plan = _validate_approval_plan(task, edit.plan)
-    except (PlanningRuleError, QualityValidationError) as exc:
+    except (EvidenceValidationError, PlanningRuleError, QualityValidationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     decided = decide_agent_approval(task_id, "edited", plan.model_dump())
     if decided is None:
@@ -308,6 +317,21 @@ def reject_video_agent_plan(task_id: str) -> dict:
         raise HTTPException(status_code=409, detail="Agent approval has already been decided")
     _resume_after_approval(task_id)
     return {"task_id": task_id, "status": "rejected", "decision_version": decided["decision_version"]}
+
+
+@app.get("/api/videos/{task_id}/evidence")
+def get_video_agent_evidence(task_id: str) -> dict:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["workflow_mode"] != "agent":
+        raise HTTPException(status_code=409, detail="Evidence is only available for Agent tasks")
+    if task.get("plan") is None:
+        return {"valid": True, "count": 0, "items": []}
+    try:
+        return evidence_status(AnimationPlan.model_validate(task["plan"]), _knowledge_service())
+    except (KnowledgeBaseError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/videos/{task_id}/media")
@@ -439,6 +463,13 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
             plan = TranscriptAnimationPlanningProvider().plan(transcript).model_copy(update={
                 "media_provider": review.plan.media_provider,
             })
+            if task.get("workflow_mode") == "agent":
+                retrieved = retrieve_agent_evidence(
+                    RetrieveEvidenceInput(queries=build_evidence_queries(transcript))
+                )
+                plan = AnimationPlan.model_validate(
+                    ground_candidate_with_evidence(plan.model_dump(), retrieved.evidence)
+                )
         else:
             # Provenance, face detections, and placements are renderer-derived.
             # Never require a browser editor to keep them synchronized with
@@ -447,7 +478,9 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
                 "media_assets": [], "face_regions": [], "media_placements": [],
             })
         plan = validate_animation_plan(plan, transcript)
-    except (PlanningRuleError, RuntimeError) as exc:
+        if task.get("workflow_mode") == "agent":
+            plan = validate_agent_plan_evidence(plan)
+    except (EvidenceValidationError, PlanningRuleError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not start_review_render(task_id, transcript.model_dump(), plan.model_dump()):
         raise HTTPException(status_code=409, detail="Review edits are only available for completed tasks")

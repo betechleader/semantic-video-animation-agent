@@ -4,7 +4,8 @@ from pathlib import Path
 
 from .audio import AudioService
 from .asr_corrections import correct_transcript, load_phrase_corrections
-from .config import MODEL_ROOT, SETTINGS
+from .config import KNOWLEDGE_ROOT, MODEL_ROOT, SETTINGS
+from .knowledge_base import KnowledgeBaseService
 from .processing import ProcessingError
 from .providers import (
     AnimationPlanningProvider,
@@ -19,6 +20,13 @@ from .providers import (
 from .planning_rules import validate_animation_plan
 from .schemas import AnimationPlan, Transcript, VideoMetadata
 from .agent_tools import PlanningToolInput, PlanningToolOutput, invoke_planning_tool
+from .rag_tools import (
+    RetrieveEvidenceInput,
+    RetrieveEvidenceOutput,
+    ground_candidate_with_evidence,
+    invoke_retrieve_evidence_tool,
+    validate_evidence_citations,
+)
 
 
 def resolve_asr_provider(processing_profile: str = "configured") -> SpeechRecognitionProvider:
@@ -141,12 +149,14 @@ def plan_agent_candidate(
                 director_instruction=value.director_instruction,
                 violations=[item.model_dump() for item in value.violations],
                 repair_attempt=value.repair_attempt,
+                evidence=[item.model_dump() for item in value.evidence],
             )
         else:
             candidate = planner.plan(value.transcript)
         if isinstance(candidate, AnimationPlan):
             candidate = candidate.model_dump()
-        return {**candidate, "media_provider": selected_media_provider}
+        candidate = {**candidate, "media_provider": selected_media_provider}
+        return ground_candidate_with_evidence(candidate, value.evidence)
 
     return invoke_planning_tool(
         tool_input,
@@ -160,3 +170,19 @@ def validate_plan(plan: AnimationPlan, transcript: Transcript) -> AnimationPlan:
     """Validate a planner result at the workflow-to-renderer trust boundary."""
 
     return validate_animation_plan(plan, transcript)
+
+
+def retrieve_agent_evidence(tool_input: RetrieveEvidenceInput) -> RetrieveEvidenceOutput:
+    """Search the project-local knowledge index through the typed RAG boundary."""
+
+    service = KnowledgeBaseService(root=KNOWLEDGE_ROOT, settings=SETTINGS)
+    return invoke_retrieve_evidence_tool(tool_input, service.search)
+
+
+def validate_agent_plan_evidence(plan: AnimationPlan) -> AnimationPlan:
+    """Re-resolve citations against the current project knowledge index."""
+
+    return validate_evidence_citations(
+        plan,
+        KnowledgeBaseService(root=KNOWLEDGE_ROOT, settings=SETTINGS),
+    )

@@ -17,7 +17,9 @@
       "auto_repair_success_rate": {"min": 0.60},
       "average_retry_count": {"max": 0.50},
       "human_intervention_rate": {"max": 0.10},
-      "task_success_rate": {"min": 0.90}
+      "task_success_rate": {"min": 0.90},
+      "evidence_retrieval_hit_rate": {"min": 1.0},
+      "citation_correctness_rate": {"min": 1.0}
     }
   }
 }

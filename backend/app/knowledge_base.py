@@ -458,6 +458,42 @@ class KnowledgeBaseService:
                 for chunk, document in rows
             ]
 
+    def resolve_chunks(self, chunk_ids: Sequence[str]) -> dict[str, dict]:
+        """Resolve current chunk revisions without invoking an embedding model."""
+
+        unique_ids = list(dict.fromkeys(chunk_ids))
+        if len(unique_ids) > 50 or any(
+            not re.fullmatch(r"chunk_[0-9a-f]{32}", chunk_id)
+            for chunk_id in unique_ids
+        ):
+            raise KnowledgeValidationError("evidence chunk IDs are invalid")
+        if not unique_ids:
+            return {}
+        database.initialize_database()
+        with next(database.get_session()) as session:
+            rows = session.execute(
+                select(KnowledgeChunk, KnowledgeDocument)
+                .join(
+                    KnowledgeDocument,
+                    KnowledgeChunk.document_id == KnowledgeDocument.document_id,
+                )
+                .where(
+                    KnowledgeChunk.chunk_id.in_(unique_ids),
+                    KnowledgeChunk.index_version == KNOWLEDGE_INDEX_VERSION,
+                )
+            ).all()
+        return {
+            chunk.chunk_id: {
+                "chunk_id": chunk.chunk_id,
+                "document_id": document.document_id,
+                "source": document.source_name,
+                "content": chunk.content,
+                "content_sha256": chunk.content_sha256,
+                "index_version": chunk.index_version,
+            }
+            for chunk, document in rows
+        }
+
     @staticmethod
     def _bm25(query_tokens: list[str], records: list[_ChunkRecord]) -> dict[str, float]:
         if not query_tokens or not records:
@@ -567,6 +603,7 @@ class KnowledgeBaseService:
                     "document_id": record.document.document_id,
                     "source": record.document.source_name,
                     "content": record.chunk.content,
+                    "content_sha256": record.chunk.content_sha256,
                     "summary": record.document.summary,
                     "score": round(score, 8),
                     "keyword_score": round(keyword_scores.get(chunk_id, 0.0), 8),

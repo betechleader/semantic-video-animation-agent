@@ -39,7 +39,7 @@ Stages 10, 10A, 10B, 10C, 10D, 10E, 10F, and 10G are complete. The site now open
 | P4 Agent mode in the existing page | COMPLETED |
 | P5 Agent eval harness and observability | COMPLETED |
 | P6 Local knowledge base and hybrid retrieval | COMPLETED |
-| P7 Citation-grounded RAG semantic planning | NOT_STARTED |
+| P7 Citation-grounded RAG semantic planning | COMPLETED |
 | P8 Natural-language edits and visual timeline | NOT_STARTED |
 | P9 MCP tool service | NOT_STARTED |
 | P10 Production task execution and deployment | NOT_STARTED |

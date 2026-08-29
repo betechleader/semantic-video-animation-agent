@@ -166,10 +166,13 @@ def test_agent_progress_and_approval_use_real_backend_events_and_contracts() -> 
     assert 'id="approval-panel"' in html
     assert 'id="approval-plan"' in html
     assert 'data-tab="agent"' in html
+    assert 'data-tab="evidence"' in html
+    assert 'id="approval-evidence"' in html
     assert "source.addEventListener('agent_node'" in script
     assert "source.addEventListener('awaiting_approval'" in script
     assert "if (!isAgentTask()) updateProgress(type)" in script
     assert "/agent-trace`" in script
+    assert "/evidence`" in script
     assert "/approval`" in script
     for action in ("approve", "edit", "reject"):
         assert f"submitApproval('{action}')" in script
@@ -185,5 +188,6 @@ def test_agent_ui_preserves_accessibility_mobile_layout_and_reduced_motion() -> 
     assert 'role="alert"' in html
     assert '.agent-node-list { grid-template-columns: 1fr; }' in styles
     assert '.approval-actions .button { width: 100%; }' in styles
+    assert '.evidence-card-heading { flex-direction: column; }' in styles
     assert "@media (prefers-reduced-motion: reduce)" in styles
     assert "overflow-x: hidden" in styles

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import re
 import time
@@ -27,9 +28,14 @@ from backend.app.planning_rules import (
 )
 from backend.app.providers import MockAnimationPlanningProvider
 from backend.app.schemas import AnimationPlan, Transcript, TranscriptSegment, WordTiming
+from backend.app.rag_tools import (
+    RetrieveEvidenceInput,
+    build_evidence_queries,
+    invoke_retrieve_evidence_tool,
+)
 
-EVAL_SCHEMA_VERSION = "agent-eval-v1"
-DATASET_SCHEMA_VERSION = "agent-eval-dataset-v1"
+EVAL_SCHEMA_VERSION = "agent-eval-v2-rag"
+DATASET_SCHEMA_VERSION = "agent-eval-dataset-v2-rag"
 
 
 class EvalSegment(BaseModel):
@@ -50,6 +56,7 @@ class EvalCase(BaseModel):
     agent_scenario: Literal[
         "none", "invalid_schema_once", "invalid_rule_once", "persistent_overlap"
     ] = "none"
+    evidence_text: str | None = Field(default=None, min_length=1, max_length=500)
 
     def transcript(self) -> Transcript:
         segments = []
@@ -86,7 +93,7 @@ class EvalCase(BaseModel):
 class EvalDataset(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["agent-eval-dataset-v1"]
+    schema_version: Literal["agent-eval-dataset-v2-rag"]
     name: str = Field(min_length=1, max_length=120)
     cases: list[EvalCase] = Field(min_length=10)
 
@@ -109,8 +116,12 @@ class RunObservation:
     repair_succeeded: bool = False
     retry_count: int = 0
     human_intervention: bool = False
+    retrieval_expected: int = 0
+    retrieval_hits: int = 0
+    citation_items: int = 0
+    correct_citations: int = 0
     latencies_ms: dict[str, list[float]] = field(
-        default_factory=lambda: {"planning": [], "validation": []}
+        default_factory=lambda: {"retrieval": [], "planning": [], "validation": []}
     )
     calls: list[dict[str, Any]] = field(default_factory=list)
     failure_category: str | None = None
@@ -261,6 +272,54 @@ def _run_agent(case: EvalCase) -> RunObservation:
     provider = MockAnimationPlanningProvider()
     candidate: dict[str, Any] | None = None
     violations: list[PlanViolation] = []
+    retrieved_evidence = []
+
+    if case.evidence_text:
+        expected_chunk_id = f"chunk_{hashlib.sha256((case.id + ':expected').encode()).hexdigest()[:32]}"
+        distractor_chunk_id = f"chunk_{hashlib.sha256((case.id + ':distractor').encode()).hexdigest()[:32]}"
+
+        def fake_search(_query: str, **kwargs) -> dict[str, Any]:
+            return {
+                "results": [
+                    {
+                        "chunk_id": expected_chunk_id,
+                        "document_id": f"doc_{hashlib.sha256(case.id.encode()).hexdigest()[:24]}",
+                        "source": f"self-authored-{case.id}.md",
+                        "content": case.evidence_text,
+                        "content_sha256": hashlib.sha256(case.evidence_text.encode()).hexdigest(),
+                        "score": 0.95,
+                        "retrieval_method": kwargs["method"],
+                        "index_version": "knowledge-index-v1",
+                    },
+                    {
+                        "chunk_id": distractor_chunk_id,
+                        "document_id": f"doc_{hashlib.sha256((case.id + ':d').encode()).hexdigest()[:24]}",
+                        "source": "self-authored-distractor.md",
+                        "content": "无关的天气与旅行记录。",
+                        "content_sha256": hashlib.sha256("无关的天气与旅行记录。".encode()).hexdigest(),
+                        "score": 0.1,
+                        "retrieval_method": kwargs["method"],
+                        "index_version": "knowledge-index-v1",
+                    },
+                ]
+            }
+
+        started_at = time.perf_counter()
+        retrieved = invoke_retrieve_evidence_tool(
+            RetrieveEvidenceInput(queries=build_evidence_queries(transcript)),
+            fake_search,
+        )
+        retrieved_evidence = retrieved.evidence
+        retrieval_ms = _duration_ms(started_at)
+        observation.latencies_ms["retrieval"].append(retrieval_ms)
+        observation.record_call("planning", "retrieve_evidence", "completed", retrieval_ms)
+        retrieved_ids = {item.chunk_id for item in retrieved.evidence}
+        observation.retrieval_expected = 1
+        observation.retrieval_hits = int(expected_chunk_id in retrieved_ids)
+        observation.citation_items = 1
+        observation.correct_citations = int(
+            bool(retrieved.evidence) and retrieved.evidence[0].chunk_id == expected_chunk_id
+        )
 
     for repair_attempt in range(MAX_PLAN_REPAIR_ATTEMPTS + 1):
         observation.retry_count = repair_attempt
@@ -270,6 +329,7 @@ def _run_agent(case: EvalCase) -> RunObservation:
                 transcript=transcript,
                 repair_attempt=repair_attempt,
                 violations=violations,
+                evidence=retrieved_evidence,
             ),
             lambda value, attempt=repair_attempt: _mutate_candidate(
                 provider.plan(value.transcript).model_dump(), case.agent_scenario, attempt
@@ -329,7 +389,7 @@ def _percentile(values: list[float], percentile: float) -> float | None:
 def _aggregate(observations: list[RunObservation]) -> dict[str, Any]:
     latencies = {
         stage: [value for item in observations for value in item.latencies_ms[stage]]
-        for stage in ("planning", "validation")
+        for stage in ("retrieval", "planning", "validation")
     }
     repair_required = sum(item.repair_required for item in observations)
     return {
@@ -365,6 +425,14 @@ def _aggregate(observations: list[RunObservation]) -> dict[str, Any]:
         "task_success_rate": _ratio(
             sum(item.status == "completed" for item in observations), len(observations)
         ),
+        "evidence_retrieval_hit_rate": _ratio(
+            sum(item.retrieval_hits for item in observations),
+            sum(item.retrieval_expected for item in observations),
+        ),
+        "citation_correctness_rate": _ratio(
+            sum(item.correct_citations for item in observations),
+            sum(item.citation_items for item in observations),
+        ),
         "stage_latency_ms": {
             stage: {
                 "sample_count": len(values),
@@ -387,6 +455,8 @@ def _comparison(standard: dict[str, Any], agent: dict[str, Any]) -> dict[str, An
         "average_retry_count",
         "human_intervention_rate",
         "task_success_rate",
+        "evidence_retrieval_hit_rate",
+        "citation_correctness_rate",
     )
     comparison: dict[str, Any] = {}
     for name in metrics:
@@ -428,7 +498,7 @@ def run_evaluation(dataset: EvalDataset) -> dict[str, Any]:
             "name": dataset.name,
             "schema_version": dataset.schema_version,
             "case_count": len(dataset.cases),
-            "content_policy": "self_authored_chinese_transcripts_only",
+            "content_policy": "self_authored_chinese_transcripts_and_knowledge_only",
         },
         "modes": {
             "standard": standard_metrics,

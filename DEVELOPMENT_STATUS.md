@@ -1,8 +1,56 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `60bf537 增加 Agent 离线评测与可观测性`
-- Current stage: P6, Local knowledge base and hybrid retrieval - completed after user acceptance and approved for commit.
+- Current commit before this work: `4059a45 增加本地知识库与混合检索`
+- Current stage: P7, Citation-grounded RAG semantic planning - implementation, automated verification, and browser acceptance complete; explicitly accepted for commit.
+
+## P7 delivered
+
+- Added Agent-only retrieval inside the existing planning node through the Pydantic-typed `RetrieveEvidenceInput`/`RetrieveEvidenceOutput` boundary. Corrected transcript segments become at most six bounded local queries; P6 keyword/vector/hybrid search remains the only index implementation and standard workflow does not call it.
+- Extended `AnimationPlan` with versioned evidence references and per-animation `evidence_ids`, `confidence`, and `selection_reason`. The deterministic grounding adapter attaches only retrieved IDs whose current excerpts lexically support the visual claim. Unsupported factual media or knowledge graphics are downgraded to transcript emphasis; non-factual B-roll is normalized to explicit abstract concept packaging.
+- Added a live evidence trust boundary. Agent validation, approval/edit, render, and Agent review re-render resolve cited chunks from the current P6 index and compare document ID, source, content SHA-256, index version, and the exact stored excerpt. Deleted, reindexed, changed, missing, unused, forged, or unsupported citations cannot proceed.
+- Upgraded recoverable Agent checkpoint state to schema version 3 with evidence/query summaries while keeping schema 1 and 2 checkpoints readable. Planning repairs reuse the same retrieved evidence, and render performs a final live citation check before starting expensive media/render work.
+- Upgraded Agent planning metadata to `agent-planning-v2-rag` and `animation-plan-v2-evidence`. Local/DeepSeek prompts receive only the bounded evidence catalog and must cite supplied IDs; the deterministic post-processor remains authoritative even when a model ignores the instruction.
+- Agent Trace records `retrieve_evidence` as a real planning tool call with query IDs, SHA-256 query fingerprints, character counts, recall count, safe error categories, retrieved IDs, and adopted IDs. It does not persist query/transcript/evidence text, absolute paths, raw exceptions, or chain of thought.
+- Added `GET /api/videos/{task_id}/evidence` and minimal evidence views inside the existing approval panel and completed Agent review tabs. Reviewers see local source names, excerpts, citing animation IDs, and live `valid|missing|stale` status without a new home card or site redesign.
+- Extended the P5 offline harness to `agent-eval-v2-rag` with five self-authored evidence cases, an in-memory Fake retriever plus distractor, retrieval P50/P95 latency, `evidence_retrieval_hit_rate`, and `citation_correctness_rate`. No user storage, model, embedding download, or network service is used.
+- No database column/table changed in P7: evidence and query summaries use the existing JSON plan/checkpoint/trace persistence, so no Alembic migration is required.
+
+## P7 code structure and learning notes
+
+- `rag_tools.py` owns typed retrieval, transcript-query construction, deterministic evidence attachment/safe downgrade, factual-visual classification, current-index validation, and reviewer-facing citation status. It reuses `KnowledgeBaseService` rather than implementing a second retriever.
+- `agent_workflow.py` treats evidence retrieval as a tool inside the existing planning node, not as a fabricated graph node. Retrieval output is checkpointed with planning, repair reuses it, and the node/event sequence remains compatible with P1-P4 UI and recovery tests.
+- Evidence references are an audit snapshot, not an authority. The current knowledge row is authoritative; a stored excerpt must match the current chunk prefix and content digest before it can support rendering.
+- Keyword/quote emphasis remains transcript-grounded and may operate without project evidence. Fact-bearing info graphics and entity/topic visuals need supporting evidence; otherwise deterministic fallback removes the factual visual claim.
+
+## P7 verification
+
+- Modification baseline: `.\.conda\python.exe -m pytest -vv` → `150 passed in 91.66s`.
+- Final focused Agent/RAG/knowledge/frontend/Eval and Agent Mock render regression: `.\.conda\python.exe -m pytest -q tests\test_rag_planning.py tests\test_agent_workflow.py tests\test_agent_plan_repair.py tests\test_agent_approval.py tests\test_agent_eval.py tests\test_frontend_i18n.py tests\test_knowledge_base.py tests\test_mock_pipeline.py tests\test_end_to_end.py::test_agent_mock_video_processing_pipeline` → `52 passed in 42.19s`.
+- Final focused RAG/Eval/approval/review regression: `.\.conda\python.exe -m pytest -q tests\test_rag_planning.py tests\test_agent_eval.py tests\test_agent_approval.py tests\test_review_api.py` → `25 passed in 10.48s`.
+- Full suite: `.\.conda\python.exe -m pytest -vv` → `154 passed in 94.91s`, including the existing standard Mock and Agent Mock real FFmpeg/Remotion end-to-end pipelines.
+- Offline Eval: `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\p7_final` → exit code `0`, `Agent eval PASS`; Agent retrieval hit rate `1.0`, citation correctness `1.0`, task success `0.916667`, and tool-call success `0.864865`.
+- `node.exe --check frontend\app.js` passed. Standard `npm.cmd run build` failed at the documented locked `animation-renderer/build` directory with `EPERM`; no existing directory was removed or overwritten. Equivalent isolated bundle `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260829_p7` succeeded.
+- Browser acceptance on `http://127.0.0.1:8000` created an Agent Mock task with `approval_policy=always`. The task paused after validation with five completed pre-render nodes and zero retries, resumed after approval without repeating those nodes, completed all eight nodes, passed quality checks, and produced a 4.00-second 360x640 result. The Evidence tab showed the expected zero-citation safe downgrade, the 375 px viewport had no horizontal overflow, and the browser console had no errors.
+
+## P7 known limitations
+
+- Citation support uses deterministic lexical overlap plus exact current-chunk identity, not a learned natural-language entailment model. It prevents missing/forged citations and obvious unsupported mappings but does not prove that every nuanced claim logically follows from its source.
+- Retrieval queries are corrected transcript segments rather than model-authored query decomposition. The six-query/three-result bounds favor predictable local execution; long or highly compositional talks may need later query planning and reranking improvements.
+- Existing completed Agent videos remain downloadable after cited knowledge is deleted, because deleting knowledge does not erase an already-rendered artifact. Their evidence API reports `missing`, and approval/re-render paths reject the stale plan until it is safely replanned.
+- The evidence UI is deliberately review-only and text-first. Natural-language plan patches, evidence replacement controls, and a visual timeline remain P8 scope.
+- No real BGE-M3, local LLM, DeepSeek, external media provider, or user content was exercised in P7 automated verification.
+
+## Recommended P7 manual acceptance
+
+1. Upgrade/start the existing service, import a small UTF-8 knowledge file about a named book or topic, then upload a short `agent + mock` or `agent + configured` task. Confirm standard uploads still finish without any knowledge dependency.
+2. For an Agent task whose transcript matches the imported file, open the approval panel (use `approval_policy=always`) or the completed “知识证据 / Evidence” tab. Confirm it shows a real `chunk_...` ID, source, excerpt, citing animation ID, confidence/reason in the plan, and `valid` status.
+3. Open `GET /api/videos/{task_id}/agent-trace`. Confirm the `retrieve_evidence` tool call includes query hashes/lengths, recall count, retrieved IDs, and adopted IDs, while the query text, transcript, evidence excerpt, and absolute project path are absent.
+4. Delete the cited knowledge document through the P6 API/CLI. Reload `GET /api/videos/{task_id}/evidence`; expect `valid=false` and `status=missing`. Try approval or review re-render with the old plan; expect HTTP 422 and no new render.
+5. Run an Agent task with an empty knowledge base and a factual/book cue. Confirm it still completes offline and the unsupported factual visual becomes transcript emphasis or abstract packaging instead of inventing a citation.
+6. Run `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\manual_p7`; expect exit code 0 and both evidence metrics at `1.0` in JSON/Markdown.
+
+P7 was explicitly accepted and approved for commit. P8 has not been started.
 
 ## P6 delivered
 

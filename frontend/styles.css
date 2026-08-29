@@ -282,6 +282,13 @@ button { color: inherit; }
 .trace-chip { padding: 6px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-soft); color: var(--text-soft); font-size: 10px; }
 .agent-trace-list li { grid-template-columns: 18px minmax(0, 1fr); }
 .agent-trace-list small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.evidence-list { display: grid; gap: 12px; margin: 16px 0; }
+.evidence-card { min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-soft); }
+.evidence-card[data-status="missing"], .evidence-card[data-status="stale"] { border-color: #6f3434; }
+.evidence-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.evidence-card-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.evidence-card p { margin: 10px 0; color: var(--text-soft); font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.evidence-card small, .evidence-empty { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 
 .result-section { margin-top: 28px; }
 .result-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
@@ -457,6 +464,7 @@ textarea { display: block; width: 100%; min-height: 380px; resize: vertical; bor
   .agent-node-list { grid-template-columns: 1fr; }
   .approval-actions { align-items: stretch; flex-direction: column; }
   .approval-actions .button { width: 100%; }
+  .evidence-card-heading { flex-direction: column; }
   .event-list li { grid-template-columns: 18px minmax(0,1fr); }
   .event-list time { grid-column: 2; }
   .restore-panel { align-items: stretch; flex-direction: column; }

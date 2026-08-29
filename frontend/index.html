@@ -172,6 +172,7 @@
           <section id="approval-panel" class="panel approval-panel" aria-labelledby="approval-heading" hidden>
             <div class="approval-heading"><div><p class="eyebrow" data-i18n="approvalEyebrow">需要人工决策</p><h2 id="approval-heading" data-i18n="approvalTitle">审核 Agent 动画计划</h2><p data-i18n="approvalHelp">确认后从持久 Checkpoint 继续；编辑会再次经过服务端 schema、规划规则与安全区校验。</p></div><span class="status-pill" data-status="awaiting_approval" data-i18n="statusAwaitingApproval">等待审批</span></div>
             <div id="approval-reasons" class="approval-reasons"></div>
+            <div id="approval-evidence" class="evidence-list" aria-live="polite"></div>
             <label class="field"><span data-i18n="approvalPlanLabel">待审批动画计划 JSON</span><textarea id="approval-plan" class="approval-plan" spellcheck="false"></textarea></label>
             <p id="approval-error" class="form-error" role="alert"></p>
             <div class="approval-actions"><button id="approve-plan" class="button button-primary" type="button" data-i18n="approvePlan">批准并继续</button><button id="edit-plan" class="button button-secondary" type="button" data-i18n="editPlan">验证修改并继续</button><button id="reject-plan" class="button button-ghost" type="button" data-i18n="rejectPlan">拒绝任务</button></div>
@@ -195,6 +196,7 @@
                 <button id="tab-transcript" role="tab" type="button" aria-selected="true" aria-controls="panel-transcript" data-tab="transcript" data-i18n="transcriptTab">转写文本</button>
                 <button id="tab-plan" role="tab" type="button" aria-selected="false" aria-controls="panel-plan" data-tab="plan" data-i18n="planTab">动画计划</button>
                 <button id="tab-media" role="tab" type="button" aria-selected="false" aria-controls="panel-media" data-tab="media" data-i18n="mediaTab">素材审核</button>
+                <button id="tab-evidence" class="agent-only" role="tab" type="button" aria-selected="false" aria-controls="panel-evidence" data-tab="evidence" data-i18n="evidenceTab" hidden>知识证据</button>
                 <button id="tab-agent" class="agent-only" role="tab" type="button" aria-selected="false" aria-controls="panel-agent" data-tab="agent" data-i18n="agentTraceTab" hidden>Agent 轨迹</button>
                 <button id="tab-activity" role="tab" type="button" aria-selected="false" aria-controls="panel-activity" data-tab="activity" data-i18n="activityTab">任务记录</button>
               </div>
@@ -214,6 +216,11 @@
                   <div class="manual-row"><label class="field field-grow"><span data-i18n="manualUrlLabel">人工候选 URL</span><input id="manual-media-url" inputmode="url" placeholder="https://..." data-i18n-placeholder="manualUrlPlaceholder" /></label><button id="add-manual-media" class="button button-secondary align-end" type="button" data-i18n="addManualButton">添加候选</button></div>
                 </div>
                 <div id="candidate-list" class="candidate-list"></div>
+              </div>
+              <div id="panel-evidence" class="tab-panel agent-only" role="tabpanel" aria-labelledby="tab-evidence" data-tab-panel="evidence" hidden>
+                <div class="editor-heading"><div><h3 data-i18n="evidenceTitle">知识证据与引用</h3><p data-i18n="evidenceHelp">显示 Agent 采用的本地知识片段、来源和实时索引状态；失效引用不能进入审批或重渲染。</p></div></div>
+                <div id="evidence-summary" class="agent-trace-summary"></div>
+                <div id="evidence-list" class="evidence-list"></div>
               </div>
               <div id="panel-activity" class="tab-panel" role="tabpanel" aria-labelledby="tab-activity" data-tab-panel="activity" hidden>
                 <div class="editor-heading"><div><h3 data-i18n="activityTitle">任务事件</h3><p data-i18n="activityHelp">记录当前浏览器会话中收到的创建、处理、渲染和审核状态。</p></div></div>

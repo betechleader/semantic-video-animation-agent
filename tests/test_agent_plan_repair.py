@@ -107,8 +107,8 @@ def test_invalid_first_plan_is_repaired_once_and_trace_is_redacted(isolated_data
     assert str(task_dir.resolve()) not in encoded
     assert trace["planner"]["planner_id"] == "scripted"
     assert trace["planner"]["model_id"] == "scripted-v1"
-    assert trace["prompt_version"] == "agent-planning-v1"
-    assert trace["plan_schema_version"] == "animation-plan-v1"
+    assert trace["prompt_version"] == "agent-planning-v2-rag"
+    assert trace["plan_schema_version"] == "animation-plan-v2-evidence"
     assert any(entry["event_type"] == "validation_error" for entry in trace["entries"])
     assert any(entry["event_type"] == "retry" for entry in trace["entries"])
     completed_node_runs = {

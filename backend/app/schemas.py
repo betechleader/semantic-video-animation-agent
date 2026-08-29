@@ -241,6 +241,21 @@ class MediaPlacement(BaseModel):
         return self
 
 
+class EvidenceReference(BaseModel):
+    """A versioned project-knowledge chunk cited by one or more animations."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_id: str = Field(pattern=r"^chunk_[0-9a-f]{32}$")
+    document_id: str = Field(pattern=r"^doc_[0-9a-f]{24}$")
+    source: str = Field(min_length=1, max_length=255)
+    excerpt: str = Field(min_length=1, max_length=1_200)
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    score: float = Field(ge=0, le=1)
+    retrieval_method: Literal["keyword", "vector", "hybrid"]
+    index_version: str = Field(min_length=1, max_length=80)
+
+
 class Animation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -251,6 +266,9 @@ class Animation(BaseModel):
     end_ms: int = Field(gt=0)
     trigger_text: str = Field(min_length=1)
     parameters: KeywordPopParameters | QuoteCardParameters | MediaVisualParameters | InformationGraphicParameters
+    evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    selection_reason: str | None = Field(default=None, min_length=1, max_length=240)
 
     @model_validator(mode="after")
     def validate_time_range(self) -> "Animation":
@@ -264,6 +282,10 @@ class Animation(BaseModel):
             raise ValueError("media_visual requires media_visual_v1 parameters")
         if self.type == "info_graphic" and (self.template_id != "knowledge_infographic_v1" or not isinstance(self.parameters, InformationGraphicParameters)):
             raise ValueError("info_graphic requires knowledge_infographic_v1 parameters")
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("animation evidence_ids must be unique")
+        if self.evidence_ids and (self.confidence is None or self.selection_reason is None):
+            raise ValueError("cited animations require confidence and selection_reason")
         return self
 
 
@@ -292,6 +314,7 @@ class AnimationPlan(BaseModel):
     media_provider: Literal["mock", "manual", "knowledge", "wikimedia_commons", "pexels"] = "mock"
     animations: list[Animation] = Field(min_length=1)
     semantic_segments: list[SemanticSegment] = Field(default_factory=list)
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=50)
     media_assets: list[MediaAssetAudit] = Field(default_factory=list)
     face_regions: list[FaceRegion] = Field(default_factory=list)
     media_placements: list[MediaPlacement] = Field(default_factory=list)

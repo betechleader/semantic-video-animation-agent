@@ -8,12 +8,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .planning_rules import PlanningRuleError
-from .schemas import AnimationPlan, Transcript
+from .schemas import AnimationPlan, EvidenceReference, Transcript
 
 DIRECTOR_INSTRUCTION_MAX_LENGTH = 2_000
 MAX_PLAN_REPAIR_ATTEMPTS = 2
-AGENT_PROMPT_VERSION = "agent-planning-v1"
-ANIMATION_PLAN_SCHEMA_VERSION = "animation-plan-v1"
+AGENT_PROMPT_VERSION = "agent-planning-v2-rag"
+ANIMATION_PLAN_SCHEMA_VERSION = "animation-plan-v2-evidence"
 
 
 class PlanViolation(BaseModel):
@@ -34,6 +34,7 @@ class PlanningToolInput(BaseModel):
     )
     repair_attempt: int = Field(ge=0, le=MAX_PLAN_REPAIR_ATTEMPTS)
     violations: list[PlanViolation] = Field(default_factory=list, max_length=50)
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=20)
 
 
 class PlanningToolOutput(BaseModel):
