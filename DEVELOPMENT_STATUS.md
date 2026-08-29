@@ -1,8 +1,47 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `9e2e427 增加带引用的RAG语义规划`
-- Current stage: P8, Natural-language edits and visual timeline - implementation and automated/browser verification complete; explicitly accepted for commit.
+- Current commit before this work: `82d0c52 增加自然语言计划修改与可视时间轴`
+- Current stage: P9, MCP tool service - explicitly accepted and approved for commit.
+
+## P9 delivered
+
+- Added a local `stdio` MCP server using the official, explicitly pinned `mcp==2.1.1` SDK, which supports the project's Python 3.12 runtime. No HTTP listener, remote bind, or authentication surface was added in this phase.
+- Exposed nine schema-first tools: `create_video`, `get_video_status`, `get_agent_trace`, `search_asset`, `get_pending_approval`, `approve_plan`, `replace_asset`, `rerender_video`, and `download_result`. Pydantic models reject extra fields and constrain workflow/profile/policy enums, UUID task IDs, candidate/animation IDs, instruction lengths, asset kinds, and edited AnimationPlan payloads.
+- Exposed three resources: privacy-minimal task status, redacted Agent Trace, and completed `video/mp4` result bytes. The download tool returns a `video://` resource URI rather than a filesystem path.
+- Kept read-only lookup annotations separate from mutating creation, search/cache, approval, replacement, and re-render annotations. These annotations are client hints only; each handler still reuses the authoritative server-side boundary.
+- Reused the existing FastAPI upload handler for MCP creation, so standard/agent dispatch, `processing_profile`, `media_provider`, director-instruction bounds, durable task creation, metrics, probe, cleanup, and workflow startup remain one implementation.
+- Reused the existing atomic approval handlers. MCP cannot approve a non-pending task, cannot consume one approval twice, and edit decisions still pass AnimationPlan schema, transcript-grounding rules, live evidence checks, and renderer safe-area checks before resume.
+- Asset replacement accepts only a candidate ID already stored in that UUID task's candidate manifest, checks the animation and candidate kind, clears all browser/client-untrusted derived media/face/placement fields, and enters the same validated review-render transition. It accepts neither arbitrary URLs nor local paths.
+- Added privacy-safe write audit events. Asset searches store only a SHA-256 query fingerprint, kind, and result count in task events; task text, query text, media bytes, credentials, and absolute paths are excluded.
+- Added official MCP Client tests for tool/resource discovery, generated schemas and annotations, normal calls, invalid UUID/argument rejection, one-winner approval behavior, approval bypass rejection, audited search, candidate-manifest enforcement, shared re-render validation, result-resource bytes, and a real stdio subprocess negotiation.
+- No database schema changed in P9, so no Alembic migration was required. Existing FastAPI and frontend contracts were not modified.
+
+## P9 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` -> `160 passed in 118.82s`.
+- Final focused MCP suite: `.\.conda\python.exe -m pytest -q tests\test_mcp_server.py` -> `7 passed in 7.19s`, including an official Client spawning `.\.conda\python.exe -m backend.app.mcp_server` over real stdio.
+- MCP plus approval/review/result/workflow regression: `.\.conda\python.exe -m pytest -vv tests\test_mcp_server.py tests\test_agent_approval.py tests\test_review_api.py tests\test_results_api.py tests\test_workflow_mode_api.py` -> `29 passed in 13.56s`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` -> `167 passed in 126.95s`, including standard Mock and Agent Mock real FFmpeg/Remotion end-to-end renders.
+- `.\.conda\python.exe -m compileall -q backend\app\mcp_server.py` passed.
+- Renderer build was not required because P9 does not change TypeScript, Remotion source, `AnimationPlan`, or the renderer contract. The full Python suite still executed both real renderer paths.
+
+## P9 known limitations
+
+- `create_video` uses bounded base64 content because MCP tools cannot be allowed to read arbitrary client paths. This is simple and safe for local short-form videos but less memory-efficient than a future authenticated streaming transport.
+- Only local stdio is offered. HTTP transport, authentication, multi-user authorization, and remote deployment are intentionally absent; production transport and worker concerns remain P10 scope.
+- A task configured with a real external media Provider may contact that Provider when `search_asset` is called. Automated P9 tests use a Fake Provider and perform no network call; no real external provider, local LLM, DeepSeek, or ASR model was tested in P9.
+- MCP uses the existing in-process background execution model. Agent checkpoint recovery remains available, while durable recovery of standard/review render workers is still P10 scope.
+
+## Recommended P9 manual acceptance
+
+1. Install `requirements.txt`, then configure an MCP host to launch `.\.conda\python.exe -m backend.app.mcp_server` with this repository as its working directory. Confirm it discovers nine tools and three `video://tasks/{task_id}...` resource templates without opening a network port.
+2. Call `create_video` with a small base64 MP4, `workflow_mode=standard`, and Mock processing. Poll `get_video_status`; expect the existing standard pipeline to complete and return a result resource URI without transcript, plan body, trace ID, or local path.
+3. Create an `agent + mock + approval_policy=always` task. Confirm `get_pending_approval` returns the paused plan, call `approve_plan` once, and verify a repeated approval fails while the first decision resumes from render.
+4. On a completed task, call `search_asset`, then `replace_asset` with a returned candidate ID. Confirm an invented candidate ID is rejected, while a valid candidate starts one validated re-render and writes MCP audit events without the search query text.
+5. Call `download_result`, then read the returned `video://tasks/{task_id}/result` resource. Expect `video/mp4` bytes and no `storage` path. Also confirm the existing browser/FastAPI upload, approval, review, and download flows remain unchanged.
+
+P9 was explicitly accepted and approved for commit. P10 has not been started.
 
 ## P8 delivered
 

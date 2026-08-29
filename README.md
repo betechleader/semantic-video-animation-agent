@@ -119,6 +119,26 @@ Every adopted asset is downloaded into `media-assets/`; the plan and `media_asse
 
 Successful output is checked with `ffprobe` and FFmpeg decode. `metrics.json` records only a SHA-256 trace fingerprint, stage durations (including media acquisition and local safety analysis), terminal category, and technical output facts—never transcript text, media bytes, absolute paths, identity data, face coordinates, or exception messages.
 
+## 本地 MCP 工具服务（P9）
+
+P9 使用官方 MCP Python SDK `2.1.1` 提供本地 `stdio` 服务，不增加 HTTP 监听端口，也不改变普通网页和 FastAPI API。启动命令：
+
+```powershell
+.\.conda\python.exe -m backend.app.mcp_server
+```
+
+MCP 工具包括 `create_video`、`get_video_status`、`get_agent_trace`、`search_asset`、`get_pending_approval`、`approve_plan`、`replace_asset`、`rerender_video` 和 `download_result`。资源模板包括任务状态、脱敏 Agent Trace 和完成视频：
+
+- `video://tasks/{task_id}`
+- `video://tasks/{task_id}/trace`
+- `video://tasks/{task_id}/result`
+
+工具参数和返回值由 Pydantic 生成明确 JSON Schema。只读查询与有副作用的创建、审批、素材搜索缓存、替换和重渲染在 MCP 注解中分开标记；注解只是客户端提示，真正的权限边界仍由服务端任务状态、原子审批更新、规划/证据/安全区校验和任务内素材清单保证。
+
+`create_video` 只接受有大小上限的 base64 MP4，不接受客户端文件路径。`replace_asset` 只接受当前任务候选清单中的 `candidate_id`，不接受任意 URL。下载工具只返回 MCP 资源 URI，结果资源返回 `video/mp4` 字节，不公开 `storage` 绝对路径。所有写操作继续写入现有任务事件审计。本阶段没有增加 HTTP transport；如果后续增加，必须先加入认证并限制绑定地址。
+
+SDK 版本选择依据：[MCP Python SDK 2.1.1](https://github.com/modelcontextprotocol/python-sdk/releases/tag/v2.1.1) 和 [官方工具/Schema 文档](https://py.sdk.modelcontextprotocol.io/servers/tools/)。
+
 ## Verification
 
 Current P4 verification: `125 passed`, including standard and `agent+mock` FFmpeg/Remotion pipelines, approval pause/restart/resume, bounded repair escalation, edit validation including renderer safe areas, rejection, cancellation, concurrent decision safety, Agent Trace/SSE coverage, and the new bilingual/responsive Agent UI contract. P4 changed only the build-free frontend and its tests; it did not change TypeScript, Remotion source, the renderer contract, or the `AnimationPlan` schema, so no renderer build was required.
