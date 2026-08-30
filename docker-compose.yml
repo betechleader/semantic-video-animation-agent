@@ -1,0 +1,37 @@
+services:
+  api:
+    build: .
+    environment:
+      EXECUTION_MODE: worker
+      ASR_PROVIDER: mock
+      PLANNER_PROVIDER: mock
+      MEDIA_PROVIDER: mock
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - semantic_video_storage:/app/storage
+    depends_on:
+      worker:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "backend.app.worker"]
+    environment:
+      EXECUTION_MODE: worker
+      ASR_PROVIDER: mock
+      PLANNER_PROVIDER: mock
+      MEDIA_PROVIDER: mock
+    volumes:
+      - semantic_video_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "from backend.app.execution import active_worker_count; raise SystemExit(0 if active_worker_count() else 1)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 6
+    restart: unless-stopped
+
+volumes:
+  semantic_video_storage:

@@ -14,8 +14,8 @@ Build a local Chinese talking-head video semantic-animation pipeline. The curren
 
 ## Commands (Windows)
 
-- Test: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv`
-- Backend: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m uvicorn backend.app.main:app --reload`
+- Test: `.\.conda\python.exe -m pytest -vv`
+- Backend: `.\.conda\python.exe -m uvicorn backend.app.main:app --reload`
 - Renderer build: `cd animation-renderer; npm.cmd run build`
 
 ## Standards and safety

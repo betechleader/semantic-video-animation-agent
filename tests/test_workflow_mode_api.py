@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -5,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from backend.app import database, main
-from backend.app.models import VideoTask
+from backend.app.models import ExecutionJob, VideoTask
 from backend.app.schemas import VideoMetadata
 
 
@@ -177,3 +178,19 @@ def test_director_instruction_is_agent_only_bounded_and_persisted(workflow_clien
     assert too_long.status_code == 422
     assert "at most 2000" in too_long.json()["detail"]
     assert {path.name for path in storage.iterdir() if path.is_dir()} == before
+
+
+def test_worker_mode_persists_dispatch_without_starting_in_process_thread(workflow_client, monkeypatch) -> None:
+    client, _storage, standard_calls, agent_calls = workflow_client
+    monkeypatch.setattr(main, "SETTINGS", replace(main.SETTINGS, execution_mode="worker"))
+
+    response = upload(client, {"workflow_mode": "agent", "processing_profile": "mock"})
+
+    assert response.status_code == 202
+    assert standard_calls == []
+    assert agent_calls == []
+    with next(database.get_session()) as session:
+        job = session.scalar(select(ExecutionJob).where(ExecutionJob.task_id == response.json()["task_id"]))
+    assert job is not None
+    assert job.kind == "agent"
+    assert job.status == "queued"

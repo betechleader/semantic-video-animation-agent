@@ -36,6 +36,11 @@ class Settings:
     knowledge_embedding_provider: str
     knowledge_embedding_model: str
     knowledge_embedding_local_files_only: bool
+    execution_mode: str
+    worker_poll_seconds: float
+    worker_lease_seconds: int
+    worker_heartbeat_seconds: int
+    worker_max_attempts: int
 
     @property
     def max_upload_bytes(self) -> int:
@@ -43,6 +48,13 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    execution_mode = os.getenv("EXECUTION_MODE", "local").lower()
+    if execution_mode not in {"local", "worker"}:
+        raise ValueError("EXECUTION_MODE must be local or worker")
+    worker_heartbeat_seconds = int(os.getenv("WORKER_HEARTBEAT_SECONDS", "5"))
+    worker_lease_seconds = int(os.getenv("WORKER_LEASE_SECONDS", "30"))
+    if worker_heartbeat_seconds < 1 or worker_lease_seconds <= worker_heartbeat_seconds * 2:
+        raise ValueError("WORKER_LEASE_SECONDS must be more than twice WORKER_HEARTBEAT_SECONDS")
     return Settings(
         max_upload_mb=int(os.getenv("MAX_UPLOAD_MB", "100")),
         command_timeout_seconds=int(os.getenv("COMMAND_TIMEOUT_SECONDS", "120")),
@@ -68,6 +80,11 @@ def load_settings() -> Settings:
         knowledge_embedding_local_files_only=os.getenv(
             "KNOWLEDGE_EMBEDDING_LOCAL_FILES_ONLY", "true"
         ).lower() == "true",
+        execution_mode=execution_mode,
+        worker_poll_seconds=max(0.1, float(os.getenv("WORKER_POLL_SECONDS", "1"))),
+        worker_lease_seconds=worker_lease_seconds,
+        worker_heartbeat_seconds=worker_heartbeat_seconds,
+        worker_max_attempts=max(1, int(os.getenv("WORKER_MAX_ATTEMPTS", "3"))),
     )
 
 

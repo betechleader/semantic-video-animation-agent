@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -44,7 +45,20 @@ def _run(command: list[str], *, cwd: Path | None = None, task_id: str | None = N
         )
         if task_id:
             process_registry.register(task_id, process)
-        stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)
+        deadline = time.monotonic() + COMMAND_TIMEOUT_SECONDS
+        while True:
+            if task_id and is_cancellation_requested(task_id):
+                process_registry.cancel(task_id)
+                process.communicate()
+                raise ProcessingCancelled("Task was cancelled while running an external command")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, COMMAND_TIMEOUT_SECONDS)
+            try:
+                stdout, stderr = process.communicate(timeout=min(0.5, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
     except (OSError, subprocess.TimeoutExpired) as exc:
         if "process" in locals() and process.poll() is None:
             process.terminate()

@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -47,6 +47,14 @@ from .storage import StorageService
 from .video import VideoProbeError, probe_video
 from .workflow import start_review_task, start_task
 from .agent_workflow import get_active_agent_thread, recover_agent_tasks, resume_agent_task, start_agent_task
+from .execution import (
+    active_worker_count,
+    enqueue_agent_resume,
+    enqueue_initial_task,
+    enqueue_review,
+    execution_metrics,
+    recover_execution_jobs,
+)
 from .agent_tools import DIRECTOR_INSTRUCTION_MAX_LENGTH
 from .agent_trace import AgentTraceError, read_agent_trace
 from .rag_tools import (
@@ -70,7 +78,10 @@ from .plan_patches import PlanPatchError, apply_plan_patch, build_rule_plan_patc
 async def lifespan(_app: FastAPI):
     configure_logging()
     initialize_database()
-    recover_agent_tasks(storage_root=STORAGE_ROOT)
+    if SETTINGS.execution_mode == "worker":
+        recover_execution_jobs()
+    else:
+        recover_agent_tasks(storage_root=STORAGE_ROOT)
     yield
 
 
@@ -158,7 +169,9 @@ async def upload_video(
             approval_policy=approval_policy,
         )
         initialize_initial_metrics(task_dir, task_id, request.state.trace_id, round((time.perf_counter() - upload_probe_started_at) * 1000))
-        if workflow_mode == "agent":
+        if SETTINGS.execution_mode == "worker":
+            enqueue_initial_task(task_id, workflow_mode)
+        elif workflow_mode == "agent":
             agent_args = (
                 task_id,
                 task_dir,
@@ -251,6 +264,11 @@ def _validate_approval_plan(task: dict, plan: AnimationPlan) -> AnimationPlan:
 
 
 def _resume_after_approval(task_id: str) -> None:
+    if SETTINGS.execution_mode == "worker":
+        approval = get_agent_approval(task_id)
+        if approval is not None:
+            enqueue_agent_resume(task_id, int(approval["decision_version"]))
+        return
     active = get_active_agent_thread(task_id)
     if active is None:
         resume_agent_task(task_id, STORAGE_ROOT)
@@ -357,6 +375,9 @@ def _start_patch_render(task_id: str, task: dict, plan: AnimationPlan, patch_id:
         metrics = initialize_initial_metrics(task_dir, task_id, task["trace_id"], 0)
         metrics.finalize(1, "completed")
         metrics.current_or_start_attempt("review")
+    if SETTINGS.execution_mode == "worker":
+        enqueue_review(task_id, patch_id=patch_id)
+        return
     start_review_task(
         task_id,
         task_dir,
@@ -675,8 +696,44 @@ def save_review_and_rerender(task_id: str, review: ReviewUpdate) -> dict:
         metrics = initialize_initial_metrics(task_dir, task_id, task["trace_id"], 0)
         metrics.finalize(1, "completed")
         metrics.current_or_start_attempt("review")
-    start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), transcript, plan, task["trace_id"])
+    if SETTINGS.execution_mode == "worker":
+        enqueue_review(task_id)
+    else:
+        start_review_task(task_id, task_dir, VideoMetadata.model_validate(task["metadata"]), transcript, plan, task["trace_id"])
     return {"task_id": task_id, "status": "rendering", "transcript": transcript, "plan": plan, "replanned": transcript_changed}
+
+
+@app.get("/health/live")
+def health_live() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready() -> JSONResponse:
+    initialize_database()
+    workers = active_worker_count() if SETTINGS.execution_mode == "worker" else 0
+    ready = SETTINGS.execution_mode == "local" or workers > 0
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "execution_mode": SETTINGS.execution_mode, "active_workers": workers},
+    )
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def prometheus_metrics() -> str:
+    """Expose local aggregate counters only; labels never contain task or user content."""
+
+    snapshot = execution_metrics()
+    lines = [
+        "# HELP semantic_video_active_workers Active persistent workers.",
+        "# TYPE semantic_video_active_workers gauge",
+        f"semantic_video_active_workers {snapshot['active_workers']}",
+    ]
+    for status_name, count in sorted(snapshot["tasks"].items()):
+        lines.append(f'semantic_video_tasks{{status="{status_name}"}} {count}')
+    for status_name, count in sorted(snapshot["jobs"].items()):
+        lines.append(f'semantic_video_execution_jobs{{status="{status_name}"}} {count}')
+    return "\n".join(lines) + "\n"
 
 
 def _knowledge_service() -> KnowledgeBaseService:

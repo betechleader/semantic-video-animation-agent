@@ -1,8 +1,54 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `82d0c52 增加自然语言计划修改与可视时间轴`
-- Current stage: P9, MCP tool service - explicitly accepted and approved for commit.
+- Current commit before this work: `a2785ae 增加本地MCP工具服务`
+- Current stage: P10, production task execution and deployment - explicitly accepted and approved for commit.
+
+## P10 delivered
+
+- Preserved `EXECUTION_MODE=local` as the default and its existing in-process standard/Agent/review dispatch signatures. Added an optional `EXECUTION_MODE=worker` path that persists initial uploads, approval resumes, plan-patch renders, Undo renders, and ordinary review renders before execution.
+- Added Alembic revision `0007_persistent_execution` with `execution_jobs` and `worker_heartbeats`. Jobs have task-local idempotency keys, bounded attempt counts, atomic SQLite claims, expiring leases, renewable heartbeats, safe error categories, and terminal execution state.
+- Added `python -m backend.app.worker`. A Worker reconstructs metadata, transcript, plan, Provider choices, trace ID, and task storage only from authoritative SQLite/task state. Agent jobs continue through the existing checkpoint graph; standard/review jobs reuse the existing workflow services and fixed task-local artifact paths.
+- Added crash recovery for expired leases and dispatch-gap recovery for non-terminal tasks committed before queue insertion. Two Workers cannot claim the same live lease; exhausted leases terminate with a clear failed task rather than retrying forever.
+- Improved cancellation propagation. Long-running FFmpeg/Remotion commands now poll the persisted cancellation bit every 0.5 seconds and terminate the registered process tree instead of waiting for the whole command timeout.
+- Added `/health/live`, `/health/ready`, and privacy-safe Prometheus text at `/metrics`. Worker readiness requires a fresh heartbeat only in worker mode; metric labels contain aggregate task/job status only, never task IDs, transcript, media, paths, prompts, or exception messages.
+- Added a Dockerfile and Docker Compose API/Worker profile bound to `127.0.0.1:8000`, with Mock Providers by default, health checks, restart policy, and a shared named storage volume. Redis was not made a prerequisite: SQLite leases match the current single-host local scale and preserve the lightweight default.
+- Added pinned development checks in `requirements-dev.txt` (`ruff==0.16.4`, `mypy==2.3.1`) after checking their current official PyPI releases. Added GitHub Actions jobs for syntax/lint/format/type checks, Alembic migration, the full Python suite, offline Agent Eval, Renderer build, and Compose validation.
+
+## P10 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` -> `167 passed in 135.42s`.
+- Final Worker/workflow/approval/review/cancellation/metrics regression: `.\.conda\python.exe -m pytest -q tests\test_persistent_execution.py tests\test_workflow_mode_api.py tests\test_agent_workflow.py tests\test_agent_approval.py tests\test_review_api.py tests\test_process_control.py tests\test_metrics.py` -> `38 passed in 21.06s`.
+- Final focused Worker/cancellation suite: `.\.conda\python.exe -m pytest -q tests\test_process_control.py tests\test_persistent_execution.py` -> `8 passed in 3.67s`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` -> `175 passed in 131.50s`, including both existing real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
+- Offline Eval: `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\p10_final` -> exit code `0`, `Agent eval PASS`.
+- Migration: `.\.conda\python.exe -m alembic upgrade head` and `.\.conda\python.exe -m alembic current` -> `0007_persistent_execution (head)`.
+- Quality checks passed: `compileall`; Ruff correctness rules; Ruff format check for the new Worker code/tests; focused mypy; and `docker compose config --quiet`.
+- Standard `npm.cmd run build` failed at the documented locked `animation-renderer/build` directory with `EPERM`; no directory was removed or overwritten. Equivalent isolated bundle `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260830_p10` succeeded.
+- `docker compose build` could not start because the local Docker Desktop Linux Engine was not running (`dockerDesktopLinuxEngine` named pipe missing). Compose configuration is valid, but no image-build or container-start success is claimed.
+
+## P10 known limitations
+
+- SQLite leases are intentionally a single-host execution design. They support multiple local Worker processes but are not intended for a multi-host cluster or a network filesystem; Redis plus a distributed queue remains a future scaling substitution, not a current runtime dependency.
+- Agent restarts resume from the latest graph checkpoint. Standard/review jobs interrupted inside one node use at-least-once retry of that current node and overwrite fixed task-local outputs; a fully checkpointed standard graph was not added because standard must remain the stable lightweight baseline.
+- Automated tests simulate Worker death by expiring a claimed lease and verify another Worker atomically reclaims it. A real Docker Worker kill during an actual render remains a manual acceptance item because Docker Engine was unavailable locally.
+- No real faster-whisper model, local/remote LLM, external media Provider, multi-Worker load test, or OpenTelemetry exporter was exercised in P10. Prometheus metrics are local and enabled; no outbound telemetry is configured.
+
+## Recommended P10 manual acceptance
+
+1. Run `.\.conda\python.exe -m alembic upgrade head`. With no execution environment variable set, start FastAPI normally and complete one standard Mock and one Agent Mock task; expect the original local behavior and outputs to remain unchanged.
+2. In two terminals set `$env:EXECUTION_MODE='worker'`; start FastAPI in one and `.\.conda\python.exe -m backend.app.worker` in the other. Open `/health/ready`; expect HTTP 200, `execution_mode=worker`, and at least one active Worker. Upload standard Mock and Agent Mock tasks and expect both to complete.
+3. Start a longer Agent Mock/controlled test task, terminate the Worker process after at least one checkpoint, wait longer than `WORKER_LEASE_SECONDS`, and start a replacement Worker. Expect the same task/job to resume, its attempt count to increase, completed Agent nodes not to repeat, and only one final result.
+4. Start another render and call `POST /api/videos/{task_id}/cancel`. Expect a cancellation event, external FFmpeg/Remotion process termination within the polling interval, terminal `cancelled`, and no completed download.
+5. Open `/metrics`; expect only aggregate status series. Stop the Worker and wait for its heartbeat to become stale; `/health/live` should remain 200 while `/health/ready` becomes 503 in worker mode. With Docker Desktop running, execute `docker compose up --build`, then repeat the health and Mock upload checks at `http://127.0.0.1:8000`.
+
+## P10 user acceptance verification
+
+- The user explicitly accepted P10 and requested that the implementation be committed and pushed to GitHub.
+- Submission-gate full suite: `.\.conda\python.exe -m pytest -vv` -> `175 passed in 130.11s`, including the real standard Mock and Agent Mock FFmpeg/Remotion end-to-end paths.
+- The P10 roadmap state is now `COMPLETED`. P11 has not been started.
+
+P10 was explicitly accepted and approved for commit. P11 has not been started.
 
 ## P9 delivered
 
@@ -21,7 +67,7 @@
 
 - Baseline before implementation: `.\.conda\python.exe -m pytest -vv` -> `160 passed in 118.82s`.
 - Final focused MCP suite: `.\.conda\python.exe -m pytest -q tests\test_mcp_server.py` -> `7 passed in 7.19s`, including an official Client spawning `.\.conda\python.exe -m backend.app.mcp_server` over real stdio.
-- MCP plus approval/review/result/workflow regression: `.\.conda\python.exe -m pytest -vv tests\test_mcp_server.py tests\test_agent_approval.py tests\test_review_api.py tests\test_results_api.py tests\test_workflow_mode_api.py` -> `29 passed in 13.56s`.
+- MCP plus approval/review/result/workflow regression: `.\.conda\python.exe -m pytest -vv tests\test_mcp_server.py tests\test_agent_approval.py tests\test_review_api.py tests\test_results_api.py tests\test_workflow_mode_api.py` -> `29 passed in 13.56s` (the run preceded the final stdio test, while that final test passed in both the focused and full suites).
 - Final full suite: `.\.conda\python.exe -m pytest -vv` -> `167 passed in 126.95s`, including standard Mock and Agent Mock real FFmpeg/Remotion end-to-end renders.
 - `.\.conda\python.exe -m compileall -q backend\app\mcp_server.py` passed.
 - Renderer build was not required because P9 does not change TypeScript, Remotion source, `AnimationPlan`, or the renderer contract. The full Python suite still executed both real renderer paths.
@@ -271,10 +317,10 @@ P5 was explicitly accepted and approved for commit. P6 has not been started.
 
 ## P4 verification
 
-- Modification baseline: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `122 passed in 100.24s`.
-- Targeted frontend/workflow/approval/recovery tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_frontend_i18n.py tests\test_workflow_mode_api.py tests\test_agent_approval.py tests\test_agent_workflow.py` → `29 passed in 11.24s`.
-- Final full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `125 passed in 82.74s`, including both real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
-- Live local API/UI-contract task `6a441123-c948-495d-89b5-0ba057db98e2` used `agent + mock + approval_policy=always` with a director instruction. It paused durably at approval after validation, returned the candidate plan and redacted Trace, accepted one approval, emitted one `resumed` event, then executed only render/quality/complete and produced a verified 4.0 s 360×640 result (82,006 bytes). Its event history contains all eight node completions and no repeated ASR/planning after approval.
+- Modification baseline: `.\.conda\python.exe -m pytest -vv` → `122 passed in 100.24s`.
+- Targeted frontend/workflow/approval/recovery tests: `.\.conda\python.exe -m pytest -vv tests\test_frontend_i18n.py tests\test_workflow_mode_api.py tests\test_agent_approval.py tests\test_agent_workflow.py` → `29 passed in 11.24s`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` → `125 passed in 82.74s`, including both real FFmpeg/Remotion standard Mock and Agent Mock end-to-end pipelines.
+- A live local API/UI-contract acceptance run used `agent + mock + approval_policy=always` with a director instruction. It paused durably at approval after validation, returned the candidate plan and redacted Trace, accepted one approval, emitted one `resumed` event, then executed only render/quality/complete and produced a verified 4.0 s 360×640 result (82,006 bytes). Its event history contains all eight node completions and no repeated ASR/planning after approval.
 - The result preview returned HTTP `206 Partial Content`, `Content-Disposition: inline`, and a 32-byte requested range, confirming the existing stable preview contract.
 - `node.exe --check frontend\app.js` passed. P4 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema, so the renderer build was not required by the stage verification rule.
 - The Browser skill could not start because the desktop runtime rejected its installed internal Browser service path as outside the configured trusted code path. No alternate browser automation was used; interactive viewport/click validation remains a manual acceptance item.
@@ -313,15 +359,15 @@ P4 was explicitly accepted for commit after the verification above. P5 has not b
 
 ## P3 verification
 
-- Baseline before implementation: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `114 passed in 77.55s`.
-- Final targeted P3/Agent/API/database/safe-area tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -q tests\test_agent_approval.py tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_workflow_mode_api.py tests\test_task_database.py tests\test_quality.py` → `30 passed in 13.86s`.
-- Final full suite after manual-acceptance hardening: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `122 passed in 82.36s`, including the existing standard and Agent Mock FFmpeg/Remotion end-to-end renders.
-- A live API acceptance task `671c5354-1e23-4176-bc88-7ef2fe6cbce9` paused under `approval_policy=always`, returned a durable pending approval, resumed after approve, completed with each graph node exactly once, and produced a verified 4.0 s, 360×640 H.264/AAC result (83,234 bytes). Repeated approve returned HTTP 409.
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` → `114 passed in 77.55s`.
+- Final targeted P3/Agent/API/database/safe-area tests: `.\.conda\python.exe -m pytest -q tests\test_agent_approval.py tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_task_database.py tests\test_quality.py` → `30 passed in 13.86s`.
+- Final full suite after manual-acceptance hardening: `.\.conda\python.exe -m pytest -vv` → `122 passed in 82.36s`, including the existing standard and Agent Mock FFmpeg/Remotion end-to-end renders.
+- A live API acceptance run paused under `approval_policy=always`, returned a durable pending approval, resumed after approve, completed with each graph node exactly once, and produced a verified 4.0 s, 360×640 H.264/AAC result (83,234 bytes). Repeated approve returned HTTP 409.
 - Live API checks also confirmed a planning-rule-invalid edit returns HTTP 422 and remains pending, reject becomes terminal with download HTTP 404, and standard mode completes while ignoring `approval_policy=always`.
-- Manual testing exposed an approval-boundary gap: a schema/rule-valid edit could still violate the renderer safe area and fail at render. The API now runs the existing `validate_animation_safe_areas` before consuming approve/edit; live retest task `60a94d7e-0d39-4726-beff-c409d2e76f48` returned HTTP 422, remained pending at decision version 0, and never entered render.
-- `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic heads` → single head `0004_agent_approval`.
+- Manual testing exposed an approval-boundary gap: a schema/rule-valid edit could still violate the renderer safe area and fail at render. The API now runs the existing `validate_animation_safe_areas` before consuming approve/edit; a live retest returned HTTP 422, remained pending at decision version 0, and never entered render.
+- `.\.conda\python.exe -m alembic heads` → single head `0004_agent_approval`.
 - Renderer build was not required: P3 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema.
-- `git diff --check` passed. The user-owned untracked file `how 提交哈希` remains untouched.
+- `git diff --check` passed.
 
 ## P3 known limitations
 
@@ -332,7 +378,7 @@ P4 was explicitly accepted for commit after the verification above. P5 has not b
 
 ## Recommended P3 manual acceptance
 
-1. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=agent`, `processing_profile=mock`, `media_provider=mock`, and `approval_policy=always`.
+1. Run `.\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=agent`, `processing_profile=mock`, `media_provider=mock`, and `approval_policy=always`.
 2. Poll `GET /api/videos/{task_id}` until `status=awaiting_approval`; open `GET /api/videos/{task_id}/approval` and confirm `policy=always`, `status=pending`, reason `policy_always`, and a candidate plan.
 3. Restart FastAPI while the task is paused. Confirm it stays `awaiting_approval`, then call `POST /api/videos/{task_id}/approval/approve`; verify the task resumes and completes, and the event stream contains `awaiting_approval`, `approved`, and `resumed` without a second ASR/planning completion event.
 4. Create another `always` task and submit an invalid plan to `POST /api/videos/{task_id}/approval/edit`; expect HTTP 422 and a still-pending approval. Submit a valid grounded plan; expect HTTP 202 and completion from render.
@@ -356,12 +402,12 @@ P3 was explicitly accepted for commit. P4 has not been started.
 
 ## P2 verification
 
-- Baseline before implementation: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `108 passed in 74.01s`.
-- Final targeted P2/Agent/API/migration/provider tests: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_workflow_mode_api.py tests\test_local_llm_planner.py tests\test_task_database.py` → `24 passed in 8.34s`.
-- Final full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `114 passed in 75.97s`, including the standard and Agent Mock FFmpeg/Remotion end-to-end pipelines.
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` → `108 passed in 74.01s`.
+- Final targeted P2/Agent/API/migration/provider tests: `.\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py tests\test_agent_workflow.py tests\test_workflow_mode_api.py tests\test_local_llm_planner.py tests\test_task_database.py` → `24 passed in 8.34s`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` → `114 passed in 75.97s`, including the standard and Agent Mock FFmpeg/Remotion end-to-end pipelines.
 - Alembic reports the single head `0003_agent_director_instruction`.
 - Renderer build was not required: P2 changes no TypeScript, Remotion source, renderer contract, or `AnimationPlan` schema.
-- `git diff --check` is part of the final verification. The user-owned untracked file `how 提交哈希` remains untouched.
+- `git diff --check` is part of the final verification.
 
 ## P2 known limitations
 
@@ -371,11 +417,11 @@ P3 was explicitly accepted for commit. P4 has not been started.
 
 ## Recommended P2 manual acceptance
 
-1. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=standard`, Mock processing/media, plus an intentionally supplied `director_instruction`; verify the standard task completes and `director_instruction` is `null` in `GET /api/videos/{task_id}`.
+1. Run `.\.conda\python.exe -m alembic upgrade head`, start FastAPI, and upload a short MP4 with `workflow_mode=standard`, Mock processing/media, plus an intentionally supplied `director_instruction`; verify the standard task completes and `director_instruction` is `null` in `GET /api/videos/{task_id}`.
 2. Upload the same file with `workflow_mode=agent`, Mock processing/media, and a short `director_instruction`; verify the task completes, the instruction is returned only for this Agent task, and the existing result downloads/plays.
 3. Open `GET /api/videos/{task_id}/agent-trace`; verify `prompt_version`, `plan_schema_version`, planner identity, tool-call entries, and retry count are present, while the instruction text, transcript text, plan body, and absolute paths are absent.
 4. Submit an Agent upload with more than 2,000 instruction characters; verify HTTP 422 and that no task directory/row is created. Submit the same oversized field in standard mode; verify it is ignored and the stable standard flow still starts.
-5. Run `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py`; inspect the two scripted cases: invalid-first/valid-second completes with one retry, while persistent rule violations stop after exactly two repairs without rendering.
+5. Run `.\.conda\python.exe -m pytest -vv tests\test_agent_plan_repair.py`; inspect the two scripted cases: invalid-first/valid-second completes with one retry, while persistent rule violations stop after exactly two repairs without rendering.
 
 P2 was explicitly accepted for commit. At that acceptance point, P3 had not been started.
 
@@ -391,12 +437,12 @@ P2 was explicitly accepted for commit. At that acceptance point, P3 had not been
 
 ## P1 verification
 
-- Targeted Agent/API/persistence regression: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_agent_workflow.py tests\test_task_database.py tests\test_workflow_mode_api.py` → `14 passed in 6.21s`.
-- Real Agent Mock render: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv tests\test_end_to_end.py::test_agent_mock_video_processing_pipeline` → `1 passed in 28.57s`.
-- Full suite: `D:\Projects\semantic-video-animation-agent\.conda\python.exe -m pytest -vv` → `108 passed in 73.81s`.
+- Targeted Agent/API/persistence regression: `.\.conda\python.exe -m pytest -vv tests\test_agent_workflow.py tests\test_task_database.py tests\test_workflow_mode_api.py` → `14 passed in 6.21s`.
+- Real Agent Mock render: `.\.conda\python.exe -m pytest -vv tests\test_end_to_end.py::test_agent_mock_video_processing_pipeline` → `1 passed in 28.57s`.
+- Full suite: `.\.conda\python.exe -m pytest -vv` → `108 passed in 73.81s`.
 - Standard renderer command `cd animation-renderer; npm.cmd run build` failed at the pre-existing locked `animation-renderer/build` directory with `EPERM`; that directory was not removed or overwritten.
 - Equivalent isolated renderer validation `cd animation-renderer; npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260812_p1` succeeded.
-- `git diff --check` passed. The user-owned untracked file `how 提交哈希` remains untouched.
+- `git diff --check` passed.
 
 ## P1 known limitations
 
@@ -430,8 +476,8 @@ P1 was explicitly accepted and committed before P2 began.
 
 - Full Python suite: `95 passed in 53.06s`. Frontend coverage now checks split static assets, complete Chinese/English keys, data-driven routes and tools, mobile drawer rules, responsive preview sizing, stable video source assignment, refresh/history persistence, and accessible review tabs while retaining all existing API/E2E coverage.
 - In-app browser checks used 1440×900, 1024×768, and 390×844 viewports. The original 390 px page overflowed to 459 px; the redesigned Chinese and English screens had no over-wide controls or document overflow. Desktop used the fixed platform sidebar, 1024 px retained a two-column result layout, and mobile used a 306 px drawer plus naturally stacked forms, preview, summary, and review controls.
-- Browser navigation covered the creation home → semantic-video workspace path, task recovery for the real completed 94.36 s / 540×960 task `fc606fb1-59b5-47ee-a6ad-bc9dd5d95b91`, transcript/plan/material review tabs, and browser back/forward with the same result and preview source key.
-- A browser-uploaded 4.00 s / 360×640 local MP4 completed the actual Mock + local-original-media pipeline as task `01360a61-2d49-4f4e-b3a2-91b420ce15ab`. The browser showed live rendering at 76%, then loaded the completed preview, transcript, plan, and media review with a new completion-event source key.
+- Browser navigation covered the creation home → semantic-video workspace path, task recovery for a completed 94.36 s / 540×960 validation sample, transcript/plan/material review tabs, and browser back/forward with the same result and preview source key.
+- A browser-uploaded 4.00 s / 360×640 local MP4 completed the actual Mock + local-original-media pipeline. The browser showed live rendering at 76%, then loaded the completed preview, transcript, plan, and media review with a new completion-event source key.
 - Standard `npm.cmd run build` reached the known locked `animation-renderer/build` directory and failed with `EPERM`; that directory was not removed or cleaned. `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260807_platform_ui` completed successfully.
 
 ## Stage 10G known limitations
@@ -489,8 +535,8 @@ P1 was explicitly accepted and committed before P2 began.
 ## Stage 10D verification
 
 - Full Python suite: `79 passed in 47.43s`, including actual FFmpeg/Remotion initial processing and a review re-render with a disabled media visual plus stale derived metadata.
-- The original audit error was reproduced against task `482cabd9-9495-4edf-964d-4e2d038657d4` by disabling `animation_004` while retaining its audit metadata; the old entry raised `media asset audit metadata must exactly match media visual references` before rendering.
-- Real source `D:\桌面\常用\自媒体创新性.mp4` completed as validation task `fc606fb1-59b5-47ee-a6ad-bc9dd5d95b91` with local `faster_whisper + rule_based`, Mock media, two recorded corrections, nine animations, and verified 94.362 s 540×960 audio/video output.
+- The original audit error was reproduced during a review validation run by disabling `animation_004` while retaining its audit metadata; the old entry raised `media asset audit metadata must exactly match media visual references` before rendering.
+- A local 94.36-second portrait validation sample completed with `faster_whisper + rule_based`, Mock media, two recorded corrections, nine animations, and verified 540×960 audio/video output.
 - The same real task accepted a review request that disabled `animation_004` while submitting two stale assets and placements. The review re-render completed and rebuilt the final plan to one enabled media visual, one audit, and one placement.
 - Browser checks used 1440×900 and 390×844 viewports. Desktop preview max height resolved to 648 px; narrow preview max height resolved to 540.16 px, the review editor became one column, and document scroll width stayed equal to 390 px.
 - Standard `npm.cmd run build` still fails because Windows denies removal of the locked `animation-renderer/build` directory (`EPERM`). `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_20260804_final` completed successfully.
@@ -518,8 +564,8 @@ P1 was explicitly accepted and committed before P2 began.
 - Unit tests cover Wikimedia response provenance parsing, missing Pexels-key error, selected external-media task-local download/hash/data-URL preparation, dynamic subtitle emphasis, and media review API candidate persistence.
 - The rule planner now normalizes the unquoted ASR variant `心理学有生活`, creates numbered-method and comparison graphics, rejects incomplete comparison placeholders, and anchors visible effects to matching word/phrase timestamps rather than every segment start.
 - Automatic Wikimedia search or download failures fall back to a task-local original infographic. Explicit reviewer selections and Pexels configuration errors remain strict and visible.
-- A real no-key Wikimedia query/download succeeded for `supermarket product`; its source and SHA-256 were saved in the reference-validation task manifest. A locally cropped eight-second talking-head region from `D:\桌面\示例.mp4` rendered as a single output with correct Chinese dynamic captions, a large yellow key phrase, and full-screen supermarket B-roll overlaid by readable captions.
-- The 94.36-second user source `D:\桌面\常用\自媒体创新性.mp4` was processed with real local `faster_whisper` and reviewed/re-rendered as task `482cabd9-9495-4edf-964d-4e2d038657d4`. The final task has 12 word/phrase-timed visual nodes, three visible full-screen B-roll/semantic inserts, three numbered-method cards, three comparison cards, continuous dynamic subtitles, and verified 540x960 audio/video output. One adopted Wikimedia psychology-research image has its URL, provider, acquisition time, use interval, and SHA-256 in the task-local manifest; two rate-limited searches fell back to authored concept graphics.
+- A real no-key Wikimedia query/download succeeded for `supermarket product`; its source and SHA-256 were saved in the reference-validation task manifest. A locally cropped eight-second talking-head validation sample rendered as a single output with correct Chinese dynamic captions, a large yellow key phrase, and full-screen supermarket B-roll overlaid by readable captions.
+- A 94.36-second portrait validation sample was processed with real local `faster_whisper` and reviewed/re-rendered. The final task had 12 word/phrase-timed visual nodes, three visible full-screen B-roll/semantic inserts, three numbered-method cards, three comparison cards, continuous dynamic subtitles, and verified 540×960 audio/video output. One adopted Wikimedia psychology-research image had its URL, provider, acquisition time, use interval, and SHA-256 in the task-local manifest; two rate-limited searches fell back to authored concept graphics.
 - Standard `npm.cmd run build` still encounters Windows `EPERM` while Remotion tries to remove the existing locked `animation-renderer/build` directory. The same final renderer source successfully bundled with `npx.cmd remotion bundle src/index.ts --out-dir ..\storage\renderer_build_validation_v2`.
 
 ## Stage 10C known limitations

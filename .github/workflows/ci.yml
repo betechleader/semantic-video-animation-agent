@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install FFmpeg and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install -r requirements-dev.txt
+      - name: Syntax, lint, format, and focused type checks
+        run: |
+          python -m compileall -q backend/app alembic/versions evals tests
+          ruff check --select E9,F63,F7,F82 backend tests evals
+          ruff format --check backend/app/execution.py backend/app/worker.py tests/test_persistent_execution.py
+          mypy --ignore-missing-imports --follow-imports=skip --check-untyped-defs backend/app/execution.py backend/app/worker.py
+      - name: Database migration head
+        run: python -m alembic upgrade head
+      - name: Python tests
+        run: python -m pytest -vv
+      - name: Offline Agent eval smoke
+        run: python -m evals.agent.cli --output-dir storage/agent_evals/ci
+
+  renderer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: animation-renderer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: animation-renderer/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
