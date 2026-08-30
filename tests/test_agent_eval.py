@@ -3,11 +3,25 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from backend.app.agent_tools import PlanningToolInput
 from backend.app.agent_trace import AgentTrace, read_agent_trace
 from evals.agent import cli
 from evals.agent.cli import PACKAGE_DIR, main
 from evals.agent.harness import load_dataset, run_evaluation
-from evals.agent.reporting import evaluate_thresholds, load_thresholds, write_reports
+from evals.agent.multi_agent import (
+    critic_violations,
+    no_evidence_search,
+    run_critic,
+    run_planner,
+    run_researcher,
+)
+from evals.agent.reporting import (
+    evaluate_multi_agent_promotion,
+    evaluate_thresholds,
+    load_promotion_policy,
+    load_thresholds,
+    write_reports,
+)
 
 
 def test_offline_dataset_and_standard_agent_metrics_are_deterministic() -> None:
@@ -19,8 +33,16 @@ def test_offline_dataset_and_standard_agent_metrics_are_deterministic() -> None:
     second = run_evaluation(dataset)
     # Compare deterministic quality/count metrics explicitly; wall-clock latency is observational.
     for mode in ("standard", "agent"):
-        left = {key: value for key, value in first["modes"][mode].items() if key != "stage_latency_ms"}
-        right = {key: value for key, value in second["modes"][mode].items() if key != "stage_latency_ms"}
+        left = {
+            key: value
+            for key, value in first["modes"][mode].items()
+            if key not in {"stage_latency_ms", "run_latency_ms"}
+        }
+        right = {
+            key: value
+            for key, value in second["modes"][mode].items()
+            if key not in {"stage_latency_ms", "run_latency_ms"}
+        }
         assert left == right
 
     assert first["modes"]["standard"]["task_success_rate"] == 1.0
@@ -47,7 +69,7 @@ def test_reports_include_all_metrics_and_default_regression_passes(tmp_path: Pat
     json_path, markdown_path = write_reports(report, tmp_path)
 
     assert report["regression"]["passed"] is True
-    assert json.loads(json_path.read_text(encoding="utf-8"))["schema_version"] == "agent-eval-v2-rag"
+    assert json.loads(json_path.read_text(encoding="utf-8"))["schema_version"] == "agent-eval-v3-multi-agent"
     markdown = markdown_path.read_text(encoding="utf-8")
     for metric in (
         "animation_plan_schema_pass_rate",
@@ -64,6 +86,112 @@ def test_reports_include_all_metrics_and_default_regression_passes(tmp_path: Pat
     ):
         assert metric in markdown
     assert "P50" in markdown and "P95" in markdown
+
+
+def test_multi_agent_experiment_is_flagged_typed_and_not_promoted_without_gain() -> None:
+    dataset = load_dataset(PACKAGE_DIR / "data" / "chinese_cases.json")
+    report = run_evaluation(dataset, enable_multi_agent_experiment=True)
+    promotion = evaluate_multi_agent_promotion(
+        report,
+        load_promotion_policy(PACKAGE_DIR / "multi_agent_promotion.json"),
+    )
+    report["multi_agent_experiment"]["promotion"] = promotion
+
+    experiment = report["multi_agent_experiment"]
+    assert experiment["enabled"] is True
+    assert experiment["default_workflow_changed"] is False
+    assert experiment["roles"] == {
+        "researcher": "evidence_and_material_candidates_only",
+        "planner": "animation_plan_candidate_only",
+        "critic": "structured_issues_and_suggestions_only",
+    }
+    assert report["modes"]["multi_agent"]["task_success_rate"] == 1.0
+    assert report["modes"]["multi_agent"]["human_intervention_rate"] == 0.0
+    assert promotion["passed"] is False
+    assert promotion["decision"] == "keep_single_agent_default"
+    failed = [item for item in promotion["checks"] if not item["passed"]]
+    assert failed == [
+        {
+            "kind": "quality_delta",
+            "metric": "task_success_rate",
+            "actual": 0.083333,
+            "min": 0.1,
+            "max": None,
+            "passed": False,
+        }
+    ]
+
+    multi_runs = [item for item in report["runs"] if item["mode"] == "multi_agent"]
+    assert len(multi_runs) == 12
+    assert all(
+        call["tool_name"]
+        in {
+            "research_evidence_and_materials",
+            "multi_agent_planner",
+            "structured_plan_critic",
+        }
+        for run in multi_runs
+        for call in run["calls"]
+    )
+    assert "render" not in json.dumps(multi_runs)
+    encoded = json.dumps(report, ensure_ascii=False)
+    assert dataset.cases[0].segments[0].text not in encoded
+
+
+def test_cli_feature_flag_writes_multi_agent_decision(tmp_path: Path, monkeypatch) -> None:
+    output_dir = tmp_path / "multi-agent-report"
+    monkeypatch.setattr(cli, "STORAGE_OUTPUT_ROOT", tmp_path)
+
+    result = main(
+        [
+            "--enable-multi-agent-experiment",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(
+        (output_dir / "agent_eval_report.json").read_text(encoding="utf-8")
+    )
+    assert payload["multi_agent_experiment"]["promotion"]["decision"] == (
+        "keep_single_agent_default"
+    )
+    markdown = (output_dir / "agent_eval_report.md").read_text(encoding="utf-8")
+    assert "Feature-flagged multi-Agent experiment" in markdown
+    assert "structured issues/suggestions; no render" in markdown
+
+
+def test_multi_agent_roles_have_non_overlapping_typed_outputs() -> None:
+    case = load_dataset(PACKAGE_DIR / "data" / "chinese_cases.json").cases[-1]
+    transcript = case.transcript()
+    research = run_researcher(transcript, no_evidence_search)
+    assert set(research.model_dump()) == {
+        "evidence",
+        "material_candidates",
+        "retrieval_errors",
+    }
+
+    first_candidate = run_planner(
+        PlanningToolInput(transcript=transcript, repair_attempt=0),
+        scenario="persistent_overlap",
+        critic_issues=[],
+    )
+    critique = run_critic(transcript, first_candidate)
+    assert critique.valid is False
+    assert set(critique.model_dump()) == {"valid", "issues"}
+    assert all(issue.suggestion for issue in critique.issues)
+
+    repaired_candidate = run_planner(
+        PlanningToolInput(
+            transcript=transcript,
+            repair_attempt=1,
+            violations=critic_violations(critique.issues),
+        ),
+        scenario="persistent_overlap",
+        critic_issues=critique.issues,
+    )
+    assert run_critic(transcript, repaired_candidate).valid is True
 
 
 def test_cli_returns_nonzero_when_a_regression_gate_fails(tmp_path: Path, monkeypatch) -> None:

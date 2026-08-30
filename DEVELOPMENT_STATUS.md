@@ -1,8 +1,53 @@
 # Development Status
 
 - Current branch: `master`
-- Current commit before this work: `a2785ae 增加本地MCP工具服务`
-- Current stage: P10, production task execution and deployment - explicitly accepted and approved for commit.
+- Current commit before this work: `9ecce77 增加持久任务执行与部署能力`
+- Current stage: P11, evidence-based multi-Agent experiment - explicitly accepted and approved for commit.
+
+## P11 delivered
+
+- Added an offline-only Researcher/Planner/Critic experiment behind the explicit `--enable-multi-agent-experiment` CLI feature flag. The normal CLI and all production standard/Agent workflows remain single-Agent by default.
+- Added typed, non-overlapping role boundaries. Researcher returns only current evidence and privacy-safe material-candidate hashes; Planner returns only an AnimationPlan candidate through the existing typed planning tool; Critic returns only bounded structured issue codes, paths, and repair suggestions and has no render or authoritative-plan mutation capability.
+- Reused the same 12 self-authored Chinese P5/P7 cases, deterministic Mock planner, typed retrieval boundary, AnimationPlan schema, planning rules, and two-repair limit. No user `storage` content, network Provider, local model, external media download, or render is used by the experiment.
+- Added `average_tool_call_count` and per-run P50/P95 measured role/tool latency alongside the existing quality, retry, human-intervention, retrieval, citation, and stage-latency metrics. JSON and Markdown now compare single Agent and multi-Agent on the same data.
+- Added the predeclared `multi_agent_promotion.json` policy. Promotion requires at least `+0.10` task-success gain, no grounding/timing regression, at least `-0.05` human-intervention change, and no more than `1.5x` average tool calls.
+- The measured candidate improved task success from `0.916667` to `1.0`, reduced human intervention from `0.083333` to `0`, removed the synthetic overlap violation, and increased average calls from `3.083333` to `3.5`. Its task-success delta was only `+0.083333`, below the predeclared `+0.10` gate, so the report records `keep_single_agent_default`. No formal multi-Agent production mode was added.
+- No database, Alembic, FastAPI, frontend, AnimationPlan, TypeScript, Remotion, or dependency change was required.
+
+## P11 verification
+
+- Baseline before implementation: `.\.conda\python.exe -m pytest -vv` -> `175 passed in 130.47s`.
+- Focused P11 role/feature-flag/report tests: `.\.conda\python.exe -m pytest -q tests\test_agent_eval.py` -> `8 passed in 1.19s`.
+- Broader Eval/repair/RAG regression: `.\.conda\python.exe -m pytest -q tests\test_agent_eval.py tests\test_agent_plan_repair.py tests\test_rag_planning.py` -> `15 passed in 5.69s`.
+- Default single-Agent Eval regression: `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\p11_single_agent_regression` -> exit code `0`, `Agent eval PASS`.
+- Feature-flagged experiment: `.\.conda\python.exe -m evals.agent.cli --enable-multi-agent-experiment --output-dir storage\agent_evals\p11_final` -> exit code `0`, `Agent eval PASS`, promotion decision `keep_single_agent_default`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` -> `178 passed in 129.07s`, including the existing real standard Mock and Agent Mock FFmpeg/Remotion end-to-end paths.
+- `.\.conda\python.exe -m ruff check --select E9,F63,F7,F82 evals tests\test_agent_eval.py` and `.\.conda\python.exe -m compileall -q evals\agent tests\test_agent_eval.py` passed.
+- Renderer build was not required because P11 changes no TypeScript, Remotion source, AnimationPlan, or renderer contract.
+
+## P11 known limitations
+
+- The experiment is a deterministic offline orchestration comparison, not a live three-model system. It measures whether role separation can improve the scripted failure cases without claiming real LLM editorial quality.
+- The 12-case self-authored corpus is a regression smoke set, not a statistically representative benchmark. The observed sub-millisecond Mock latency is instrumentation evidence only and must not be interpreted as production capacity.
+- Researcher material candidates are privacy-safe opaque concept candidates for call/role evaluation; it does not query external media Providers. Existing P7 evidence fixtures still exercise retrieval and citation quality offline.
+- The candidate did not meet the predeclared promotion threshold. Production remains the existing single Agent; P11 is available only through the Eval CLI feature flag.
+
+## Recommended P11 manual acceptance
+
+1. Run `.\.conda\python.exe -m evals.agent.cli --output-dir storage\agent_evals\manual_p11_single`; expect exit code 0, `Agent eval PASS`, no `multi_agent` mode, and no change to the production workflow.
+2. Run `.\.conda\python.exe -m evals.agent.cli --enable-multi-agent-experiment --output-dir storage\agent_evals\manual_p11_multi`; expect exit code 0 plus `Multi-Agent promotion: keep_single_agent_default`.
+3. Open the generated JSON/Markdown and confirm the three role boundaries, 12 single-Agent plus 12 multi-Agent runs, quality/latency/call/human-intervention comparison, and exactly one failed promotion gate: task-success delta `0.083333 < 0.10`.
+4. Search the report for a known dataset transcript and the project absolute path; neither should appear. Confirm every multi-Agent call is Researcher, Planner, or Critic and no render call exists.
+5. Run one ordinary standard Mock and one Agent Mock task through the existing UI/API; expect both existing workflows, approval behavior, rendering, and downloads to remain unchanged because the experiment has no production entry point.
+
+## P11 user acceptance verification
+
+- The user explicitly accepted P11 and requested that the implementation be committed and pushed to GitHub.
+- Submission-gate full suite: `.\.conda\python.exe -m pytest -vv` -> `178 passed in 130.63s`, including the existing real standard Mock and Agent Mock FFmpeg/Remotion end-to-end paths.
+- Submission-gate experiment: `.\.conda\python.exe -m evals.agent.cli --enable-multi-agent-experiment --output-dir storage\agent_evals\p11_acceptance` -> exit code `0`, `Agent eval PASS`, promotion decision `keep_single_agent_default`.
+- The P11 roadmap state is now `COMPLETED`. The evidence-based experiment remains opt-in and production remains single-Agent by default.
+
+P11 was explicitly accepted and approved for commit.
 
 ## P10 delivered
 

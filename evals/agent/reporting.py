@@ -14,6 +14,17 @@ def load_thresholds(path: Path) -> dict[str, Any]:
     return payload
 
 
+def load_promotion_policy(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(
+        payload.get("quality_delta_gates"), dict
+    ):
+        raise ValueError("Promotion policy must contain quality_delta_gates")
+    if not isinstance(payload.get("resource_ratio_gates"), dict):
+        raise ValueError("Promotion policy must contain resource_ratio_gates")
+    return payload
+
+
 def evaluate_thresholds(report: dict[str, Any], thresholds: dict[str, Any]) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     for mode, rules in thresholds["modes"].items():
@@ -38,6 +49,62 @@ def evaluate_thresholds(report: dict[str, Any], thresholds: dict[str, Any]) -> d
     return {"passed": all(item["passed"] for item in checks), "checks": checks}
 
 
+def evaluate_multi_agent_promotion(
+    report: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply predeclared quality-gain and resource-cost gates to the experiment."""
+
+    experiment = report["multi_agent_experiment"]
+    if not experiment["enabled"]:
+        return {
+            "evaluated": False,
+            "passed": False,
+            "decision": "keep_single_agent_default",
+            "checks": [],
+        }
+    baseline = report["modes"]["agent"]
+    candidate = report["modes"]["multi_agent"]
+    checks: list[dict[str, Any]] = []
+    for metric, bounds in policy["quality_delta_gates"].items():
+        value = round(candidate[metric] - baseline[metric], 6)
+        passed = value >= bounds.get("min", value) and value <= bounds.get("max", value)
+        checks.append(
+            {
+                "kind": "quality_delta",
+                "metric": metric,
+                "actual": value,
+                "min": bounds.get("min"),
+                "max": bounds.get("max"),
+                "passed": passed,
+            }
+        )
+    for metric, bounds in policy["resource_ratio_gates"].items():
+        denominator = baseline[metric]
+        value = None if denominator == 0 else round(candidate[metric] / denominator, 6)
+        passed = value is not None
+        if passed and "max" in bounds:
+            passed = value <= bounds["max"]
+        checks.append(
+            {
+                "kind": "resource_ratio",
+                "metric": metric,
+                "actual": value,
+                "min": bounds.get("min"),
+                "max": bounds.get("max"),
+                "passed": passed,
+            }
+        )
+    passed = all(item["passed"] for item in checks)
+    return {
+        "evaluated": True,
+        "passed": passed,
+        "decision": (
+            "eligible_for_formal_mode" if passed else "keep_single_agent_default"
+        ),
+        "checks": checks,
+    }
+
+
 def render_markdown(report: dict[str, Any]) -> str:
     metric_names = (
         "animation_plan_schema_pass_rate",
@@ -45,6 +112,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "time_interval_valid_rate",
         "overlap_violation_rate",
         "tool_call_success_rate",
+        "average_tool_call_count",
         "auto_repair_success_rate",
         "average_retry_count",
         "human_intervention_rate",
@@ -67,10 +135,51 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{_display(values['delta_agent_minus_standard'])} |"
         )
     lines.extend(["", "## Stage latency (ms)", "", "| Mode | Stage | Samples | P50 | P95 |", "|---|---|---:|---:|---:|"])
-    for mode in ("standard", "agent"):
+    latency_modes = ["standard", "agent"]
+    if report["multi_agent_experiment"]["enabled"]:
+        latency_modes.append("multi_agent")
+    for mode in latency_modes:
         for stage, values in report["modes"][mode]["stage_latency_ms"].items():
             lines.append(
                 f"| {mode} | {stage} | {values['sample_count']} | {values['p50']} | {values['p95']} |"
+            )
+    experiment = report["multi_agent_experiment"]
+    if experiment["enabled"]:
+        lines.extend(
+            [
+                "",
+                "## Feature-flagged multi-Agent experiment",
+                "",
+                "Roles: Researcher (evidence/material candidates), Planner (plan candidate), "
+                "Critic (structured issues/suggestions; no render).",
+                "",
+                "| Metric | Single Agent | Multi Agent | Multi - Single |",
+                "|---|---:|---:|---:|",
+            ]
+        )
+        for name in metric_names:
+            values = experiment["comparison_to_single_agent"][name]
+            lines.append(
+                f"| `{name}` | {_display(values['agent'])} | "
+                f"{_display(values['multi_agent'])} | "
+                f"{_display(values['delta_multi_agent_minus_agent'])} |"
+            )
+        lines.extend(
+            [
+                "",
+                "### Promotion decision",
+                "",
+                f"Decision: **{experiment['promotion']['decision']}**",
+                "",
+                "| Gate | Metric | Actual | Min | Max | Result |",
+                "|---|---|---:|---:|---:|---|",
+            ]
+        )
+        for check in experiment["promotion"]["checks"]:
+            lines.append(
+                f"| {check['kind']} | `{check['metric']}` | {_display(check['actual'])} | "
+                f"{_display(check['min'])} | {_display(check['max'])} | "
+                f"{'PASS' if check['passed'] else 'FAIL'} |"
             )
     regression = report.get("regression", {"passed": True, "checks": []})
     lines.extend(

@@ -1,0 +1,12 @@
+{
+  "schema_version": "multi-agent-promotion-v1",
+  "quality_delta_gates": {
+    "task_success_rate": {"min": 0.10},
+    "transcript_grounding_precision": {"min": 0.0},
+    "time_interval_valid_rate": {"min": 0.0},
+    "human_intervention_rate": {"max": -0.05}
+  },
+  "resource_ratio_gates": {
+    "average_tool_call_count": {"max": 1.50}
+  }
+}

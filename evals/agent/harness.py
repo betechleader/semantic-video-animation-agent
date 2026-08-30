@@ -33,8 +33,15 @@ from backend.app.rag_tools import (
     build_evidence_queries,
     invoke_retrieve_evidence_tool,
 )
+from .multi_agent import (
+    critic_violations,
+    no_evidence_search,
+    run_critic,
+    run_planner,
+    run_researcher,
+)
 
-EVAL_SCHEMA_VERSION = "agent-eval-v2-rag"
+EVAL_SCHEMA_VERSION = "agent-eval-v3-multi-agent"
 DATASET_SCHEMA_VERSION = "agent-eval-dataset-v2-rag"
 
 
@@ -101,7 +108,7 @@ class EvalDataset(BaseModel):
 @dataclass
 class RunObservation:
     case_id: str
-    mode: Literal["standard", "agent"]
+    mode: Literal["standard", "agent", "multi_agent"]
     status: Literal["completed", "awaiting_human", "failed"] = "failed"
     schema_valid: bool = False
     grounded_items: int = 0
@@ -374,6 +381,112 @@ def _run_agent(case: EvalCase) -> RunObservation:
     return observation
 
 
+def _run_multi_agent(case: EvalCase) -> RunObservation:
+    """Run the feature-flagged Researcher → Planner → Critic experiment."""
+
+    observation = RunObservation(case_id=case.id, mode="multi_agent")
+    transcript = case.transcript()
+    expected_chunk_id: str | None = None
+    search = no_evidence_search
+    if case.evidence_text:
+        expected_chunk_id = (
+            f"chunk_{hashlib.sha256((case.id + ':expected').encode()).hexdigest()[:32]}"
+        )
+        distractor_chunk_id = (
+            f"chunk_{hashlib.sha256((case.id + ':distractor').encode()).hexdigest()[:32]}"
+        )
+
+        def search(_query: str, **kwargs) -> dict[str, Any]:
+            return {
+                "results": [
+                    {
+                        "chunk_id": expected_chunk_id,
+                        "document_id": f"doc_{hashlib.sha256(case.id.encode()).hexdigest()[:24]}",
+                        "source": f"self-authored-{case.id}.md",
+                        "content": case.evidence_text,
+                        "content_sha256": hashlib.sha256(case.evidence_text.encode()).hexdigest(),
+                        "score": 0.95,
+                        "retrieval_method": kwargs["method"],
+                        "index_version": "knowledge-index-v1",
+                    },
+                    {
+                        "chunk_id": distractor_chunk_id,
+                        "document_id": f"doc_{hashlib.sha256((case.id + ':d').encode()).hexdigest()[:24]}",
+                        "source": "self-authored-distractor.md",
+                        "content": "无关的天气与旅行记录。",
+                        "content_sha256": hashlib.sha256(
+                            "无关的天气与旅行记录。".encode()
+                        ).hexdigest(),
+                        "score": 0.1,
+                        "retrieval_method": kwargs["method"],
+                        "index_version": "knowledge-index-v1",
+                    },
+                ]
+            }
+
+    started_at = time.perf_counter()
+    research = run_researcher(transcript, search)
+    research_ms = _duration_ms(started_at)
+    observation.latencies_ms["retrieval"].append(research_ms)
+    observation.record_call("research", "research_evidence_and_materials", "completed", research_ms)
+    if expected_chunk_id is not None:
+        retrieved_ids = {item.chunk_id for item in research.evidence}
+        observation.retrieval_expected = 1
+        observation.retrieval_hits = int(expected_chunk_id in retrieved_ids)
+        observation.citation_items = 1
+        observation.correct_citations = int(
+            bool(research.evidence) and research.evidence[0].chunk_id == expected_chunk_id
+        )
+
+    candidate: dict[str, Any] | None = None
+    issues: list[Any] = []
+    for repair_attempt in range(MAX_PLAN_REPAIR_ATTEMPTS + 1):
+        observation.retry_count = repair_attempt
+        started_at = time.perf_counter()
+        candidate = run_planner(
+            PlanningToolInput(
+                transcript=transcript,
+                repair_attempt=repair_attempt,
+                violations=critic_violations(issues),
+                evidence=research.evidence,
+            ),
+            scenario=case.agent_scenario,
+            critic_issues=issues,
+        )
+        planning_ms = _duration_ms(started_at)
+        observation.latencies_ms["planning"].append(planning_ms)
+        observation.record_call(
+            "planning",
+            "multi_agent_planner",
+            "completed" if candidate is not None else "failed",
+            planning_ms,
+        )
+
+        started_at = time.perf_counter()
+        critique = run_critic(transcript, candidate)
+        critic_ms = _duration_ms(started_at)
+        observation.latencies_ms["validation"].append(critic_ms)
+        observation.record_call(
+            "critique",
+            "structured_plan_critic",
+            "completed",
+            critic_ms,
+        )
+        if critique.valid:
+            observation.status = "completed"
+            observation.repair_succeeded = repair_attempt > 0
+            break
+        observation.repair_required = True
+        issues = critique.issues
+    else:
+        observation.status = "awaiting_human"
+        observation.human_intervention = True
+        observation.failure_category = "critic_repair_exhausted"
+
+    _observe_plan(observation, candidate, transcript)
+    return observation
+
+
 def _ratio(numerator: int, denominator: int) -> float | None:
     return None if denominator == 0 else round(numerator / denominator, 6)
 
@@ -413,6 +526,9 @@ def _aggregate(observations: list[RunObservation]) -> dict[str, Any]:
             sum(item.successful_tool_calls for item in observations),
             sum(item.tool_calls for item in observations),
         ),
+        "average_tool_call_count": round(
+            sum(item.tool_calls for item in observations) / len(observations), 6
+        ),
         "auto_repair_success_rate": _ratio(
             sum(item.repair_succeeded for item in observations), repair_required
         ),
@@ -441,16 +557,33 @@ def _aggregate(observations: list[RunObservation]) -> dict[str, Any]:
             }
             for stage, values in latencies.items()
         },
+        "run_latency_ms": {
+            "p50": _percentile(
+                [sum(call["duration_ms"] for call in item.calls) for item in observations],
+                0.50,
+            ),
+            "p95": _percentile(
+                [sum(call["duration_ms"] for call in item.calls) for item in observations],
+                0.95,
+            ),
+        },
     }
 
 
-def _comparison(standard: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
+def _comparison(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    baseline_name: str = "standard",
+    candidate_name: str = "agent",
+) -> dict[str, Any]:
     metrics = (
         "animation_plan_schema_pass_rate",
         "transcript_grounding_precision",
         "time_interval_valid_rate",
         "overlap_violation_rate",
         "tool_call_success_rate",
+        "average_tool_call_count",
         "auto_repair_success_rate",
         "average_retry_count",
         "human_intervention_rate",
@@ -460,15 +593,15 @@ def _comparison(standard: dict[str, Any], agent: dict[str, Any]) -> dict[str, An
     )
     comparison: dict[str, Any] = {}
     for name in metrics:
-        standard_value = standard.get(name)
-        agent_value = agent.get(name)
+        baseline_value = baseline.get(name)
+        candidate_value = candidate.get(name)
         comparison[name] = {
-            "standard": standard_value,
-            "agent": agent_value,
-            "delta_agent_minus_standard": (
+            baseline_name: baseline_value,
+            candidate_name: candidate_value,
+            f"delta_{candidate_name}_minus_{baseline_name}": (
                 None
-                if standard_value is None or agent_value is None
-                else round(agent_value - standard_value, 6)
+                if baseline_value is None or candidate_value is None
+                else round(candidate_value - baseline_value, 6)
             ),
         }
     return comparison
@@ -487,11 +620,51 @@ def _public_run(item: RunObservation) -> dict[str, Any]:
     }
 
 
-def run_evaluation(dataset: EvalDataset) -> dict[str, Any]:
+def run_evaluation(
+    dataset: EvalDataset,
+    *,
+    enable_multi_agent_experiment: bool = False,
+) -> dict[str, Any]:
     standard_runs = [_run_standard(case) for case in dataset.cases]
     agent_runs = [_run_agent(case) for case in dataset.cases]
     standard_metrics = _aggregate(standard_runs)
     agent_metrics = _aggregate(agent_runs)
+    modes = {
+        "standard": standard_metrics,
+        "agent": agent_metrics,
+    }
+    runs = [*map(_public_run, standard_runs), *map(_public_run, agent_runs)]
+    experiment: dict[str, Any] = {
+        "enabled": enable_multi_agent_experiment,
+        "feature_flag": "--enable-multi-agent-experiment",
+        "default_workflow_changed": False,
+        "promotion": {
+            "evaluated": False,
+            "passed": False,
+            "decision": "keep_single_agent_default",
+            "checks": [],
+        },
+    }
+    if enable_multi_agent_experiment:
+        multi_agent_runs = [_run_multi_agent(case) for case in dataset.cases]
+        multi_agent_metrics = _aggregate(multi_agent_runs)
+        modes["multi_agent"] = multi_agent_metrics
+        runs.extend(map(_public_run, multi_agent_runs))
+        experiment.update(
+            {
+                "roles": {
+                    "researcher": "evidence_and_material_candidates_only",
+                    "planner": "animation_plan_candidate_only",
+                    "critic": "structured_issues_and_suggestions_only",
+                },
+                "comparison_to_single_agent": _comparison(
+                    agent_metrics,
+                    multi_agent_metrics,
+                    baseline_name="agent",
+                    candidate_name="multi_agent",
+                ),
+            }
+        )
     return {
         "schema_version": EVAL_SCHEMA_VERSION,
         "dataset": {
@@ -500,12 +673,10 @@ def run_evaluation(dataset: EvalDataset) -> dict[str, Any]:
             "case_count": len(dataset.cases),
             "content_policy": "self_authored_chinese_transcripts_and_knowledge_only",
         },
-        "modes": {
-            "standard": standard_metrics,
-            "agent": agent_metrics,
-        },
+        "modes": modes,
         "comparison": _comparison(standard_metrics, agent_metrics),
-        "runs": [*map(_public_run, standard_runs), *map(_public_run, agent_runs)],
+        "multi_agent_experiment": experiment,
+        "runs": runs,
         "privacy": {
             "contains_user_storage_content": False,
             "contains_transcript_text": False,
