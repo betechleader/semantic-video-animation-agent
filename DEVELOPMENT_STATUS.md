@@ -1,8 +1,19 @@
 # Development Status
 
-- Current branch: `master`
-- Current commit before this work: `9ecce77 增加持久任务执行与部署能力`
+- Current branch: `main`
+- Current commit before this work: `ad7d2e7 增加有评测依据的多Agent实验`
 - Current stage: P11, evidence-based multi-Agent experiment - explicitly accepted and approved for commit.
+
+## Post-P11 GitHub Actions renderer portability fix
+
+- Diagnosed failed GitHub Actions run `33291046803`: the Python job passed installation, static checks, and migrations, then both real render E2E tests failed because the Ubuntu runner could not execute the Windows-only `npx.cmd` launcher.
+- Made the Remotion command platform-aware: Windows uses `npx.cmd`, while POSIX runners use `npx`. The command remains an argument array and does not use `shell=True`.
+- Added Node.js 22 setup plus `npm ci --prefix animation-renderer` to the Python CI job. Renderer dependencies are now installed in the same isolated job that runs the Python E2E suite rather than incorrectly relying on the separate renderer job's filesystem.
+- Added regression tests for both launcher names and for the Python CI dependency-install contract.
+- Focused Remotion/E2E suite: `.\.conda\python.exe -m pytest -q tests\test_remotion_props.py tests\test_end_to_end.py` -> `5 passed in 92.79s`.
+- Final full suite: `.\.conda\python.exe -m pytest -vv` -> `180 passed in 130.01s`, including both real standard Mock and Agent Mock FFmpeg/Remotion paths.
+- Ruff correctness selection and Python compileall passed. Standard Windows renderer build still encountered the documented locked `animation-renderer/build` directory (`EPERM`); no directory was removed or overwritten. Equivalent isolated bundle to `storage/renderer_build_validation_20260830_ci_fix` succeeded.
+- This portability fix is not yet staged, committed, or pushed.
 
 ## P11 delivered
 

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from collections.abc import Callable
@@ -79,9 +80,15 @@ def write_remotion_props(destination: Path, props: dict) -> Path:
     return destination
 
 
-def remotion_render_command(overlay: Path, props_file: Path) -> list[str]:
+def remotion_render_command(
+    overlay: Path,
+    props_file: Path,
+    *,
+    platform_name: str | None = None,
+) -> list[str]:
+    npx_executable = "npx.cmd" if (platform_name or os.name) == "nt" else "npx"
     return [
-        "npx.cmd", "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
+        npx_executable, "remotion", "render", "src/index.ts", "AnimationOverlay", str(overlay),
         "--codec=prores", "--prores-profile=4444", "--image-format=png", "--pixel-format=yuva444p10le",
         f"--props={props_file}",
     ]

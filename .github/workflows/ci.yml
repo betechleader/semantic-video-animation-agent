@@ -13,11 +13,17 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install FFmpeg and Python dependencies
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: animation-renderer/package-lock.json
+      - name: Install FFmpeg and project dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           python -m pip install -r requirements-dev.txt
+          npm ci --prefix animation-renderer
       - name: Syntax, lint, format, and focused type checks
         run: |
           python -m compileall -q backend/app alembic/versions evals tests
